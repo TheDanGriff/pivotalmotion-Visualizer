@@ -24,7 +24,8 @@ from data_processing import (
     plot_curvature_analysis,
     get_segment_label,
     get_player_kpi_averages,
-    get_shot_type
+    get_shot_type,
+    plot_shot_location
 )
 from visualization import (
     plot_single_shot,
@@ -320,6 +321,8 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
                                player_average=player_averages['Lateral Deviation'] if player_averages is not None else None,
                                min_value=kpis['Lateral Deviation']['min'],
                                max_value=kpis['Lateral Deviation']['max'])
+        
+        plot_shot_location(df_ball, metrics)
 
     fig = plot_curvature_analysis(df_ball, metrics, weighting_exponent=3, num_interp=300, curvature_scale=2.3)
     st.plotly_chart(fig, use_container_width=True)

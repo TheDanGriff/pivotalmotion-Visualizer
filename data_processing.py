@@ -1644,3 +1644,128 @@ def create_alignment_diagram(df, basket_position=(41.75, 0)):
 
     return fig
 
+
+def plot_shot_location(ball_df, metrics):
+    """
+    Create a 2D visualization of the shot location on a half basketball court.
+    
+    Parameters:
+    - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y' in inches.
+    - metrics: Dictionary from calculate_shot_metrics with 'release_idx', 'hoop_x', 'hoop_y'.
+    
+    Returns:
+    - fig: Plotly figure object.
+    """
+    import plotly.graph_objects as go
+    import numpy as np
+
+    INCHES_TO_FEET = 1 / 12
+
+    # Get shot location at release (convert to feet)
+    release_idx = metrics['release_idx']
+    shot_x = ball_df.loc[release_idx, 'Basketball_X'] * INCHES_TO_FEET
+    shot_y = ball_df.loc[release_idx, 'Basketball_Y'] * INCHES_TO_FEET
+
+    # Court dimensions (in feet)
+    court_length = 47  # Half-court length
+    court_width = 50   # Full court width
+    hoop_x = 25        # Hoop at 25 ft from baseline (assuming baseline at x=0)
+    hoop_y = 0         # Center of court
+    free_throw_distance = 19  # Free throw line from baseline
+    three_point_radius = 23.75  # NBA 3-point line radius from hoop
+
+    # Create figure
+    fig = go.Figure()
+
+    # Court boundary (rectangle)
+    fig.add_trace(
+        go.Scatter(
+            x=[0, court_length, court_length, 0, 0],
+            y=[-court_width/2, -court_width/2, court_width/2, court_width/2, -court_width/2],
+            mode='lines',
+            line=dict(color='black', width=2),
+            name='Court Boundary'
+        )
+    )
+
+    # Hoop (small circle)
+    fig.add_trace(
+        go.Scatter(
+            x=[hoop_x],
+            y=[hoop_y],
+            mode='markers',
+            marker=dict(size=10, color='red', symbol='circle'),
+            name='Hoop'
+        )
+    )
+
+    # Free throw line
+    fig.add_trace(
+        go.Scatter(
+            x=[free_throw_distance, free_throw_distance],
+            y=[-court_width/2, court_width/2],
+            mode='lines',
+            line=dict(color='black', width=2, dash='dash'),
+            name='Free Throw Line'
+        )
+    )
+
+    # 3-point arc (simplified as a semicircle centered at hoop)
+    theta = np.linspace(-np.pi/2, np.pi/2, 100)  # Half circle from -90° to 90°
+    three_x = hoop_x + three_point_radius * np.cos(theta)
+    three_y = hoop_y + three_point_radius * np.sin(theta)
+    fig.add_trace(
+        go.Scatter(
+            x=three_x,
+            y=three_y,
+            mode='lines',
+            line=dict(color='black', width=2),
+            name='3-Point Line'
+        )
+    )
+
+    # Extend 3-point line to sidelines (straight segments)
+    fig.add_trace(
+        go.Scatter(
+            x=[0, hoop_x - three_point_radius],
+            y=[-three_point_radius, -three_point_radius],
+            mode='lines',
+            line=dict(color='black', width=2),
+            showlegend=False
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[0, hoop_x - three_point_radius],
+            y=[three_point_radius, three_point_radius],
+            mode='lines',
+            line=dict(color='black', width=2),
+            showlegend=False
+        )
+    )
+
+    # Shot location (X marker)
+    fig.add_trace(
+        go.Scatter(
+            x=[shot_x],
+            y=[shot_y],
+            mode='markers',
+            marker=dict(size=15, color='blue', symbol='x'),
+            name='Shot Location'
+        )
+    )
+
+    # Update layout
+    fig.update_layout(
+        title="Shot Location on Half Court",
+        xaxis_title="Distance from Baseline (ft)",
+        yaxis_title="Lateral Position (ft)",
+        xaxis=dict(range=[0, court_length], showgrid=False),
+        yaxis=dict(range=[-court_width/2, court_width/2], showgrid=False),
+        width=500,
+        height=500,
+        showlegend=True,
+        template="plotly_white"
+    )
+
+    return fig
