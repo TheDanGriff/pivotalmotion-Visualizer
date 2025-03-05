@@ -1672,7 +1672,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
                 marker_name = f'Shot Location (Unknown Outcome)'
                 logger.warning(f"OUTCOME is NaN at lift_idx {lift_idx}. Using grey 'X'.")
             elif outcome == 'Y':
-                marker_symbol = 'circle'
+                marker_symbol = 'circle-open'  # Unfilled ring for make
                 marker_color = 'green'
                 marker_name = f'Shot Location (Make)'
             elif outcome == 'N':
@@ -1699,7 +1699,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
                 marker_name = f'Shot Location (Unknown Outcome)'
                 logger.warning(f"IS_MADE is NaN at lift_idx {lift_idx}. Using grey 'X'.")
             elif is_made in [True, 'TRUE', 1]:
-                marker_symbol = 'circle'
+                marker_symbol = 'circle-open'  # Unfilled ring for make
                 marker_color = 'green'
                 marker_name = f'Shot Location (Make)'
             elif is_made in [False, 'FALSE', 0]:
@@ -1746,13 +1746,13 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         )
     )
 
-    # Hoop (small circle)
+    # Hoop (small circle, light orange)
     fig.add_trace(
         go.Scatter(
             x=[hoop_x],
             y=[hoop_y],
             mode='markers',
-            marker=dict(size=10, color='red', symbol='circle'),
+            marker=dict(size=10, color='#FFA07A', symbol='circle'),  # Light orange
             name='Hoop'
         )
     )
