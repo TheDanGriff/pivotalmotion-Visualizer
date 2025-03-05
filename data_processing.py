@@ -1650,7 +1650,7 @@ def plot_shot_location(ball_df, metrics):
     Create a 2D visualization of the shot location on a half basketball court.
     
     Parameters:
-    - ball_df: DataFrame with 'BALL_X', 'BALL_Y', 'OUTCOME' in inches.
+    - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', 'OUTCOME' in inches.
     - metrics: Dictionary with 'release_idx', 'hoop_x', 'hoop_y'.
     
     Returns:
@@ -1663,9 +1663,9 @@ def plot_shot_location(ball_df, metrics):
 
     # Get shot location at release (in inches)
     release_idx = metrics['release_idx']
-    shot_x = ball_df.loc[release_idx, 'BALL_X']  # Already in inches
-    shot_y = ball_df.loc[release_idx, 'BALL_Y']
-    outcome = ball_df.loc[release_idx, 'OUTCOME']  # 'Y' for make, 'N' for miss
+    shot_x = ball_df.loc[release_idx, 'Basketball_X']  # Corrected column name
+    shot_y = ball_df.loc[release_idx, 'Basketball_Y']  # Corrected column name
+    outcome = ball_df.loc[release_idx, 'OUTCOME']      # Already correct
 
     # Determine marker based on shot outcome
     marker_symbol = 'circle' if outcome == 'Y' else 'x'
