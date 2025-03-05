@@ -1669,25 +1669,25 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             if pd.isna(outcome):
                 marker_symbol = 'x'
                 marker_color = 'grey'
-                marker_name = f'Shot Location (Unknown Outcome){source_note}'
+                marker_name = f'Shot Location (Unknown Outcome)'
                 logger.warning(f"OUTCOME is NaN at lift_idx {lift_idx}. Using grey 'X'.")
             elif outcome == 'Y':
                 marker_symbol = 'circle'
                 marker_color = 'green'
-                marker_name = f'Shot Location (Make){source_note}'
+                marker_name = f'Shot Location (Make)'
             elif outcome == 'N':
                 marker_symbol = 'x'
                 marker_color = 'red'
-                marker_name = f'Shot Location (Miss){source_note}'
+                marker_name = f'Shot Location (Miss)'
             else:
                 marker_symbol = 'x'
                 marker_color = 'grey'
-                marker_name = f'Shot Location (Unexpected Outcome: {outcome}){source_note}'
+                marker_name = f'Shot Location (Unexpected Outcome: {outcome})'
                 logger.warning(f"Unexpected OUTCOME value '{outcome}' at lift_idx {lift_idx}. Using grey 'X'.")
         except KeyError:
             marker_symbol = 'x'
             marker_color = 'grey'
-            marker_name = f'Shot Location (Index Error){source_note}'
+            marker_name = f'Shot Location (Index Error)'
             logger.error(f"lift_idx {lift_idx} not in ball_df index for OUTCOME. Using grey 'X'.")
     elif 'IS_MADE' in ball_df.columns:
         try:
@@ -1696,30 +1696,30 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             if pd.isna(is_made):
                 marker_symbol = 'x'
                 marker_color = 'grey'
-                marker_name = f'Shot Location (Unknown Outcome){source_note}'
+                marker_name = f'Shot Location (Unknown Outcome)'
                 logger.warning(f"IS_MADE is NaN at lift_idx {lift_idx}. Using grey 'X'.")
             elif is_made in [True, 'TRUE', 1]:
                 marker_symbol = 'circle'
                 marker_color = 'green'
-                marker_name = f'Shot Location (Make){source_note}'
+                marker_name = f'Shot Location (Make)'
             elif is_made in [False, 'FALSE', 0]:
                 marker_symbol = 'x'
                 marker_color = 'red'
-                marker_name = f'Shot Location (Miss){source_note}'
+                marker_name = f'Shot Location (Miss)'
             else:
                 marker_symbol = 'x'
                 marker_color = 'grey'
-                marker_name = f'Shot Location (Unexpected IS_MADE: {is_made}){source_note}'
+                marker_name = f'Shot Location (Unexpected IS_MADE: {is_made})'
                 logger.warning(f"Unexpected IS_MADE value '{is_made}' at lift_idx {lift_idx}. Using grey 'X'.")
         except KeyError:
             marker_symbol = 'x'
             marker_color = 'grey'
-            marker_name = f'Shot Location (Index Error){source_note}'
+            marker_name = f'Shot Location (Index Error)'
             logger.error(f"lift_idx {lift_idx} not in ball_df index for IS_MADE. Using grey 'X'.")
     else:
         marker_symbol = 'x'
         marker_color = 'grey'
-        marker_name = f'Shot Location (No Outcome Data){source_note}'
+        marker_name = f'Shot Location (No Outcome Data)'
         logger.warning(f"Neither OUTCOME nor IS_MADE available at lift_idx {lift_idx}. Using grey 'X'.")
 
     # Court dimensions in inches (centered at (0, 0) for base layout, flipped if needed)
