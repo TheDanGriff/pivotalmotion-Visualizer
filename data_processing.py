@@ -1647,16 +1647,14 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         source_note = " (Ball at Lift)"
         logger.warning(f"Using ball position at lift_idx {lift_idx} as pose data is unavailable.")
 
-    # Determine court side and flip if necessary
+    # Determine court side (flip court layout if shot_x is negative, keep shot coordinates unchanged)
     flip_court = shot_x < 0
     if flip_court:
-        shot_x = -shot_x
-        shot_y = -shot_y
         hoop_x = -501  # Flip hoop to left side
-        logger.debug(f"Flipping court: shot_x was negative, now hoop_x = {hoop_x}")
+        logger.debug(f"Flipping court layout: shot_x = {shot_x} is negative, hoop_x = {hoop_x}")
     else:
         hoop_x = 501  # Default right side
-        logger.debug(f"Court not flipped: shot_x positive, hoop_x = {hoop_x}")
+        logger.debug(f"Court not flipped: shot_x = {shot_x} is positive, hoop_x = {hoop_x}")
 
     # Debug OUTCOME and IS_MADE presence
     logger.debug(f"ball_df columns: {ball_df.columns.tolist()}")
@@ -1669,7 +1667,10 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             outcome = ball_df.loc[lift_idx, 'OUTCOME']
             logger.debug(f"OUTCOME at lift_idx {lift_idx}: {outcome}")
             if pd.isna(outcome):
-                logger.warning(f"OUTCOME is NaN at lift_idx {lift_idx}.")
+                marker_symbol = 'x'
+                marker_color = 'grey'
+                marker_name = f'Shot Location (Unknown Outcome){source_note}'
+                logger.warning(f"OUTCOME is NaN at lift_idx {lift_idx}. Using grey 'X'.")
             elif outcome == 'Y':
                 marker_symbol = 'circle'
                 marker_color = 'green'
@@ -1679,15 +1680,24 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
                 marker_color = 'red'
                 marker_name = f'Shot Location (Miss){source_note}'
             else:
-                logger.warning(f"Unexpected OUTCOME value '{outcome}' at lift_idx {lift_idx}.")
+                marker_symbol = 'x'
+                marker_color = 'grey'
+                marker_name = f'Shot Location (Unexpected Outcome: {outcome}){source_note}'
+                logger.warning(f"Unexpected OUTCOME value '{outcome}' at lift_idx {lift_idx}. Using grey 'X'.")
         except KeyError:
-            logger.error(f"lift_idx {lift_idx} not in ball_df index for OUTCOME.")
+            marker_symbol = 'x'
+            marker_color = 'grey'
+            marker_name = f'Shot Location (Index Error){source_note}'
+            logger.error(f"lift_idx {lift_idx} not in ball_df index for OUTCOME. Using grey 'X'.")
     elif 'IS_MADE' in ball_df.columns:
         try:
             is_made = ball_df.loc[lift_idx, 'IS_MADE']
             logger.debug(f"IS_MADE at lift_idx {lift_idx}: {is_made}")
             if pd.isna(is_made):
-                logger.warning(f"IS_MADE is NaN at lift_idx {lift_idx}.")
+                marker_symbol = 'x'
+                marker_color = 'grey'
+                marker_name = f'Shot Location (Unknown Outcome){source_note}'
+                logger.warning(f"IS_MADE is NaN at lift_idx {lift_idx}. Using grey 'X'.")
             elif is_made in [True, 'TRUE', 1]:
                 marker_symbol = 'circle'
                 marker_color = 'green'
@@ -1697,16 +1707,20 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
                 marker_color = 'red'
                 marker_name = f'Shot Location (Miss){source_note}'
             else:
-                logger.warning(f"Unexpected IS_MADE value '{is_made}' at lift_idx {lift_idx}.")
+                marker_symbol = 'x'
+                marker_color = 'grey'
+                marker_name = f'Shot Location (Unexpected IS_MADE: {is_made}){source_note}'
+                logger.warning(f"Unexpected IS_MADE value '{is_made}' at lift_idx {lift_idx}. Using grey 'X'.")
         except KeyError:
-            logger.error(f"lift_idx {lift_idx} not in ball_df index for IS_MADE.")
-    
-    # Fallback if neither OUTCOME nor IS_MADE is usable
-    if 'marker_symbol' not in locals():
+            marker_symbol = 'x'
+            marker_color = 'grey'
+            marker_name = f'Shot Location (Index Error){source_note}'
+            logger.error(f"lift_idx {lift_idx} not in ball_df index for IS_MADE. Using grey 'X'.")
+    else:
         marker_symbol = 'x'
         marker_color = 'grey'
         marker_name = f'Shot Location (No Outcome Data){source_note}'
-        logger.warning(f"Neither OUTCOME nor IS_MADE available or valid at lift_idx {lift_idx}. Using grey 'X'.")
+        logger.warning(f"Neither OUTCOME nor IS_MADE available at lift_idx {lift_idx}. Using grey 'X'.")
 
     # Court dimensions in inches (centered at (0, 0) for base layout, flipped if needed)
     court_length = 564  # Half-court length from center to right edge
@@ -1766,7 +1780,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
     three_x = three_x_full[mask]
     three_y = three_y_full[mask]
     
-    # Ensure arc connects to (396, ±264) by forcing endpoints
+    # Ensure arc connects to (396, ±264) or (-396, ±264) by forcing endpoints
     if not flip_court:
         three_x = np.append(three_x, 396)
         three_y = np.append(three_y, 264)
@@ -1810,7 +1824,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         )
     )
 
-    # Shot location marker
+    # Shot location marker (use original coordinates without flipping sign)
     fig.add_trace(
         go.Scatter(
             x=[shot_x],
