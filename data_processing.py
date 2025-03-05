@@ -1660,6 +1660,10 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
     logger.debug(f"ball_df columns: {ball_df.columns.tolist()}")
     logger.debug(f"ball_df index: {ball_df.index.tolist()}")
     logger.debug(f"lift_idx: {lift_idx}")
+    if 'OUTCOME' in ball_df.columns:
+        logger.debug(f"OUTCOME values sample: {ball_df['OUTCOME'].head().tolist()}")
+    if 'IS_MADE' in ball_df.columns:
+        logger.debug(f"IS_MADE values sample: {ball_df['IS_MADE'].head().tolist()}")
 
     # Determine marker based on shot outcome
     if 'OUTCOME' in ball_df.columns:
@@ -1722,6 +1726,9 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         marker_name = f'Shot Location (No Outcome Data)'
         logger.warning(f"Neither OUTCOME nor IS_MADE available at lift_idx {lift_idx}. Using grey 'X'.")
 
+    # Log final marker settings
+    logger.debug(f"Marker settings - symbol: {marker_symbol}, color: {marker_color}, name: {marker_name}")
+
     # Court dimensions in inches (centered at (0, 0) for base layout, flipped if needed)
     court_length = 564  # Half-court length from center to right edge
     court_width = 600   # Full width (-300 to 300)
@@ -1752,7 +1759,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             x=[hoop_x],
             y=[hoop_y],
             mode='markers',
-            marker=dict(size=10, color='#FFA07A', symbol='circle'),  # Light orange
+            marker=dict(size=10, color='#FFA07A', symbol='circle'),  # Light orange hoop
             name='Hoop'
         )
     )
