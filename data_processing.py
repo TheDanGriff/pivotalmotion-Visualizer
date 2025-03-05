@@ -1912,7 +1912,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     Parameters:
     - pose_df: DataFrame with pose data (e.g., 'RSHOULDER_X', 'RELBOW_X', etc.) in inches.
     - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', 'Basketball_Z' in inches.
-    - metrics: Dictionary with 'lift_idx', 'release_idx', etc.
+    - metrics: Dictionary with 'lift_idx', 'set_idx', 'release_idx', etc.
     - fps: Frames per second, default 60.
     
     Returns:
@@ -1924,8 +1924,25 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
 
     INCHES_TO_FEET = 1 / 12
 
+    # Define color palette and dash styles
+    COLOR_PALETTE = {
+        'trajectory': 'rgba(31, 119, 180, 1)',    # Blue for trajectory
+        'lift': 'rgba(147, 112, 219, 1)',        # Purple
+        'set': 'rgba(255, 182, 193, 1)',         # Pastel pink
+        'release': 'rgba(255, 102, 102, 1)',     # Red
+        'curvature': 'rgba(31, 120, 180, 1)',     # Blue for curvature
+        'velocity': 'rgba(107, 174, 214, 1)',     # Light blue for velocity
+        'weighted_area': 'rgba(255, 102, 102, 0.3)'  # Red shaded area
+    }
+    DASH_STYLES = {
+        'lift': 'dash',
+        'set': 'dot',
+        'release': 'dashdot'
+    }
+
     # Extract key indices
     lift_idx = metrics['lift_idx']
+    set_idx = metrics['set_idx']
     release_idx = metrics['release_idx']
 
     # Extend time window: 0.25s before lift_idx, 0.5s after release_idx
@@ -1942,14 +1959,14 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     pose_segment['time'] = (pose_segment.index - start_idx) / fps
     ball_segment['time'] = (ball_segment.index - start_idx) / fps
 
-    # Calculate joint angles using law of cosines (updated column names)
+    # Calculate joint angles using law of cosines
     def calculate_angle(df, a_x, a_y, a_z, b_x, b_y, b_z, c_x, c_y, c_z):
         """Calculate angle at point B between points A, B, C in 3D."""
         ab = np.sqrt((df[a_x] - df[b_x])**2 + (df[a_y] - df[b_y])**2 + (df[a_z] - df[b_z])**2)
         bc = np.sqrt((df[c_x] - df[b_x])**2 + (df[c_y] - df[b_y])**2 + (df[c_z] - df[b_z])**2)
         ac = np.sqrt((df[a_x] - df[c_x])**2 + (df[a_y] - df[c_y])**2 + (df[a_z] - df[c_z])**2)
         cos_angle = (ab**2 + bc**2 - ac**2) / (2 * ab * bc)
-        cos_angle = np.clip(cos_angle, -1, 1)  # Avoid numerical errors outside [-1, 1]
+        cos_angle = np.clip(cos_angle, -1, 1)
         return np.degrees(np.arccos(cos_angle))
 
     # Upper body angles
@@ -1966,7 +1983,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     pose_segment['wrist_angle'] = calculate_angle(
         pose_segment, 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
         'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z',
-        'RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z'  # Using thumb as proxy for wrist end
+        'RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z'
     )
 
     # Lower body angles
@@ -1986,13 +2003,16 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         'RBIGTOE_X', 'RBIGTOE_Y', 'RBIGTOE_Z'
     )
 
-    # Calculate ball velocity (in feet/s)
+    # Calculate ball velocity (in feet/s), remove zeros/nulls, and interpolate
     ball_segment['velo_x'] = ball_segment['Basketball_X'].diff() * fps * INCHES_TO_FEET
     ball_segment['velo_y'] = ball_segment['Basketball_Y'].diff() * fps * INCHES_TO_FEET
     ball_segment['velo_z'] = ball_segment['Basketball_Z'].diff() * fps * INCHES_TO_FEET
     ball_segment['velocity'] = np.sqrt(
         ball_segment['velo_x']**2 + ball_segment['velo_y']**2 + ball_segment['velo_z']**2
-    ).fillna(0)
+    )
+    # Remove zeros and NaNs, then interpolate
+    velocity_clean = ball_segment['velocity'].replace(0, np.nan).interpolate(method='linear').fillna(method='bfill').fillna(method='ffill')
+    ball_segment['velocity'] = velocity_clean
 
     # Create subplots for upper and lower body
     figs = {}
@@ -2016,13 +2036,17 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             y=ball_segment['velocity'],
             mode='lines',
             name='Ball Velocity',
-            line=dict(color='magenta', dash='dot', width=2)
+            line=dict(color=COLOR_PALETTE['velocity'], width=2)
         ),
         secondary_y=True
     )
-    # Add vertical lines for lift and release
-    fig_upper.add_vline(x=(lift_idx - start_idx) / fps, line=dict(color='green', dash='dash'), name='Lift')
-    fig_upper.add_vline(x=(release_idx - start_idx) / fps, line=dict(color='red', dash='dash'), name='Release')
+    # Add vertical lines for lift, set, and release
+    for event, idx in [('lift', lift_idx), ('set', set_idx), ('release', release_idx)]:
+        fig_upper.add_vline(
+            x=(idx - start_idx) / fps,
+            line=dict(color=COLOR_PALETTE[event], dash=DASH_STYLES[event], width=2),
+            name=event.capitalize()
+        )
     fig_upper.update_layout(
         title="Upper Body Joint Flexion/Extension",
         xaxis_title="Time (s)",
@@ -2054,12 +2078,16 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             y=ball_segment['velocity'],
             mode='lines',
             name='Ball Velocity',
-            line=dict(color='magenta', dash='dot', width=2)
+            line=dict(color=COLOR_PALETTE['velocity'], width=2)
         ),
         secondary_y=True
     )
-    fig_lower.add_vline(x=(lift_idx - start_idx) / fps, line=dict(color='green', dash='dash'), name='Lift')
-    fig_lower.add_vline(x=(release_idx - start_idx) / fps, line=dict(color='red', dash='dash'), name='Release')
+    for event, idx in [('lift', lift_idx), ('set', set_idx), ('release', release_idx)]:
+        fig_lower.add_vline(
+            x=(idx - start_idx) / fps,
+            line=dict(color=COLOR_PALETTE[event], dash=DASH_STYLES[event], width=2),
+            name=event.capitalize()
+        )
     fig_lower.update_layout(
         title="Lower Body Joint Flexion/Extension",
         xaxis_title="Time (s)",
@@ -2082,6 +2110,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             'max_flexion': angles.max(),
             'min_flexion': angles.min(),
             'at_lift': angles.iloc[lift_idx - start_idx] if lift_idx >= start_idx else np.nan,
+            'at_set': angles.iloc[set_idx - start_idx] if set_idx >= start_idx and set_idx <= end_idx else np.nan,
             'at_release': angles.iloc[release_idx - start_idx] if release_idx <= end_idx else np.nan,
             'range': angles.max() - angles.min(),
             'rate_change': (angles.diff() / pose_segment['time'].diff()).max()  # Max rate of change (degrees/s)
