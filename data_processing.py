@@ -1671,17 +1671,15 @@ def plot_shot_location(ball_df, metrics):
     marker_symbol = 'circle' if outcome == 'Y' else 'x'
     marker_color = 'green' if outcome == 'Y' else 'red'
 
-    # Convert to feet for display (optional, but keeping inches for precision)
-    shot_x_ft = shot_x * INCHES_TO_FEET
-    shot_y_ft = shot_y * INCHES_TO_FEET
-
     # Court dimensions in inches (centered at (0, 0))
-    court_length = 564  # Half-court length (47 ft = 564 inches)
-    court_width = 600   # Full width (50 ft = 600 inches)
-    hoop_x = 564        # Hoop at right end, midline (47 ft from center)
-    hoop_y = 0          # Center of court
-    free_throw_x = 336  # 19 ft = 228 inches from baseline, 564 - 228 = 336 inches from center
-    three_point_radius = 285  # 23.75 ft = 285 inches from hoop
+    court_length = 564  # Half-court length from center to right edge
+    court_width = 600   # Full width (-300 to 300)
+    hoop_x = 501        # Hoop position
+    hoop_y = 0
+    free_throw_x = 336  # Free throw line x-coordinate
+    free_throw_y_min = -96
+    free_throw_y_max = 96
+    three_point_radius = 285  # Distance from hoop to peak (501 - 216)
 
     # Create figure
     fig = go.Figure()
@@ -1689,7 +1687,7 @@ def plot_shot_location(ball_df, metrics):
     # Court boundary (rectangle, centered at (0, 0))
     fig.add_trace(
         go.Scatter(
-            x=[-court_length/2, court_length/2, court_length/2, -court_length/2, -court_length/2],
+            x=[-court_length/2, court_length, court_length, -court_length/2, -court_length/2],
             y=[-court_width/2, -court_width/2, court_width/2, court_width/2, -court_width/2],
             mode='lines',
             line=dict(color='black', width=2),
@@ -1708,21 +1706,27 @@ def plot_shot_location(ball_df, metrics):
         )
     )
 
-    # Free throw line
+    # Free throw line (narrower span)
     fig.add_trace(
         go.Scatter(
             x=[free_throw_x, free_throw_x],
-            y=[-court_width/2, court_width/2],
+            y=[free_throw_y_min, free_throw_y_max],
             mode='lines',
             line=dict(color='black', width=2, dash='dash'),
             name='Free Throw Line'
         )
     )
 
-    # 3-point arc (semicircle centered at hoop)
-    theta = np.linspace(-np.pi/2, np.pi/2, 100)  # Half circle from -90° to 90°
-    three_x = hoop_x - three_point_radius * np.cos(theta)  # Adjust for center at hoop
-    three_y = hoop_y + three_point_radius * np.sin(theta)
+    # 3-point arc (semicircle centered at hoop, trimmed to match endpoints)
+    theta = np.linspace(-np.pi/2, np.pi/2, 100)  # Full semicircle
+    three_x_full = hoop_x - three_point_radius * np.cos(theta)
+    three_y_full = hoop_y + three_point_radius * np.sin(theta)
+
+    # Trim arc to stay within y = ±264 and x >= 216
+    mask = (three_y_full >= -264) & (three_y_full <= 264) & (three_x_full >= 216)
+    three_x = three_x_full[mask]
+    three_y = three_y_full[mask]
+
     fig.add_trace(
         go.Scatter(
             x=three_x,
@@ -1733,12 +1737,11 @@ def plot_shot_location(ball_df, metrics):
         )
     )
 
-    # Extend 3-point line to sidelines
-    three_point_start_x = hoop_x - three_point_radius  # Where arc meets straight line
+    # Extend 3-point line to sidelines at y = ±264
     fig.add_trace(
         go.Scatter(
-            x=[-court_length/2, three_point_start_x],
-            y=[-three_point_radius, -three_point_radius],
+            x=[-court_length/2, 396],
+            y=[-264, -264],
             mode='lines',
             line=dict(color='black', width=2),
             showlegend=False
@@ -1746,8 +1749,8 @@ def plot_shot_location(ball_df, metrics):
     )
     fig.add_trace(
         go.Scatter(
-            x=[-court_length/2, three_point_start_x],
-            y=[three_point_radius, three_point_radius],
+            x=[-court_length/2, 396],
+            y=[264, 264],
             mode='lines',
             line=dict(color='black', width=2),
             showlegend=False
@@ -1770,10 +1773,10 @@ def plot_shot_location(ball_df, metrics):
         title="Shot Location on Half Court",
         xaxis_title="X Position (inches)",
         yaxis_title="Y Position (inches)",
-        xaxis=dict(range=[-court_length/2, court_length/2], showgrid=False),
-        yaxis=dict(range=[-court_width/2, court_width/2], showgrid=False),
-        width=500,  # Fixed width
-        height=500,  # Fixed height for square aspect
+        xaxis=dict(range=[-282, 564], showgrid=False),  # -court_length/2 to court_length
+        yaxis=dict(range=[-300, 300], showgrid=False),  # -court_width/2 to court_width/2
+        width=500,
+        height=500,
         autosize=False,
         showlegend=True,
         template="plotly_white",
