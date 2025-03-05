@@ -346,15 +346,13 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
     st.header("Biomechanics Analysis")
     release_idx = metrics.get('release_idx', 0)
 
-    # New joint flexion/extension analysis
     st.subheader("Joint Flexion/Extension")
     fig, kpis = plot_joint_flexion_analysis(df_pose, df_ball, metrics)
-    st.plotly_chart(fig, use_container_width=True)  # Use the single figure directly
+    st.plotly_chart(fig, use_container_width=True)
 
-    # Display KPIs
     st.subheader("Joint Flexion/Extension KPIs")
     col1, col2, col3 = st.columns(3)
-    for i, joint in enumerate(kpis.keys()):
+    for i, joint in enumerate([j for j in kpis.keys() if j != 'kinematic_chain_score']):
         col = [col1, col2, col3][i % 3]
         with col:
             st.metric(f"{joint.capitalize()} Max Flexion", f"{kpis[joint]['max_flexion']:.1f}°")
@@ -364,6 +362,10 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
             st.metric(f"{joint.capitalize()} at Release", f"{kpis[joint]['at_release']:.1f}°")
             st.metric(f"{joint.capitalize()} Range", f"{kpis[joint]['range']:.1f}°")
             st.metric(f"{joint.capitalize()} Max Rate", f"{kpis[joint]['rate_change']:.1f}°/s")
+    
+    st.subheader("Kinematic Chain Score")
+    st.metric("Kinematic Chain Score", f"{kpis['kinematic_chain_score']:.1f}/100")
+
     
     # Get hoop position and flip from metrics
     hoop_x = metrics.get('hoop_x', 501.0)  # Default to 501 if not in metrics
