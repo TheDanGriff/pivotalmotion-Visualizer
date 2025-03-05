@@ -823,7 +823,6 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             ball_df['velocity_z']**2
         )
 
-        # Replace zeros to avoid jumpiness
         ball_df['velocity_magnitude'] = ball_df['velocity_magnitude'].replace(0, np.nan)
         ball_df['velocity_magnitude'] = (
             ball_df['velocity_magnitude']
@@ -843,7 +842,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         set_window_start = max(0, metrics['set_idx'] - 15)
         metrics['lift_idx'] = ball_df.iloc[set_window_start:metrics['set_idx']]['Basketball_X'].idxmax()
 
-        metrics['rim_impact_idx'] = (basketball_z <= 10).idxmax()  # 10 inches (assuming typo in original; should be 120 for 10 ft)
+        metrics['rim_impact_idx'] = (basketball_z <= 120).idxmax()  # 10 ft = 120 inches
 
         # 5. Compute KPIs (convert to feet where applicable)
         release_point = ball_df.loc[metrics['release_idx']]
@@ -855,7 +854,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         dy = (hoop_y - release_point['Basketball_Y']) * INCHES_TO_FEET
         original_shot_distance = np.sqrt(dx**2 + dy**2)
 
-        if original_shot_distance > 47.0:  # 47 ft is half-court; adjust if court length changes
+        if original_shot_distance > 47.0:
             shot_distance = 94.0 - original_shot_distance
             flip = True
         else:
@@ -878,34 +877,19 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         dxy = np.sqrt(post_release['Basketball_X'].diff()**2 + post_release['Basketball_Y'].diff()**2).iloc[1:].mean() * INCHES_TO_FEET
         metrics['release_angle'] = np.degrees(np.arctan2(dz, dxy))
 
-        # 7. Compute Release Velocity with enhanced debugging
-        logger.debug(f"Calculating release velocity at release_idx: {metrics['release_idx']}")
-        logger.debug(f"Ball columns: {ball_df.columns.tolist()}")
-
+        # 7. Compute Release Velocity
         if pd.isna(metrics['release_idx']) or metrics['release_idx'] >= len(ball_df):
             logger.error(f"Invalid release_idx: {metrics['release_idx']}, ball_df length: {len(ball_df)}")
             metrics['release_velocity'] = 0.0
         else:
-            # Calculate velocities in inches/second, handling NaN values
-            release_velocity_x = basketball_x.diff().fillna(0) * fps  # Use fps consistently
+            release_velocity_x = basketball_x.diff().fillna(0) * fps
             release_velocity_y = basketball_y.diff().fillna(0) * fps
             release_velocity_z = basketball_z.diff().fillna(0) * fps
-
-            logger.debug(f"velocity_x at release_idx: {release_velocity_x.iloc[metrics['release_idx']]}")
-            logger.debug(f"velocity_y at release_idx: {release_velocity_y.iloc[metrics['release_idx']]}")
-            logger.debug(f"velocity_z at release_idx: {release_velocity_z.iloc[metrics['release_idx']]}")
-
             rv_x = release_velocity_x.iloc[metrics['release_idx']]
             rv_y = release_velocity_y.iloc[metrics['release_idx']]
             rv_z = release_velocity_z.iloc[metrics['release_idx']]
-            release_velocity = np.sqrt(rv_x**2 + rv_y**2 + rv_z**2) * INCHES_TO_FEET  # Convert to feet/second
-
-            if pd.isna(release_velocity) or release_velocity < 0:
-                logger.warning(f"Invalid release velocity calculated: {release_velocity}. Setting to 0.0.")
-                metrics['release_velocity'] = 0.0
-            else:
-                metrics['release_velocity'] = release_velocity
-                logger.debug(f"Release velocity calculated: {release_velocity} ft/s")
+            release_velocity = np.sqrt(rv_x**2 + rv_y**2 + rv_z**2) * INCHES_TO_FEET
+            metrics['release_velocity'] = 0.0 if pd.isna(release_velocity) or release_velocity < 0 else release_velocity
 
         # 8. Curvature computations (convert from 1/inches to 1/feet)
         metrics['curvature_side'] = savgol_filter(np.gradient(np.gradient(basketball_x)), 11, 3) * 12
@@ -919,21 +903,15 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             metrics.get('release_height', 0)
         )
 
-        # 10. Lateral deviation with midline adjustment
-        lateral_dev = calculate_lateral_deviation(
-            ball_df,
-            metrics['release_idx'],
-            hoop_x=metrics['hoop_x'],
-            hoop_y=metrics['hoop_y']
-        )
+        # 10. Lateral deviation (updated to example code)
+        lateral_dev = calculate_lateral_deviation(ball_df, metrics['release_idx'])
         if lateral_dev:
-            metrics['lateral_deviation'] = lateral_dev[0]  # Already in feet from the new function
-            metrics['lateral_final_x'] = lateral_dev[1]  # In inches
-            metrics['lateral_actual_y'] = lateral_dev[2]  # In inches
-            metrics['lateral_expected_y'] = lateral_dev[3]  # In inches
+            metrics['lateral_deviation'] = lateral_dev[0] * INCHES_TO_FEET  # Convert from inches to feet
+            metrics['lateral_final_x'] = lateral_dev[1]
+            metrics['lateral_actual_y'] = lateral_dev[2]
+            metrics['lateral_expected_y'] = lateral_dev[3]
         else:
             metrics['lateral_deviation'] = 0.0
-            logger.warning("Lateral deviation calculation failed; defaulting to 0.0.")
 
         # 11. Additional Pose Computations
         pose_df = compute_joint_angles(pose_df)
@@ -943,7 +921,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
 
     except Exception as e:
         logger.error(f"Error calculating shot metrics: {str(e)}")
-        metrics['release_velocity'] = 0.0  # Fallback in case of errors
+        metrics['release_velocity'] = 0.0
 
     return metrics, pose_df, ball_df
 
