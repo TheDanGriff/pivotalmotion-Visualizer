@@ -215,7 +215,7 @@ def plot_shot_analysis(df_ball, metrics):
     """Create interactive basketball shot analysis visualization with dynamically scaled, rectangular, zoomed-in trajectories 
     starting at lift_idx, including set_idx, and ending at release_idx, with X-axis exactly 3 ft wide 
     (showing lowest and greatest horizontal positions) and Y-axis dynamically scaled (3–11 ft with 0.5 ft buffer), 
-    fitting properly within the Streamlit app window."""
+    fitting properly within the Streamlit app window. Adjusted to show midline-aligned lateral deviation."""
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
     import numpy as np
@@ -229,12 +229,15 @@ def plot_shot_analysis(df_ball, metrics):
         'release': 'rgba(255, 102, 102, 1)',
         'curvature': 'rgba(31, 120, 180, 1)',
         'velocity': 'rgba(107, 174, 214, 1)',
-        'weighted_area': 'rgba(255, 102, 102, 0.3)'
+        'weighted_area': 'rgba(255, 102, 102, 0.3)',
+        'shot_line': 'rgba(0, 255, 0, 0.5)',  # Green for intended shot line
+        'deviation': 'rgba(255, 0, 0, 1)'     # Red for deviation marker
     }
     DASH_STYLES = {
         'lift': 'dash',
         'set': 'dot',
-        'release': 'dashdot'
+        'release': 'dashdot',
+        'shot_line': 'dash'
     }
 
     def clamp_index(idx, max_idx):
@@ -242,17 +245,17 @@ def plot_shot_analysis(df_ball, metrics):
     
     max_idx = len(df_ball) - 1
     lift_idx = clamp_index(metrics.get('lift_idx', 0), max_idx)
-    set_idx = clamp_index(metrics.get('set_idx', lift_idx), max_idx)  # Ensure set_idx is within bounds and after lift_idx
-    release_idx = clamp_index(metrics.get('release_idx', set_idx + 1), max_idx)  # Ensure release_idx is after set_idx
+    set_idx = clamp_index(metrics.get('set_idx', lift_idx), max_idx)
+    release_idx = clamp_index(metrics.get('release_idx', set_idx + 1), max_idx)
 
-    # Use lift_idx, set_idx, and release_idx for trajectory (ordered correctly)
+    # Use lift_idx, set_idx, and release_idx for trajectory
     trajectory_indices = sorted([lift_idx, set_idx, release_idx])
     trajectory_start = trajectory_indices[0]  # lift_idx
     trajectory_end = trajectory_indices[-1]   # release_idx
     set_idx = trajectory_indices[1]           # set_idx (middle point)
 
-    curvature_start = lift_idx  # Keep curvature starting at lift_idx
-    curvature_end = release_idx  # Keep curvature ending at release_idx
+    curvature_start = lift_idx
+    curvature_end = release_idx
 
     fig = make_subplots(
         rows=2, cols=2,
@@ -271,101 +274,87 @@ def plot_shot_analysis(df_ball, metrics):
     def get_slice(data, start, end):
         if isinstance(data, (pd.Series, np.ndarray, list)) and len(data) > 0:
             segment = data[start:end].to_numpy() if hasattr(data, 'to_numpy') else np.array(data[start:end])
-            # Apply Savitzky-Golay smoothing
             if len(segment) > 3:
-                window_length = min(11, len(segment) - 1)  # Ensure window fits data
+                window_length = min(11, len(segment) - 1)
                 if window_length % 2 == 0:
                     window_length += 1
                 segment = savgol_filter(segment, window_length=window_length, polyorder=2)
-            return segment * INCHES_TO_FEET  # Convert to feet
+            return segment * INCHES_TO_FEET
         return np.array([])
 
-    # Get smoothed trajectory data using lift_idx, set_idx, and release_idx
+    # Get smoothed trajectory data
     traj_x = get_slice(df_ball['Basketball_X'], trajectory_start, trajectory_end + 1)  # feet
     traj_y = get_slice(df_ball['Basketball_Y'], trajectory_start, trajectory_end + 1)  # feet
     traj_z = get_slice(df_ball['Basketball_Z'], trajectory_start, trajectory_end + 1)  # feet
 
-    # Calculate trajectory path lengths for dynamic scaling
+    # Calculate trajectory ranges
     if len(traj_x) > 1 and len(traj_z) > 1:
-        # Calculate path length in side view (X vs Z)
         dx = np.diff(traj_x)
         dz = np.diff(traj_z)
         side_path_length = np.sum(np.sqrt(dx**2 + dz**2))
         
-        # Calculate path length in lateral view (Y vs Z)
         dy = np.diff(traj_y)
         lateral_path_length = np.sum(np.sqrt(dy**2 + dz**2))
         
-        # Use the longer path length for scaling, and vertical range for Y-axis scaling
-        path_length = max(side_path_length, lateral_path_length, 0.1)  # Minimum 0.1 to avoid division by zero
+        path_length = max(side_path_length, lateral_path_length, 0.1)
         z_min, z_max = np.nanmin(traj_z), np.nanmax(traj_z)
         if pd.isna(z_min) or pd.isna(z_max) or z_max == z_min:
-            z_range = [3.0, 11.0]  # Default 3–11 ft if no valid data
+            z_range = [3.0, 11.0]
         else:
-            z_range_height = max(1.0, min(8.0, z_max - z_min))  # Dynamic Y-axis height (min 1 ft, max 8 ft)
-            # Add 0.5 ft buffer on both sides of the vertical range
-            z_range_height = min(8.0, z_range_height + 1.0)  # Ensure max 8 ft after buffer
+            z_range_height = max(1.0, min(8.0, z_max - z_min))
+            z_range_height = min(8.0, z_range_height + 1.0)  # 0.5 ft buffer
             z_center = (z_min + z_max) / 2
-            z_range = [max(3.0, z_center - z_range_height / 2), min(11.0, z_center + z_range_height / 2)]  # Ensure within 3–11 ft
+            z_range = [max(3.0, z_center - z_range_height / 2), min(11.0, z_center + z_range_height / 2)]
     else:
-        path_length = 1.0  # Default if no valid data
-        z_range = [3.0, 11.0]  # Default 3–11 ft
+        path_length = 1.0
+        z_range = [3.0, 11.0]
 
-    # Calculate fixed X-axis ranges (exactly 3 ft wide)
-    if len(traj_x) > 0 and len(traj_z) > 0:
-        # Side View (X vs Z): Exactly 3 ft wide X, centered on the range of traj_x
+    # Fixed 3 ft X/Y-axis ranges
+    if len(traj_x) > 0:
         x_min, x_max = np.nanmin(traj_x), np.nanmax(traj_x)
-        if pd.isna(x_min) or pd.isna(x_max) or x_max == x_min:
-            x_range = [-1.5, 1.5]  # Default 3 ft wide if no valid data
-        else:
-            x_center = (x_min + x_max) / 2
-            x_range = [x_center - 1.5, x_center + 1.5]  # Exactly 3 ft wide, centered on data range
-
-        # Lateral View (Y vs Z): Exactly 3 ft wide Y, centered on the range of traj_y
-        y_min, y_max = np.nanmin(traj_y), np.nanmax(traj_y)
-        if pd.isna(y_min) or pd.isna(y_max) or y_max == y_min:
-            y_range = [-1.5, 1.5]  # Default 3 ft wide if no valid data
-        else:
-            y_center = (y_min + y_max) / 2
-            y_range = [y_center - 1.5, y_center + 1.5]  # Exactly 3 ft wide, centered on data range
+        x_center = (x_min + x_max) / 2 if not (pd.isna(x_min) or pd.isna(x_max) or x_max == x_min) else 0
+        x_range = [x_center - 1.5, x_center + 1.5]
     else:
-        x_range = [-1.5, 1.5]  # Default exactly 3 ft wide
-        y_range = [-1.5, 1.5]  # Default exactly 3 ft wide
+        x_range = [-1.5, 1.5]
 
-    # Set base plot size to fit within Streamlit app window, with dynamic scaling for trajectory clarity
-    base_width = 450  # Base width for each subplot, fitting within Streamlit columns
-    base_height = int(base_width * (z_range_height / 3))  # Dynamically adjust height based on Y-axis range (maintain 3:8 aspect ratio relative to Y range)
+    if len(traj_y) > 0:
+        y_min, y_max = np.nanmin(traj_y), np.nanmax(traj_y)
+        y_center = (y_min + y_max) / 2 if not (pd.isna(y_min) or pd.isna(y_max) or y_max == y_min) else 0
+        y_range = [y_center - 1.5, y_center + 1.5]
+    else:
+        y_range = [-1.5, 1.5]
 
-    # Scale the plot size based on path length and Y-axis range, but constrain to fit within app
-    scale_factor = min(1.2, max(0.8, path_length / 5.0))  # Scale between 0.8x and 1.2x based on path length (5 ft as reference)
+    # Plot size scaling
+    base_width = 450
+    base_height = int(base_width * (z_range_height / 3))
+    scale_factor = min(1.2, max(0.8, path_length / 5.0))
     subplot_width = int(base_width * scale_factor)
     subplot_height = int(base_height * scale_factor)
+    subplot_width = max(400, min(500, subplot_width))
+    subplot_height = max(1067, min(1333, subplot_height))
 
-    # Constrain plot size to prevent overflow and ensure fit within app
-    subplot_width = max(400, min(500, subplot_width))  # Constrain between 400 and 500 pixels
-    subplot_height = max(1067, min(1333, subplot_height))  # Constrain between 1067 and 1333 pixels (8/3 * 400–500)
-
-    # Trajectory Plots with fixed 3 ft X, dynamically scaled Y (3–11 ft or adjusted with buffer), rectangular, dynamically scaled, and fitting in app window
+    # Trajectory Plots
     for col, coord in enumerate(['Basketball_X', 'Basketball_Y'], 1):
         is_side_view = col == 1
         x_data = traj_x if is_side_view else traj_y
         z_data = traj_z
 
+        # Plot trajectory
         fig.add_trace(
             go.Scatter(
                 x=x_data,
                 y=z_data,
                 mode='lines+markers',
                 name='Trajectory',
-                line=dict(color=COLOR_PALETTE['trajectory'], width=4 * scale_factor),  # Scale line width
-                marker=dict(size=6 * scale_factor),  # Scale marker size
+                line=dict(color=COLOR_PALETTE['trajectory'], width=4 * scale_factor),
+                marker=dict(size=6 * scale_factor),
                 showlegend=col == 1
             ),
             row=1,
             col=col
         )
 
-        # Add phase markers for lift, set, and release, scaled for visibility
+        # Add phase markers
         for phase, color_key in [('lift', 'lift'), ('set', 'set'), ('release', 'release')]:
             idx = locals()[f"{phase}_idx"]
             if trajectory_start <= idx <= trajectory_end:
@@ -377,9 +366,9 @@ def plot_shot_analysis(df_ball, metrics):
                         y=[z_val],
                         mode='markers',
                         marker=dict(
-                            color=COLOR_PALETTE[color_key], 
-                            size=10 * scale_factor,  # Scale marker size
-                            line=dict(width=2 * scale_factor, color='white')  # Scale line width
+                            color=COLOR_PALETTE[color_key],
+                            size=10 * scale_factor,
+                            line=dict(width=2 * scale_factor, color='white')
                         ),
                         name=f'{phase.capitalize()} Point',
                         showlegend=col == 1
@@ -388,10 +377,66 @@ def plot_shot_analysis(df_ball, metrics):
                     col=col
                 )
 
-    # Curvature Analysis (smoothed data)
-    side_curve = get_slice(metrics.get('curvature_side', []), curvature_start, curvature_end) * 12  # Convert to 1/feet
-    lateral_curve = get_slice(metrics.get('curvature_lateral', []), curvature_start, curvature_end) * 12  # Convert to 1/feet
-    velocity = get_slice(df_ball.get('velocity_magnitude', []), curvature_start, curvature_end) * INCHES_TO_FEET  # Convert to feet/s
+        # Lateral View: Add intended shot line and deviation
+        if not is_side_view:
+            release_x = df_ball.at[release_idx, 'Basketball_X'] * INCHES_TO_FEET
+            release_y = df_ball.at[release_idx, 'Basketball_Y'] * INCHES_TO_FEET
+            release_z = df_ball.at[release_idx, 'Basketball_Z'] * INCHES_TO_FEET
+            hoop_x = metrics.get('hoop_x', 501.0) * INCHES_TO_FEET
+            hoop_y = metrics.get('hoop_y', 0.0) * INCHES_TO_FEET
+            hoop_z = 10.0  # Hoop height in feet
+
+            # Intended shot line (projected to hoop height)
+            fig.add_trace(
+                go.Scatter(
+                    x=[release_y, hoop_y],
+                    y=[release_z, hoop_z],
+                    mode='lines',
+                    line=dict(color=COLOR_PALETTE['shot_line'], width=2 * scale_factor, dash=DASH_STYLES['shot_line']),
+                    name='Intended Shot Line',
+                    showlegend=True
+                ),
+                row=1,
+                col=2
+            )
+
+            # Add deviation marker if available
+            if 'lateral_deviation' in metrics and metrics['lateral_deviation'] != 0.0:
+                final_x = metrics.get('lateral_final_x', 0) * INCHES_TO_FEET
+                actual_y = metrics.get('lateral_actual_y', 0) * INCHES_TO_FEET
+                final_z = df_ball.at[df_ball['Basketball_Z'].ge(120).idxmax(), 'Basketball_Z'] * INCHES_TO_FEET
+                expected_y = metrics.get('lateral_expected_y', 0) * INCHES_TO_FEET
+
+                # Deviation point
+                fig.add_trace(
+                    go.Scatter(
+                        x=[actual_y],
+                        y=[final_z],
+                        mode='markers',
+                        marker=dict(color=COLOR_PALETTE['deviation'], size=12 * scale_factor, symbol='x'),
+                        name=f'Lateral Deviation ({metrics["lateral_deviation"]:.2f} ft)',
+                        showlegend=True
+                    ),
+                    row=1,
+                    col=2
+                )
+                # Line from expected to actual y
+                fig.add_trace(
+                    go.Scatter(
+                        x=[expected_y, actual_y],
+                        y=[final_z, final_z],
+                        mode='lines',
+                        line=dict(color=COLOR_PALETTE['deviation'], width=2 * scale_factor),
+                        showlegend=False
+                    ),
+                    row=1,
+                    col=2
+                )
+
+    # Curvature Analysis
+    side_curve = get_slice(metrics.get('curvature_side', []), curvature_start, curvature_end) * 12  # 1/feet
+    lateral_curve = get_slice(metrics.get('curvature_lateral', []), curvature_start, curvature_end) * 12  # 1/feet
+    velocity = get_slice(df_ball.get('velocity_magnitude', []), curvature_start, curvature_end) * INCHES_TO_FEET
 
     if len(side_curve) > 0:
         weighted_area_side = np.abs(side_curve) * np.linspace(0, 1, len(side_curve))
@@ -404,7 +449,6 @@ def plot_shot_analysis(df_ball, metrics):
             [weighted_area_side, weighted_area_lateral],
             ['Side', 'Lateral']
         ), 1):
-            # Apply smoothing to curvature and velocity
             if len(curve) > 3:
                 window_length = min(11, len(curve) - 1)
                 if window_length % 2 == 0:
@@ -435,7 +479,7 @@ def plot_shot_analysis(df_ball, metrics):
                     y=curve,
                     mode='lines',
                     name=f'{curve_name} Curvature (1/ft)',
-                    line=dict(color=COLOR_PALETTE['curvature'], width=2 * scale_factor)  # Scale line width
+                    line=dict(color=COLOR_PALETTE['curvature'], width=2 * scale_factor)
                 ),
                 row=2,
                 col=col_idx
@@ -448,7 +492,7 @@ def plot_shot_analysis(df_ball, metrics):
                         x=idx,
                         line=dict(
                             color=COLOR_PALETTE[phase],
-                            width=1.5 * scale_factor,  # Scale line width
+                            width=1.5 * scale_factor,
                             dash=DASH_STYLES[phase]
                         ),
                         row=2,
@@ -462,7 +506,7 @@ def plot_shot_analysis(df_ball, metrics):
                         y=velocity,
                         mode='lines',
                         name='Velocity (ft/s)',
-                        line=dict(color=COLOR_PALETTE['velocity'], width=2 * scale_factor)  # Scale line width
+                        line=dict(color=COLOR_PALETTE['velocity'], width=2 * scale_factor)
                     ),
                     row=2,
                     col=col_idx,
@@ -470,68 +514,25 @@ def plot_shot_analysis(df_ball, metrics):
                 )
 
     # Axis configuration
-    # Side View (Column 1): Exactly 3 ft wide X, dynamically scaled Y (3–11 ft or adjusted with buffer), rectangular
-    fig.update_xaxes(
-        title_text="Horizontal Position (ft)",
-        row=1,
-        col=1,
-        range=x_range,  # Exactly 3 ft wide, centered on data range
-        scaleanchor="y",
-        scaleratio=z_range_height / 3  # Dynamically adjust ratio based on Y-axis range (maintain rectangular shape)
-    )
-    fig.update_yaxes(
-        title_text="Height (ft)",
-        row=1,
-        col=1,
-        range=z_range,  # Dynamically scaled Y-axis (default 3–11 ft, adjusted for short trajectories with 0.5 ft buffer)
-        constrain='domain'
-    )
+    fig.update_xaxes(title_text="Horizontal Position (ft)", row=1, col=1, range=x_range, scaleanchor="y", scaleratio=z_range_height / 3)
+    fig.update_yaxes(title_text="Height (ft)", row=1, col=1, range=z_range, constrain='domain')
 
-    # Lateral View (Column 2): Exactly 3 ft wide Y, dynamically scaled Z (3–11 ft or adjusted with buffer), rectangular
-    fig.update_xaxes(
-        title_text="Lateral Position (ft)",
-        row=1,
-        col=2,
-        range=y_range,  # Exactly 3 ft wide, centered on data range
-        scaleanchor="y",
-        scaleratio=z_range_height / 3  # Dynamically adjust ratio based on Y-axis range
-    )
-    fig.update_yaxes(
-        title_text="Height (ft)",
-        row=1,
-        col=2,
-        range=z_range,  # Dynamically scaled Y-axis
-        constrain='domain'
-    )
+    fig.update_xaxes(title_text="Lateral Position (ft)", row=1, col=2, range=y_range, scaleanchor="y", scaleratio=z_range_height / 3)
+    fig.update_yaxes(title_text="Height (ft)", row=1, col=2, range=z_range, constrain='domain')
 
-    # Curvature plots configuration
     for col in [1, 2]:
-        fig.update_xaxes(
-            title_text="Frame Number",
-            row=2,
-            col=col
-        )
-        fig.update_yaxes(
-            title_text="Curvature (1/ft)",
-            row=2,
-            col=col
-        )
-        fig.update_yaxes(
-            title_text="Velocity (ft/s)", 
-            secondary_y=True, 
-            row=2,
-            col=col, 
-            range=[0, 35 * INCHES_TO_FEET]  # Max velocity in feet/s
-        )
+        fig.update_xaxes(title_text="Frame Number", row=2, col=col)
+        fig.update_yaxes(title_text="Curvature (1/ft)", row=2, col=col)
+        fig.update_yaxes(title_text="Velocity (ft/s)", secondary_y=True, row=2, col=col, range=[0, 35 * INCHES_TO_FEET])
 
-    # Set consistent plot size for all subplots to fit within Streamlit app window, with dynamic scaling but constrained
-    total_width = subplot_width * 2 + 50  # Two subplots side by side with spacing
-    total_height = subplot_height * 2 + 50  # Two subplots stacked with spacing (for trajectory and curvature)
+    # Layout
+    total_width = subplot_width * 2 + 50
+    total_height = subplot_height * 2 + 50
     fig.update_layout(
-        height=min(1200, total_height),  # Cap height at 1200 to fit within app window
-        width=min(900, total_width),     # Cap width at 900 to fit within Streamlit columns
+        height=min(1200, total_height),
+        width=min(900, total_width),
         title_text="Comprehensive Shot Analysis",
-        margin=dict(t=50, b=50, l=50, r=50),  # Minimal margins to fit tightly in the app
+        margin=dict(t=50, b=50, l=50, r=50),
         legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5)
     )
 
