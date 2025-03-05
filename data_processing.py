@@ -180,7 +180,7 @@ def separate_pose_and_ball_tracking(df_segment, source):
     # Define possible ball column sets with case-insensitive and common variations
     possible_ball_columns = [
         ['Basketball_X', 'Basketball_Y', 'Basketball_Z'],
-        ['Ball_X', 'Ball_Y', 'Ball_Z'],
+        ['Ball_X', 'Ball_Y', 'Ball_Z'],  # Matches your data
         ['ball_x', 'ball_y', 'ball_z'],
         ['BALL_X', 'BALL_Y', 'BALL_Z'],
     ]
@@ -198,12 +198,13 @@ def separate_pose_and_ball_tracking(df_segment, source):
         ball_df = pd.DataFrame()
         return pose_df, ball_df
     
-    # Include 'OUTCOME' in ball_df if it exists
+    # Include 'OUTCOME' and 'IS_MADE' in ball_df if they exist
     ball_columns = active_ball_columns.copy()
-    if 'OUTCOME' in df_segment.columns:
-        ball_columns.append('OUTCOME')
+    for col in ['OUTCOME', 'IS_MADE']:
+        if col in df_segment.columns:
+            ball_columns.append(col)
     
-    # All non-ball columns (except 'OUTCOME') are considered pose data
+    # All non-ball columns (except 'OUTCOME' and 'IS_MADE') are considered pose data
     pose_columns = [col for col in df_segment.columns if col not in ball_columns]
     
     # Separate into pose and ball DataFrames
@@ -213,8 +214,12 @@ def separate_pose_and_ball_tracking(df_segment, source):
     # Rename ball columns to standard 'Basketball_X/Y/Z' if needed
     if active_ball_columns != ['Basketball_X', 'Basketball_Y', 'Basketball_Z']:
         rename_dict = {old: new for old, new in zip(active_ball_columns, ['Basketball_X', 'Basketball_Y', 'Basketball_Z'])}
+        if active_ball_columns == ['Ball_X', 'Ball_Y', 'Ball_Z']:  # Matches your data
+            logger.info(f"Renaming ball columns from {active_ball_columns} to {['Basketball_X', 'Basketball_Y', 'Basketball_Z']}")
         ball_df = ball_df.rename(columns=rename_dict)
-        logger.info(f"Renamed ball columns from {active_ball_columns} to {ball_df.columns.tolist()}")
+    
+    logger.debug(f"After separation - pose_df columns: {pose_df.columns.tolist()}")
+    logger.debug(f"After separation - ball_df columns: {ball_df.columns.tolist()}")
     
     return pose_df, ball_df
 
@@ -1404,43 +1409,6 @@ def calculate_lateral_deviation(df, release_index, hoop_x=501.0, hoop_y=0.0):
         logger.error(f"Error calculating lateral deviation: {str(e)}")
         return None
 
-def separate_pose_and_ball_tracking(df_segment, source):
-    """Split data into pose and ball tracking, supporting multiple ball column name variations."""
-    # Define possible ball column sets with case-insensitive and common variations
-    possible_ball_columns = [
-        ['Basketball_X', 'Basketball_Y', 'Basketball_Z'],
-        ['Ball_X', 'Ball_Y', 'Ball_Z'],
-        ['ball_x', 'ball_y', 'ball_z'],  # Add common lowercase variants
-        ['BALL_X', 'BALL_Y', 'BALL_Z'],  # Add uppercase variants
-    ]
-    
-    # Find the first matching set of ball columns
-    active_ball_columns = None
-    for ball_cols in possible_ball_columns:
-        if all(col in df_segment.columns for col in ball_cols):
-            active_ball_columns = ball_cols
-            break
-    
-    if not active_ball_columns:
-        # Log a warning and return empty ball DataFrame if no ball columns are found
-        logger.warning(f"No complete set of ball tracking columns found in DataFrame. Available columns: {list(df_segment.columns)}")
-        pose_df = df_segment.copy()
-        ball_df = pd.DataFrame()
-        return pose_df, ball_df
-    
-    # All non-ball columns are considered pose data
-    pose_columns = [col for col in df_segment.columns if col not in active_ball_columns]
-    
-    # Separate into pose and ball DataFrames
-    pose_df = df_segment[pose_columns].copy()
-    ball_df = df_segment[active_ball_columns].copy()
-    
-    # Rename ball columns to standard 'Basketball_X/Y/Z' if needed
-    if active_ball_columns != ['Basketball_X', 'Basketball_Y', 'Basketball_Z']:
-        ball_df.columns = ['Basketball_X', 'Basketball_Y', 'Basketball_Z']
-        logger.info(f"Renamed ball columns from {active_ball_columns} to {ball_df.columns.tolist()}")
-    
-    return pose_df, ball_df
 # -------------------------------------------------------------------------------------
 # Data Cleaning, Angles, and Trimming
 # -------------------------------------------------------------------------------------
@@ -1655,7 +1623,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
     Create a 2D visualization of the shot location on a half basketball court.
     
     Parameters:
-    - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', and optionally 'OUTCOME' in inches.
+    - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', and optionally 'OUTCOME'/'IS_MADE' in inches.
     - metrics: Dictionary with 'lift_idx', 'release_idx', 'hoop_x', 'hoop_y'.
     - pose_df: Optional DataFrame with pose data (e.g., 'MIDHIP_X', 'MIDHIP_Y') for foot position.
     
@@ -1679,7 +1647,18 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         source_note = " (Ball at Lift)"
         logger.warning(f"Using ball position at lift_idx {lift_idx} as pose data is unavailable.")
 
-    # Debug OUTCOME presence and value
+    # Determine court side and flip if necessary
+    flip_court = shot_x < 0
+    if flip_court:
+        shot_x = -shot_x
+        shot_y = -shot_y
+        hoop_x = -501  # Flip hoop to left side
+        logger.debug(f"Flipping court: shot_x was negative, now hoop_x = {hoop_x}")
+    else:
+        hoop_x = 501  # Default right side
+        logger.debug(f"Court not flipped: shot_x positive, hoop_x = {hoop_x}")
+
+    # Debug OUTCOME and IS_MADE presence
     logger.debug(f"ball_df columns: {ball_df.columns.tolist()}")
     logger.debug(f"ball_df index: {ball_df.index.tolist()}")
     logger.debug(f"lift_idx: {lift_idx}")
@@ -1690,10 +1669,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             outcome = ball_df.loc[lift_idx, 'OUTCOME']
             logger.debug(f"OUTCOME at lift_idx {lift_idx}: {outcome}")
             if pd.isna(outcome):
-                marker_symbol = 'x'
-                marker_color = 'grey'
-                marker_name = f'Shot Location (Unknown Outcome){source_note}'
-                logger.warning(f"OUTCOME is NaN at lift_idx {lift_idx}. Using grey 'X'.")
+                logger.warning(f"OUTCOME is NaN at lift_idx {lift_idx}.")
             elif outcome == 'Y':
                 marker_symbol = 'circle'
                 marker_color = 'green'
@@ -1703,38 +1679,52 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
                 marker_color = 'red'
                 marker_name = f'Shot Location (Miss){source_note}'
             else:
-                marker_symbol = 'x'
-                marker_color = 'grey'
-                marker_name = f'Shot Location (Unexpected Outcome: {outcome}){source_note}'
-                logger.warning(f"Unexpected OUTCOME value '{outcome}' at lift_idx {lift_idx}. Using grey 'X'.")
+                logger.warning(f"Unexpected OUTCOME value '{outcome}' at lift_idx {lift_idx}.")
         except KeyError:
-            marker_symbol = 'x'
-            marker_color = 'grey'
-            marker_name = f'Shot Location (Index Error){source_note}'
-            logger.error(f"lift_idx {lift_idx} not in ball_df index. Using grey 'X'.")
-    else:
+            logger.error(f"lift_idx {lift_idx} not in ball_df index for OUTCOME.")
+    elif 'IS_MADE' in ball_df.columns:
+        try:
+            is_made = ball_df.loc[lift_idx, 'IS_MADE']
+            logger.debug(f"IS_MADE at lift_idx {lift_idx}: {is_made}")
+            if pd.isna(is_made):
+                logger.warning(f"IS_MADE is NaN at lift_idx {lift_idx}.")
+            elif is_made in [True, 'TRUE', 1]:
+                marker_symbol = 'circle'
+                marker_color = 'green'
+                marker_name = f'Shot Location (Make){source_note}'
+            elif is_made in [False, 'FALSE', 0]:
+                marker_symbol = 'x'
+                marker_color = 'red'
+                marker_name = f'Shot Location (Miss){source_note}'
+            else:
+                logger.warning(f"Unexpected IS_MADE value '{is_made}' at lift_idx {lift_idx}.")
+        except KeyError:
+            logger.error(f"lift_idx {lift_idx} not in ball_df index for IS_MADE.")
+    
+    # Fallback if neither OUTCOME nor IS_MADE is usable
+    if 'marker_symbol' not in locals():
         marker_symbol = 'x'
         marker_color = 'grey'
-        marker_name = f'Shot Location (No OUTCOME Column){source_note}'
-        logger.warning(f"'OUTCOME' column missing from ball_df. Using grey 'X' marker.")
+        marker_name = f'Shot Location (No Outcome Data){source_note}'
+        logger.warning(f"Neither OUTCOME nor IS_MADE available or valid at lift_idx {lift_idx}. Using grey 'X'.")
 
-    # Court dimensions in inches (centered at (0, 0))
+    # Court dimensions in inches (centered at (0, 0) for base layout, flipped if needed)
     court_length = 564  # Half-court length from center to right edge
     court_width = 600   # Full width (-300 to 300)
-    hoop_x = 501        # Hoop position
     hoop_y = 0
-    free_throw_x = 336  # Free throw line x-coordinate (19 ft = 228 inches from baseline)
-    paint_width = 192   # Paint width (16 ft = 192 inches, -96 to 96)
-    paint_end = 564     # Extend paint to court end
+    free_throw_x = 336 if not flip_court else -336  # Adjust for flip
+    paint_width = 192  # 16 ft = 192 inches, -96 to 96
+    paint_end = 564 if not flip_court else -564  # Extend to court end
     three_point_radius = 285  # Distance from hoop to peak (501 - 216)
 
     # Create figure
     fig = go.Figure()
 
-    # Court boundary (rectangle, centered at (0, 0))
+    # Court boundary (adjusted for flip)
+    court_x = [-court_length/2, court_length, court_length, -court_length/2, -court_length/2] if not flip_court else [court_length/2, -court_length, -court_length, court_length/2, court_length/2]
     fig.add_trace(
         go.Scatter(
-            x=[-court_length/2, court_length, court_length, -court_length/2, -court_length/2],
+            x=court_x,
             y=[-court_width/2, -court_width/2, court_width/2, court_width/2, -court_width/2],
             mode='lines',
             line=dict(color='black', width=2),
@@ -1753,10 +1743,11 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         )
     )
 
-    # Paint outline (rectangle from 336 to 564, y = ±96)
+    # Paint outline (rectangle from 336 to 564, y = ±96, flipped if needed)
+    paint_x = [free_throw_x, paint_end, paint_end, free_throw_x, free_throw_x]
     fig.add_trace(
         go.Scatter(
-            x=[free_throw_x, paint_end, paint_end, free_throw_x, free_throw_x],
+            x=paint_x,
             y=[-paint_width/2, -paint_width/2, paint_width/2, paint_width/2, -paint_width/2],
             mode='lines',
             line=dict(color='black', width=2, dash='dash'),
@@ -1766,13 +1757,26 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
 
     # 3-point arc (semicircle centered at hoop, trimmed to match endpoints)
     theta = np.linspace(-np.pi/2, np.pi/2, 100)  # Full semicircle
-    three_x_full = hoop_x - three_point_radius * np.cos(theta)
+    three_x_full = hoop_x - three_point_radius * np.cos(theta) if not flip_court else hoop_x + three_point_radius * np.cos(theta)
     three_y_full = hoop_y + three_point_radius * np.sin(theta)
 
-    # Trim arc to stay within y = ±264 and x >= 216
-    mask = (three_y_full >= -264) & (three_y_full <= 264) & (three_x_full >= 216)
+    # Trim arc to reach exactly (396, ±264) or flipped equivalent
+    three_point_end_x = 396 if not flip_court else -396
+    mask = (three_y_full >= -264) & (three_y_full <= 264) & (three_x_full >= 216 if not flip_court else three_x_full <= -216)
     three_x = three_x_full[mask]
     three_y = three_y_full[mask]
+    
+    # Ensure arc connects to (396, ±264) by forcing endpoints
+    if not flip_court:
+        three_x = np.append(three_x, 396)
+        three_y = np.append(three_y, 264)
+        three_x = np.insert(three_x, 0, 396)
+        three_y = np.insert(three_y, 0, -264)
+    else:
+        three_x = np.append(three_x, -396)
+        three_y = np.append(three_y, 264)
+        three_x = np.insert(three_x, 0, -396)
+        three_y = np.insert(three_y, 0, -264)
 
     fig.add_trace(
         go.Scatter(
@@ -1784,10 +1788,12 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         )
     )
 
-    # Extend 3-point line to court end (x = 564) at y = ±264
+    # Extend 3-point line to court end (x = 564 or -564) at y = ±264
+    three_ext_start_x = 396 if not flip_court else -396
+    three_ext_end_x = court_length if not flip_court else -court_length
     fig.add_trace(
         go.Scatter(
-            x=[396, court_length],  # From arc end to court end
+            x=[three_ext_start_x, three_ext_end_x],
             y=[-264, -264],
             mode='lines',
             line=dict(color='black', width=2),
@@ -1796,7 +1802,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
     )
     fig.add_trace(
         go.Scatter(
-            x=[396, court_length],  # From arc end to court end
+            x=[three_ext_start_x, three_ext_end_x],
             y=[264, 264],
             mode='lines',
             line=dict(color='black', width=2),
@@ -1816,11 +1822,12 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
     )
 
     # Update layout with fixed size and equal aspect ratio
+    x_range = [-282, 564] if not flip_court else [-564, 282]
     fig.update_layout(
         title="Shot Location on Half Court",
         xaxis_title="X Position (inches)",
         yaxis_title="Y Position (inches)",
-        xaxis=dict(range=[-282, 564], showgrid=False),
+        xaxis=dict(range=x_range, showgrid=False),
         yaxis=dict(range=[-300, 300], showgrid=False),
         width=500,
         height=500,
