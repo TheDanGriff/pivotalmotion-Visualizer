@@ -1922,6 +1922,9 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
     import numpy as np
+    import logging
+
+    logger = logging.getLogger(__name__)
 
     INCHES_TO_FEET = 1 / 12
 
@@ -1937,16 +1940,16 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         # Distinct pastel colors for joints
         'elbow': 'rgba(173, 216, 230, 1)',       # Pastel blue
         'shoulder': 'rgba(221, 160, 221, 1)',    # Pastel plum
-        'wrist': 'rgba(152, 251, 152, 1)',       # Pastel pale green (replacing khaki)
-        'hip': 'rgba(240, 230, 140, 1)',         # Pastel khaki (replacing green)
-        'knee': 'rgba(255, 160, 122, 1)',        # Pastel coral (replacing peach)
+        'wrist': 'rgba(152, 251, 152, 1)',       # Pastel pale green
+        'hip': 'rgba(240, 230, 140, 1)',         # Pastel khaki
+        'knee': 'rgba(255, 160, 122, 1)',        # Pastel coral
         'ankle': 'rgba(176, 224, 230, 1)'        # Pastel powder blue
     }
     DASH_STYLES = {
         'lift': 'dash',
         'set': 'dot',
         'release': 'dashdot',
-        'velocity': 'dot'  # Added for dotted velocity line
+        'velocity': 'dot'  # Dotted line for velocity
     }
 
     # Extract key indices
@@ -2095,8 +2098,8 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     fig.update_layout(
         title="Joint Flexion/Extension Analysis",
         title_x=0.5,  # Center the title
-        height=400,   # Increased height
-        width=1000,   # Increased width
+        height=400,   # Larger height
+        width=1000,   # Larger width
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -2129,5 +2132,8 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             'range': angles.max() - angles.min(),
             'rate_change': (angles.diff() / pose_segment['time'].diff()).max()
         }
+
+    # Debug log to confirm function execution
+    logger.debug("plot_joint_flexion_analysis executed with fig size: 1000x400, velocity dotted, unique colors applied")
 
     return fig, kpis
