@@ -342,29 +342,77 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         except Exception as e:
             st.error(f"Visualization error: {str(e)}")
 
+
+
 def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
     st.header("Biomechanics Analysis")
     release_idx = metrics.get('release_idx', 0)
 
-    st.subheader("Joint Flexion/Extension")
+    # Kinematic Chain Score at the top
     fig, kpis = plot_joint_flexion_analysis(df_pose, df_ball, metrics)
-    st.plotly_chart(fig, use_container_width=True)
+    st.subheader("Key Performance Indicators")
+    animated_flip_kpi_card(
+        label="Kinematic Chain Score",
+        value=kpis.get('kinematic_chain_score', 0),
+        unit="/100",
+        player_average=None,  # Replace with actual average if available
+        min_value=0,
+        max_value=100,
+        extra_html="<p>Measures sequential energy transfer from lower to upper body.</p>"
+    )
 
-    st.subheader("Joint Flexion/Extension KPIs")
-    col1, col2, col3 = st.columns(3)
-    for i, joint in enumerate([j for j in kpis.keys() if j != 'kinematic_chain_score']):
-        col = [col1, col2, col3][i % 3]
-        with col:
-            st.metric(f"{joint.capitalize()} Max Flexion", f"{kpis[joint]['max_flexion']:.1f}°")
-            st.metric(f"{joint.capitalize()} Min Flexion", f"{kpis[joint]['min_flexion']:.1f}°")
-            st.metric(f"{joint.capitalize()} at Lift", f"{kpis[joint]['at_lift']:.1f}°")
-            st.metric(f"{joint.capitalize()} at Set", f"{kpis[joint]['at_set']:.1f}°")
-            st.metric(f"{joint.capitalize()} at Release", f"{kpis[joint]['at_release']:.1f}°")
-            st.metric(f"{joint.capitalize()} Range", f"{kpis[joint]['range']:.1f}°")
-            st.metric(f"{joint.capitalize()} Max Rate", f"{kpis[joint]['rate_change']:.1f}°/s")
-    
-    st.subheader("Kinematic Chain Score")
-    st.metric("Kinematic Chain Score", f"{kpis['kinematic_chain_score']:.1f}/100")
+    # Other KPIs in cards
+    col1, col2 = st.columns(2)
+    with col1:
+        animated_flip_kpi_card(
+            label="Max Knee Flexion",
+            value=kpis.get('max_knee_flexion', 0),
+            unit="°",
+            player_average=None,  # Replace with actual average if available
+            min_value=0,
+            max_value=180,
+            extra_html="<p>Indicates lower body power generation.</p>"
+        )
+        animated_flip_kpi_card(
+            label="Max Elbow Flexion",
+            value=kpis.get('max_elbow_flexion', 0),
+            unit="°",
+            player_average=None,
+            min_value=0,
+            max_value=180,
+            extra_html="<p>Reflects shooting arm preparation.</p>"
+        )
+        animated_flip_kpi_card(
+            label="Shoulder Rotation",
+            value=kpis.get('shoulder_rotation', 0),
+            unit="°",
+            player_average=None,
+            min_value=0,
+            max_value=180,
+            extra_html="<p>Shows torso contribution to shot power.</p>"
+        )
+    with col2:
+        animated_flip_kpi_card(
+            label="COM Speed",
+            value=kpis.get('com_speed', 0),
+            unit="ft/s",
+            player_average=None,
+            min_value=0,
+            max_value=10,
+            extra_html=f"<p>Direction: {kpis.get('com_direction', 0):.1f}° from forward.</p><p>Average speed before release.</p>"
+        )
+        animated_flip_kpi_card(
+            label="Stability Ratio",
+            value=kpis.get('stability_ratio', 0),
+            unit="x",
+            player_average=None,
+            min_value=0,
+            max_value=2,
+            extra_html="<p>Feet width relative to hips; ~1.1x is optimal.</p>"
+        )
+
+    st.subheader("Joint Flexion/Extension")
+    st.plotly_chart(fig, use_container_width=True)
 
     
     # Get hoop position and flip from metrics

@@ -464,83 +464,6 @@ def display_clickable_kpi_card(label, value, benchmark_values, unit="", player_a
 
 import streamlit.components.v1 as components
 
-def get_metallic_color(value, player_average, min_value=None, max_value=None):
-    """
-    Return a metallic color (red to green gradient) based on how close the value is to the player_average,
-    or use hardcoded thresholds if no player_average is available.
-    Uses a metallic gradient (e.g., red #FF0000 to green #00FF00).
-    """
-    if pd.isna(value):
-        return "#D3D3D3"  # Gray for NaN
-
-    # If player_average is None or NaN, use hardcoded thresholds
-    if pd.isna(player_average) or player_average is None:
-        # Hardcoded thresholds for each KPI (adjust as needed)
-        if "Velocity" in str(value):
-            min_value, max_value = 5, 15  # feet/s (e.g., 5–15 ft/s for release velocity)
-            target = 10  # Optimal release velocity in feet/s
-        elif "Height" in str(value):
-            min_value, max_value = 5, 10  # feet (e.g., 5–10 ft for release/apex height)
-            target = 8  # Optimal height in feet
-        elif "Distance" in str(value):
-            min_value, max_value = 5, 30  # feet (e.g., 5–30 ft for shot distance)
-            target = 15  # Optimal distance in feet
-        elif "Time" in str(value):
-            min_value, max_value = 0.2, 0.6  # seconds (e.g., 0.2–0.6 s for release time)
-            target = 0.4  # Optimal release time in seconds
-        elif "Curvature" in str(value):
-            min_value, max_value = 0.1, 0.5  # 1/ft (e.g., 0.1–0.5 1/ft for release curvature)
-            target = 0.3  # Optimal curvature in 1/ft
-        elif "Deviation" in str(value):
-            min_value, max_value = 0, 0.5  # feet (e.g., 0–0.5 ft for lateral deviation)
-            target = 0.1  # Optimal deviation in feet
-        else:
-            min_value, max_value = 0, 100  # Default range
-            target = 50
-
-        # Normalize the difference between value and target to [0, 1]
-        diff = abs(value - target)
-        range_span = max_value - min_value
-        if range_span == 0:
-            normalized_diff = 0
-        else:
-            normalized_diff = min(1, diff / range_span)
-
-    else:
-        # Use player average for color coding
-        # Define dynamic range if min_value and max_value are not provided
-        if min_value is None or max_value is None:
-            if "Velocity" in str(value):
-                min_value, max_value = 0, 15  # feet/s
-            elif "Height" in str(value):
-                min_value, max_value = 0, 10  # feet
-            elif "Distance" in str(value):
-                min_value, max_value = 0, 50  # feet
-            elif "Time" in str(value):
-                min_value, max_value = 0, 1  # seconds
-            elif "Curvature" in str(value):
-                min_value, max_value = 0, 0.5  # 1/feet
-            elif "Deviation" in str(value):
-                min_value, max_value = 0, 0.5  # feet
-            else:
-                min_value, max_value = 0, 100  # Default range
-
-        # Normalize the difference between value and player_average to [0, 1]
-        diff = abs(value - player_average)
-        range_span = max_value - min_value
-        if range_span == 0:
-            normalized_diff = 0
-        else:
-            normalized_diff = min(1, diff / range_span)
-
-    # Create a metallic gradient from red (#FF0000) to green (#00FF00)
-    r = int(255 * (1 - normalized_diff))  # Red decreases from 255 to 0
-    g = int(255 * normalized_diff)        # Green increases from 0 to 255
-    b = 0  # Blue stays at 0 for a metallic look
-    color = f"#{r:02x}{g:02x}{b:02x}"
-
-    return color
-
 # Update format_kpi_with_color to use the new metallic color logic
 def format_kpi_with_color(name, value, player_average, benchmarks=None, min_value=None, max_value=None):
     color = get_metallic_color(value, player_average, min_value, max_value)
@@ -591,24 +514,26 @@ def display_clickable_kpi_card(label, value, player_average, unit="", benchmarks
             for line in extra_lines:
                 st.markdown(line)
 
+def get_metallic_color(value, player_average, min_value=None, max_value=None):
+    """Helper function to determine metallic color based on value proximity to average."""
+    if pd.isna(player_average) or player_average is None:
+        return "#D3D3D3"  # Gray for unknown average
+    norm_value = (value - player_average) / (max_value - min_value if max_value and min_value else 1)
+    norm_value = max(min(norm_value, 1), -1)  # Clamp between -1 and 1
+    if norm_value > 0:
+        r = int(255 * (1 - norm_value) + 192 * norm_value)  # Transition to gold
+        g = int(215 * (1 - norm_value) + 215 * norm_value)
+        b = int(0 * (1 - norm_value) + 203 * norm_value)
+    else:
+        r = int(192 * (1 + norm_value) + 169 * -norm_value)  # Transition to silver
+        g = int(215 * (1 + norm_value) + 169 * -norm_value)
+        b = int(203 * (1 + norm_value) + 169 * -norm_value)
+    return f"rgb({r}, {g}, {b})"
+
 def animated_flip_kpi_card(label, value, unit, player_average, min_value=None, max_value=None, extra_html=""):
-    """
-    Renders an animated flip card with a metallic color spectrum based on proximity to player average,
-    and an arrow indicating above/below average, handling None values for player_average.
-    
-    Parameters:
-      label (str): KPI name.
-      value (float): KPI value in feet.
-      unit (str): Unit string (e.g., "ft").
-      player_average (float, optional): Player's average for this KPI in feet.
-      min_value (float, optional): Minimum value for the KPI range.
-      max_value (float, optional): Maximum value for the KPI range.
-      extra_html (str, optional): Additional HTML content to show on the back.
-    """
-    # Default arrow and color if player_average is None
     if pd.isna(player_average) or player_average is None:
         arrow = ""
-        color = "#D3D3D3"  # Gray for unknown average
+        color = "#D3D3D3"
     else:
         color = get_metallic_color(value, player_average, min_value, max_value)
         arrow = "↑" if value > player_average else "↓" if value < player_average else "="
@@ -621,7 +546,7 @@ def animated_flip_kpi_card(label, value, unit, player_average, min_value=None, m
         width: 300px;
         height: 200px;
         perspective: 1000px;
-        margin: auto;
+        margin: 10px auto;
         cursor: pointer;
       }}
       .flip-card-inner {{
@@ -689,4 +614,5 @@ def animated_flip_kpi_card(label, value, unit, player_average, min_value=None, m
       </div>
     </div>
     """
+
     components.html(html_code, height=250)
