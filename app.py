@@ -159,10 +159,10 @@ def main():
     selected_job_id = selected_job['JobID']
     shot_type = selected_job.get("ShootingType", "Unknown")
 
-    # Get player averages based on shot type.
+    # Get player averages based on shot type
     player_averages = get_player_kpi_averages(selected_job['PlayerName'], shot_type)
 
-    # After retrieving your segments (using list_segments or list_data_file_job_segments)
+    # After retrieving your segments
     if selected_job['Source'].lower() == 'pose_video':
         segments = list_segments(s3_client, BUCKET_NAME, user_email, selected_job_id)
     elif selected_job['Source'].lower() == 'data_file':
@@ -182,13 +182,11 @@ def main():
         for seg_id in segments
     }
 
-
     selected_segment = st.selectbox(
         "Select Segment",
         options=list(segment_labels.keys()),
         format_func=lambda seg_id: segment_labels[seg_id]
     )
-
 
     if selected_job['Source'].lower() in ['pose_video', 'data_file']:
         if selected_job['Source'].lower() == 'data_file':
@@ -256,9 +254,10 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         'Release Time': {'value': metrics.get('release_time', 0), 'min': 0, 'max': 1},      # seconds
         'Apex Height': {'value': metrics.get('apex_height', 0), 'min': 0, 'max': 10},       # feet
         'Release Curvature': {'value': metrics.get('release_curvature', 0), 'min': 0, 'max': 0.5},  # 1/ft
-        'Lateral Deviation': {'value': metrics.get('lateral_deviation', 0), 'min': 0, 'max': 0.5}   # feet
+        'Lateral Deviation': {'value': metrics.get('lateral_deviation', 0), 'min': -0.5, 'max': 0.5}  # feet, adjusted range
     }
 
+    # KPI Grid (two rows of four columns)
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         animated_flip_kpi_card("Release Height",
@@ -321,9 +320,14 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
                                player_average=player_averages['Lateral Deviation'] if player_averages is not None else None,
                                min_value=kpis['Lateral Deviation']['min'],
                                max_value=kpis['Lateral Deviation']['max'])
-        
-        plot_shot_location(df_ball, metrics)
 
+    # Shot Location Visualization (Full Width)
+    if not df_ball.empty:
+        st.subheader("Shot Location")
+        shot_location_fig = plot_shot_location(df_ball, metrics)
+        st.plotly_chart(shot_location_fig, use_container_width=True)
+
+    # Existing Visualizations
     fig = plot_curvature_analysis(df_ball, metrics, weighting_exponent=3, num_interp=300, curvature_scale=2.3)
     st.plotly_chart(fig, use_container_width=True)
 
@@ -336,7 +340,6 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             st.plotly_chart(fig3, use_container_width=True, key="overview_3d_ball_path")
         except Exception as e:
             st.error(f"Visualization error: {str(e)}")
-
 
 def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
     st.header("Biomechanics Analysis")
