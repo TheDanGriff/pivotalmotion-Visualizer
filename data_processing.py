@@ -785,6 +785,191 @@ def compute_joint_angles(df):
                 ), axis=1)
     return df
 
+# After plot_shot_location, add the new joint flexion/extension analysis function
+def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
+    """
+    Create a visualization of joint flexion/extension angles during the shooting motion.
+    
+    Parameters:
+    - pose_df: DataFrame with pose data (e.g., 'RSHOULDER_X', 'RELBOW_X', etc.) in inches.
+    - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', 'Basketball_Z' in inches.
+    - metrics: Dictionary with 'lift_idx', 'release_idx', etc.
+    - fps: Frames per second, default 60.
+    
+    Returns:
+    - figs: Dictionary with 'upper_body' and 'lower_body' Plotly figure objects.
+    """
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    import numpy as np
+
+    INCHES_TO_FEET = 1 / 12
+
+    # Extract key indices
+    lift_idx = metrics['lift_idx']
+    release_idx = metrics['release_idx']
+
+    # Extend time window: 0.25s before lift_idx, 0.5s after release_idx
+    frames_before = int(0.25 * fps)  # 15 frames at 60 fps
+    frames_after = int(0.5 * fps)    # 30 frames at 60 fps
+    start_idx = max(0, lift_idx - frames_before)
+    end_idx = min(len(pose_df) - 1, release_idx + frames_after)
+
+    # Subset dataframes
+    pose_segment = pose_df.iloc[start_idx:end_idx + 1].copy()
+    ball_segment = ball_df.iloc[start_idx:end_idx + 1].copy()
+
+    # Add time column (in seconds)
+    pose_segment['time'] = (pose_segment.index - start_idx) / fps
+    ball_segment['time'] = (ball_segment.index - start_idx) / fps
+
+    # Calculate joint angles using law of cosines (updated column names)
+    def calculate_angle(df, a_x, a_y, a_z, b_x, b_y, b_z, c_x, c_y, c_z):
+        """Calculate angle at point B between points A, B, C in 3D."""
+        ab = np.sqrt((df[a_x] - df[b_x])**2 + (df[a_y] - df[b_y])**2 + (df[a_z] - df[b_z])**2)
+        bc = np.sqrt((df[c_x] - df[b_x])**2 + (df[c_y] - df[b_y])**2 + (df[c_z] - df[b_z])**2)
+        ac = np.sqrt((df[a_x] - df[c_x])**2 + (df[a_y] - df[c_y])**2 + (df[a_z] - df[c_z])**2)
+        cos_angle = (ab**2 + bc**2 - ac**2) / (2 * ab * bc)
+        cos_angle = np.clip(cos_angle, -1, 1)  # Avoid numerical errors outside [-1, 1]
+        return np.degrees(np.arccos(cos_angle))
+
+    # Upper body angles
+    pose_segment['elbow_angle'] = calculate_angle(
+        pose_segment, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
+        'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
+        'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z'
+    )
+    pose_segment['shoulder_angle'] = calculate_angle(
+        pose_segment, 'MIDHIP_X', 'MIDHIP_Y', 'MIDHIP_Z',
+        'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
+        'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z'
+    )
+    pose_segment['wrist_angle'] = calculate_angle(
+        pose_segment, 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
+        'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z',
+        'RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z'  # Using thumb as proxy for wrist end
+    )
+
+    # Lower body angles
+    pose_segment['hip_angle'] = calculate_angle(
+        pose_segment, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
+        'RHIP_X', 'RHIP_Y', 'RHIP_Z',
+        'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z'
+    )
+    pose_segment['knee_angle'] = calculate_angle(
+        pose_segment, 'RHIP_X', 'RHIP_Y', 'RHIP_Z',
+        'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
+        'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z'
+    )
+    pose_segment['ankle_angle'] = calculate_angle(
+        pose_segment, 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
+        'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z',
+        'RBIGTOE_X', 'RBIGTOE_Y', 'RBIGTOE_Z'
+    )
+
+    # Calculate ball velocity (in feet/s)
+    ball_segment['velo_x'] = ball_segment['Basketball_X'].diff() * fps * INCHES_TO_FEET
+    ball_segment['velo_y'] = ball_segment['Basketball_Y'].diff() * fps * INCHES_TO_FEET
+    ball_segment['velo_z'] = ball_segment['Basketball_Z'].diff() * fps * INCHES_TO_FEET
+    ball_segment['velocity'] = np.sqrt(
+        ball_segment['velo_x']**2 + ball_segment['velo_y']**2 + ball_segment['velo_z']**2
+    ).fillna(0)
+
+    # Create subplots for upper and lower body
+    figs = {}
+    
+    # Upper body plot
+    fig_upper = make_subplots(specs=[[{"secondary_y": True}]])
+    for angle, color in [('elbow_angle', 'blue'), ('shoulder_angle', 'black'), ('wrist_angle', 'cyan')]:
+        fig_upper.add_trace(
+            go.Scatter(
+                x=pose_segment['time'],
+                y=pose_segment[angle],
+                mode='lines',
+                name=angle.replace('_angle', '').capitalize(),
+                line=dict(color=color, width=2)
+            ),
+            secondary_y=False
+        )
+    fig_upper.add_trace(
+        go.Scatter(
+            x=ball_segment['time'],
+            y=ball_segment['velocity'],
+            mode='lines',
+            name='Ball Velocity',
+            line=dict(color='magenta', dash='dot', width=2)
+        ),
+        secondary_y=True
+    )
+    # Add vertical lines for lift and release
+    fig_upper.add_vline(x=(lift_idx - start_idx) / fps, line=dict(color='green', dash='dash'), name='Lift')
+    fig_upper.add_vline(x=(release_idx - start_idx) / fps, line=dict(color='red', dash='dash'), name='Release')
+    fig_upper.update_layout(
+        title="Upper Body Joint Flexion/Extension",
+        xaxis_title="Time (s)",
+        yaxis_title="Angle (degrees)",
+        yaxis=dict(range=[0, 180]),
+        yaxis2=dict(title="Velocity (ft/s)", range=[0, 35], overlaying='y', side='right'),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+        height=400,
+        width=800
+    )
+    figs['upper_body'] = fig_upper
+
+    # Lower body plot
+    fig_lower = make_subplots(specs=[[{"secondary_y": True}]])
+    for angle, color in [('hip_angle', 'blue'), ('knee_angle', 'black'), ('ankle_angle', 'cyan')]:
+        fig_lower.add_trace(
+            go.Scatter(
+                x=pose_segment['time'],
+                y=pose_segment[angle],
+                mode='lines',
+                name=angle.replace('_angle', '').capitalize(),
+                line=dict(color=color, width=2)
+            ),
+            secondary_y=False
+        )
+    fig_lower.add_trace(
+        go.Scatter(
+            x=ball_segment['time'],
+            y=ball_segment['velocity'],
+            mode='lines',
+            name='Ball Velocity',
+            line=dict(color='magenta', dash='dot', width=2)
+        ),
+        secondary_y=True
+    )
+    fig_lower.add_vline(x=(lift_idx - start_idx) / fps, line=dict(color='green', dash='dash'), name='Lift')
+    fig_lower.add_vline(x=(release_idx - start_idx) / fps, line=dict(color='red', dash='dash'), name='Release')
+    fig_lower.update_layout(
+        title="Lower Body Joint Flexion/Extension",
+        xaxis_title="Time (s)",
+        yaxis_title="Angle (degrees)",
+        yaxis=dict(range=[0, 180]),
+        yaxis2=dict(title="Velocity (ft/s)", range=[0, 35], overlaying='y', side='right'),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+        height=400,
+        width=800
+    )
+    figs['lower_body'] = fig_lower
+
+    # Calculate KPIs
+    kpis = {}
+    joints = ['elbow', 'shoulder', 'wrist', 'hip', 'knee', 'ankle']
+    for joint in joints:
+        angle_col = f'{joint}_angle'
+        angles = pose_segment[angle_col]
+        kpis[joint] = {
+            'max_flexion': angles.max(),
+            'min_flexion': angles.min(),
+            'at_lift': angles.iloc[lift_idx - start_idx] if lift_idx >= start_idx else np.nan,
+            'at_release': angles.iloc[release_idx - start_idx] if release_idx <= end_idx else np.nan,
+            'range': angles.max() - angles.min(),
+            'rate_change': (angles.diff() / pose_segment['time'].diff()).max()  # Max rate of change (degrees/s)
+        }
+
+    return figs, kpis
+
 def calculate_shot_metrics(pose_df, ball_df, fps=60):
     """
     Calculate basketball shot metrics entirely in FEET.
@@ -928,11 +1113,51 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         else:
             metrics['lateral_deviation'] = 0.0  # Only set to 0.0 if calculation fails
 
-        # 11. Additional Pose Computations
-        pose_df = compute_joint_angles(pose_df)
-        pose_df = calculate_centroid(pose_df)
-        pose_df = calculate_stability(pose_df)
-        pose_df = calculate_guide_hand_release(pose_df)
+        # 11. Additional Pose Computations (update this section)
+            pose_df = compute_joint_angles(pose_df)  # Already calculates some angles
+            pose_df = calculate_centroid(pose_df)
+            pose_df = calculate_stability(pose_df)
+            pose_df = calculate_guide_hand_release(pose_df)
+
+            # Add new joint angle calculations for consistency with visuals
+            def calculate_angle(df, a_x, a_y, a_z, b_x, b_y, b_z, c_x, c_y, c_z):
+                ab = np.sqrt((df[a_x] - df[b_x])**2 + (df[a_y] - df[b_y])**2 + (df[a_z] - df[b_z])**2)
+                bc = np.sqrt((df[c_x] - df[b_x])**2 + (df[c_y] - df[b_y])**2 + (df[c_z] - df[b_z])**2)
+                ac = np.sqrt((df[a_x] - df[c_x])**2 + (df[a_y] - df[c_y])**2 + (df[a_z] - df[c_z])**2)
+                cos_angle = (ab**2 + bc**2 - ac**2) / (2 * ab * bc)
+                cos_angle = np.clip(cos_angle, -1, 1)
+                return np.degrees(np.arccos(cos_angle))
+
+            pose_df['elbow_angle'] = calculate_angle(
+                pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
+                'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
+                'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z'
+            )
+            pose_df['shoulder_angle'] = calculate_angle(
+                pose_df, 'MIDHIP_X', 'MIDHIP_Y', 'MIDHIP_Z',
+                'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
+                'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z'
+            )
+            pose_df['wrist_angle'] = calculate_angle(
+                pose_df, 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
+                'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z',
+                'RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z'
+            )
+            pose_df['hip_angle'] = calculate_angle(
+                pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
+                'RHIP_X', 'RHIP_Y', 'RHIP_Z',
+                'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z'
+            )
+            pose_df['knee_angle'] = calculate_angle(
+                pose_df, 'RHIP_X', 'RHIP_Y', 'RHIP_Z',
+                'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
+                'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z'
+            )
+            pose_df['ankle_angle'] = calculate_angle(
+                pose_df, 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
+                'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z',
+                'RBIGTOE_X', 'RBIGTOE_Y', 'RBIGTOE_Z'
+            )
 
     except Exception as e:
         logger.error(f"Error calculating shot metrics: {str(e)}")

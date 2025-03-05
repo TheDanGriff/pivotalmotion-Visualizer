@@ -25,7 +25,8 @@ from data_processing import (
     get_segment_label,
     get_player_kpi_averages,
     get_shot_type,
-    plot_shot_location
+    plot_shot_location,
+    plot_joint_flexion_analysis
 )
 from visualization import (
     plot_single_shot,
@@ -344,6 +345,29 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
 def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
     st.header("Biomechanics Analysis")
     release_idx = metrics.get('release_idx', 0)
+
+    # New joint flexion/extension analysis
+    st.subheader("Joint Flexion/Extension")
+    figs, kpis = plot_joint_flexion_analysis(df_pose, df_ball, metrics)
+
+    # Display upper body plot
+    st.plotly_chart(figs['upper_body'], use_container_width=True)
+
+    # Display lower body plot
+    st.plotly_chart(figs['lower_body'], use_container_width=True)
+
+    # Display KPIs
+    st.subheader("Joint Flexion/Extension KPIs")
+    col1, col2, col3 = st.columns(3)
+    for i, joint in enumerate(kpis.keys()):
+        col = [col1, col2, col3][i % 3]
+        with col:
+            st.metric(f"{joint.capitalize()} Max Flexion", f"{kpis[joint]['max_flexion']:.1f}°")
+            st.metric(f"{joint.capitalize()} Min Flexion", f"{kpis[joint]['min_flexion']:.1f}°")
+            st.metric(f"{joint.capitalize()} at Lift", f"{kpis[joint]['at_lift']:.1f}°")
+            st.metric(f"{joint.capitalize()} at Release", f"{kpis[joint]['at_release']:.1f}°")
+            st.metric(f"{joint.capitalize()} Range", f"{kpis[joint]['range']:.1f}°")
+            st.metric(f"{joint.capitalize()} Max Rate", f"{kpis[joint]['rate_change']:.1f}°/s")
     
     # Get hoop position and flip from metrics
     hoop_x = metrics.get('hoop_x', 501.0)  # Default to 501 if not in metrics
