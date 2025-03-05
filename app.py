@@ -349,9 +349,9 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
     # New joint flexion/extension analysis
     st.subheader("Joint Flexion/Extension")
     fig, kpis = plot_joint_flexion_analysis(df_pose, df_ball, metrics)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True)  # Use the single figure directly
 
-    # Display KPIs (unchanged)
+    # Display KPIs
     st.subheader("Joint Flexion/Extension KPIs")
     col1, col2, col3 = st.columns(3)
     for i, joint in enumerate(kpis.keys()):

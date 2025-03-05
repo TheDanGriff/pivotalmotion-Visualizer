@@ -2093,8 +2093,8 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     # Update layout
     fig.update_layout(
         title="Joint Flexion/Extension Analysis",
-        height=300,  # Smaller height
-        width=900,   # Width to fit side-by-side
+        height=300,
+        width=900,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
         margin=dict(l=50, r=50, t=80, b=50)
     )
