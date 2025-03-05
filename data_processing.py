@@ -1670,7 +1670,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
     # Get shot location at lift_idx (prefer foot position, fallback to ball position)
     lift_idx = metrics['lift_idx']
     if pose_df is not None and 'MIDHIP_X' in pose_df.columns and 'MIDHIP_Y' in pose_df.columns:
-        shot_x = pose_df.loc[lift_idx, 'MIDHIP_X']  # Use mid-hip as proxy for foot position
+        shot_x = pose_df.loc[lift_idx, 'MIDHIP_X']
         shot_y = pose_df.loc[lift_idx, 'MIDHIP_Y']
         source_note = " (Foot Position at Lift)"
     else:
@@ -1679,38 +1679,54 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         source_note = " (Ball at Lift)"
         logger.warning(f"Using ball position at lift_idx {lift_idx} as pose data is unavailable.")
 
+    # Debug OUTCOME presence and value
+    logger.debug(f"ball_df columns: {ball_df.columns.tolist()}")
+    logger.debug(f"ball_df index: {ball_df.index.tolist()}")
+    logger.debug(f"lift_idx: {lift_idx}")
+
     # Determine marker based on shot outcome
-    if 'OUTCOME' in ball_df.columns and not pd.isna(ball_df.loc[lift_idx, 'OUTCOME']):
-        outcome = ball_df.loc[lift_idx, 'OUTCOME']
-        if outcome == 'Y':
-            marker_symbol = 'circle'
-            marker_color = 'green'
-            marker_name = f'Shot Location (Make){source_note}'
-        elif outcome == 'N':
-            marker_symbol = 'x'
-            marker_color = 'red'
-            marker_name = f'Shot Location (Miss){source_note}'
-        else:
+    if 'OUTCOME' in ball_df.columns:
+        try:
+            outcome = ball_df.loc[lift_idx, 'OUTCOME']
+            logger.debug(f"OUTCOME at lift_idx {lift_idx}: {outcome}")
+            if pd.isna(outcome):
+                marker_symbol = 'x'
+                marker_color = 'grey'
+                marker_name = f'Shot Location (Unknown Outcome){source_note}'
+                logger.warning(f"OUTCOME is NaN at lift_idx {lift_idx}. Using grey 'X'.")
+            elif outcome == 'Y':
+                marker_symbol = 'circle'
+                marker_color = 'green'
+                marker_name = f'Shot Location (Make){source_note}'
+            elif outcome == 'N':
+                marker_symbol = 'x'
+                marker_color = 'red'
+                marker_name = f'Shot Location (Miss){source_note}'
+            else:
+                marker_symbol = 'x'
+                marker_color = 'grey'
+                marker_name = f'Shot Location (Unexpected Outcome: {outcome}){source_note}'
+                logger.warning(f"Unexpected OUTCOME value '{outcome}' at lift_idx {lift_idx}. Using grey 'X'.")
+        except KeyError:
             marker_symbol = 'x'
             marker_color = 'grey'
-            marker_name = f'Shot Location (Unknown Outcome){source_note}'
-            logger.warning(f"Unexpected OUTCOME value '{outcome}' at lift_idx {lift_idx}. Using grey 'X'.")
+            marker_name = f'Shot Location (Index Error){source_note}'
+            logger.error(f"lift_idx {lift_idx} not in ball_df index. Using grey 'X'.")
     else:
         marker_symbol = 'x'
         marker_color = 'grey'
-        marker_name = f'Shot Location (Unknown Outcome){source_note}'
-        logger.warning(f"'OUTCOME' column missing or NaN at lift_idx {lift_idx}. Using grey 'X' marker.")
+        marker_name = f'Shot Location (No OUTCOME Column){source_note}'
+        logger.warning(f"'OUTCOME' column missing from ball_df. Using grey 'X' marker.")
 
     # Court dimensions in inches (centered at (0, 0))
     court_length = 564  # Half-court length from center to right edge
     court_width = 600   # Full width (-300 to 300)
     hoop_x = 501        # Hoop position
     hoop_y = 0
-    free_throw_x = 336  # Free throw line x-coordinate (19 ft = 228 inches from baseline, 564 - 228)
+    free_throw_x = 336  # Free throw line x-coordinate (19 ft = 228 inches from baseline)
     paint_width = 192   # Paint width (16 ft = 192 inches, -96 to 96)
-    paint_left = free_throw_x  # Left edge of paint
-    paint_right = hoop_x       # Right edge at hoop
-    three_point_radius = 285   # Distance from hoop to peak (501 - 216 = 23.75 ft)
+    paint_end = 564     # Extend paint to court end
+    three_point_radius = 285  # Distance from hoop to peak (501 - 216)
 
     # Create figure
     fig = go.Figure()
@@ -1737,10 +1753,10 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         )
     )
 
-    # Paint outline (rectangle from free throw line to hoop)
+    # Paint outline (rectangle from 336 to 564, y = ±96)
     fig.add_trace(
         go.Scatter(
-            x=[paint_left, paint_right, paint_right, paint_left, paint_left],
+            x=[free_throw_x, paint_end, paint_end, free_throw_x, free_throw_x],
             y=[-paint_width/2, -paint_width/2, paint_width/2, paint_width/2, -paint_width/2],
             mode='lines',
             line=dict(color='black', width=2, dash='dash'),
@@ -1768,10 +1784,10 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         )
     )
 
-    # Extend 3-point line to baseline (x = -282) at y = ±264
+    # Extend 3-point line to court end (x = 564) at y = ±264
     fig.add_trace(
         go.Scatter(
-            x=[396, -court_length/2],  # From arc end to baseline
+            x=[396, court_length],  # From arc end to court end
             y=[-264, -264],
             mode='lines',
             line=dict(color='black', width=2),
@@ -1780,7 +1796,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
     )
     fig.add_trace(
         go.Scatter(
-            x=[396, -court_length/2],  # From arc end to baseline
+            x=[396, court_length],  # From arc end to court end
             y=[264, 264],
             mode='lines',
             line=dict(color='black', width=2),
