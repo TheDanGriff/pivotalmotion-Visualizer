@@ -903,15 +903,20 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             metrics.get('release_height', 0)
         )
 
-        # 10. Lateral deviation (updated to example code)
-        lateral_dev = calculate_lateral_deviation(ball_df, metrics['release_idx'])
+        # 10. Lateral deviation (using provided function)
+        lateral_dev = calculate_lateral_deviation(
+            ball_df,
+            metrics['release_idx'],
+            hoop_x=metrics['hoop_x'],
+            hoop_y=metrics['hoop_y']
+        )
         if lateral_dev:
-            metrics['lateral_deviation'] = lateral_dev[0] * INCHES_TO_FEET  # Convert from inches to feet
+            metrics['lateral_deviation'] = lateral_dev[0]  # Already in feet, preserve full precision
             metrics['lateral_final_x'] = lateral_dev[1]
             metrics['lateral_actual_y'] = lateral_dev[2]
             metrics['lateral_expected_y'] = lateral_dev[3]
         else:
-            metrics['lateral_deviation'] = 0.0
+            metrics['lateral_deviation'] = 0.0  # Only set to 0.0 if calculation fails
 
         # 11. Additional Pose Computations
         pose_df = compute_joint_angles(pose_df)
@@ -921,10 +926,9 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
 
     except Exception as e:
         logger.error(f"Error calculating shot metrics: {str(e)}")
-        metrics['release_velocity'] = 0.0
+        metrics['release_velocity'] = 0.0  # Fallback
 
     return metrics, pose_df, ball_df
-
 
 def calculate_lateral_deviation(df, release_index, hoop_x=501.0, hoop_y=0.0):
     """
@@ -977,7 +981,7 @@ def calculate_lateral_deviation(df, release_index, hoop_x=501.0, hoop_y=0.0):
         # Cross product magnitude in 2D gives the area of parallelogram
         cross = shot_dx * (actual_y - release_y) - shot_dy * (final_x - release_x)
         deviation_inches = abs(cross) / np.sqrt(line_len_sq)  # Perpendicular distance
-        deviation_feet = deviation_inches * INCHES_TO_FEET
+        deviation_feet = deviation_inches * INCHES_TO_FEET  # Preserve full precision
 
         # Determine sign: positive if right of line, negative if left
         sign = np.sign(cross)
@@ -990,7 +994,6 @@ def calculate_lateral_deviation(df, release_index, hoop_x=501.0, hoop_y=0.0):
     except Exception as e:
         logger.error(f"Error calculating lateral deviation: {str(e)}")
         return None
-
 
 
 
