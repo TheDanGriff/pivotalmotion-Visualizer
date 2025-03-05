@@ -843,7 +843,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         set_window_start = max(0, metrics['set_idx'] - 15)
         metrics['lift_idx'] = ball_df.iloc[set_window_start:metrics['set_idx']]['Basketball_X'].idxmax()
 
-        metrics['rim_impact_idx'] = (basketball_z <= 10).idxmax()  # 10 inches
+        metrics['rim_impact_idx'] = (basketball_z <= 10).idxmax()  # 10 inches (assuming typo in original; should be 120 for 10 ft)
 
         # 5. Compute KPIs (convert to feet where applicable)
         release_point = ball_df.loc[metrics['release_idx']]
@@ -855,7 +855,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         dy = (hoop_y - release_point['Basketball_Y']) * INCHES_TO_FEET
         original_shot_distance = np.sqrt(dx**2 + dy**2)
 
-        if original_shot_distance > 47.0:
+        if original_shot_distance > 47.0:  # 47 ft is half-court; adjust if court length changes
             shot_distance = 94.0 - original_shot_distance
             flip = True
         else:
@@ -878,32 +878,28 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         dxy = np.sqrt(post_release['Basketball_X'].diff()**2 + post_release['Basketball_Y'].diff()**2).iloc[1:].mean() * INCHES_TO_FEET
         metrics['release_angle'] = np.degrees(np.arctan2(dz, dxy))
 
-        # 7. Compute Release Velocity using the provided snippet, with enhanced debugging
+        # 7. Compute Release Velocity with enhanced debugging
         logger.debug(f"Calculating release velocity at release_idx: {metrics['release_idx']}")
         logger.debug(f"Ball columns: {ball_df.columns.tolist()}")
 
-        # Ensure release_idx is valid and within bounds
         if pd.isna(metrics['release_idx']) or metrics['release_idx'] >= len(ball_df):
             logger.error(f"Invalid release_idx: {metrics['release_idx']}, ball_df length: {len(ball_df)}")
             metrics['release_velocity'] = 0.0
         else:
-            # Calculate velocities in inches/second, handling potential NaN values
-            release_velocity_x = basketball_x.diff().fillna(0) * 60
-            release_velocity_y = basketball_y.diff().fillna(0) * 60
-            release_velocity_z = basketball_z.diff().fillna(0) * 60
+            # Calculate velocities in inches/second, handling NaN values
+            release_velocity_x = basketball_x.diff().fillna(0) * fps  # Use fps consistently
+            release_velocity_y = basketball_y.diff().fillna(0) * fps
+            release_velocity_z = basketball_z.diff().fillna(0) * fps
 
-            # Log the velocity values at release_idx for debugging
             logger.debug(f"velocity_x at release_idx: {release_velocity_x.iloc[metrics['release_idx']]}")
             logger.debug(f"velocity_y at release_idx: {release_velocity_y.iloc[metrics['release_idx']]}")
             logger.debug(f"velocity_z at release_idx: {release_velocity_z.iloc[metrics['release_idx']]}")
 
-            # Calculate release velocity in inches/second, then convert to feet/second
             rv_x = release_velocity_x.iloc[metrics['release_idx']]
             rv_y = release_velocity_y.iloc[metrics['release_idx']]
             rv_z = release_velocity_z.iloc[metrics['release_idx']]
             release_velocity = np.sqrt(rv_x**2 + rv_y**2 + rv_z**2) * INCHES_TO_FEET  # Convert to feet/second
 
-            # Handle potential NaN or invalid values
             if pd.isna(release_velocity) or release_velocity < 0:
                 logger.warning(f"Invalid release velocity calculated: {release_velocity}. Setting to 0.0.")
                 metrics['release_velocity'] = 0.0
@@ -923,10 +919,21 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             metrics.get('release_height', 0)
         )
 
-        # 10. Lateral deviation (convert to feet)
-        lateral_dev = calculate_lateral_deviation(ball_df, metrics['release_idx'])
+        # 10. Lateral deviation with midline adjustment
+        lateral_dev = calculate_lateral_deviation(
+            ball_df,
+            metrics['release_idx'],
+            hoop_x=metrics['hoop_x'],
+            hoop_y=metrics['hoop_y']
+        )
         if lateral_dev:
-            metrics['lateral_deviation'] = lateral_dev[0] * INCHES_TO_FEET
+            metrics['lateral_deviation'] = lateral_dev[0]  # Already in feet from the new function
+            metrics['lateral_final_x'] = lateral_dev[1]  # In inches
+            metrics['lateral_actual_y'] = lateral_dev[2]  # In inches
+            metrics['lateral_expected_y'] = lateral_dev[3]  # In inches
+        else:
+            metrics['lateral_deviation'] = 0.0
+            logger.warning("Lateral deviation calculation failed; defaulting to 0.0.")
 
         # 11. Additional Pose Computations
         pose_df = compute_joint_angles(pose_df)
@@ -939,6 +946,72 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['release_velocity'] = 0.0  # Fallback in case of errors
 
     return metrics, pose_df, ball_df
+
+
+def calculate_lateral_deviation(df, release_index, hoop_x=501.0, hoop_y=0.0):
+    """
+    Calculate lateral deviation of the ball from the intended shot line to the hoop, in feet.
+    
+    Parameters:
+    - df: DataFrame with 'Basketball_X', 'Basketball_Y', 'Basketball_Z' in inches.
+    - release_index: Index of the release frame.
+    - hoop_x: Hoop x-position in inches (default 501.0 or -501.0 based on shot side).
+    - hoop_y: Hoop y-position in inches (default 0.0, center of court).
+    
+    Returns:
+    - tuple: (deviation in feet, final_x in inches, actual_y in inches, expected_y in inches)
+             deviation is positive (right) or negative (left) of the intended line.
+    """
+    INCHES_TO_FEET = 1 / 12
+    try:
+        # Get release point coordinates (in inches)
+        release_x = df.loc[release_index, 'Basketball_X']
+        release_y = df.loc[release_index, 'Basketball_Y']
+
+        # Define the intended shot line from release point to hoop
+        shot_dx = hoop_x - release_x  # Delta x in inches
+        shot_dy = hoop_y - release_y  # Delta y in inches
+
+        # Find the last frame before the ball descends below hoop height (10 ft = 120 inches)
+        hoop_height = 120.0  # 10 feet in inches
+        final_idx = df[df['Basketball_Z'] >= hoop_height].index[-1]
+        final_x = df.loc[final_idx, 'Basketball_X']
+        actual_y = df.loc[final_idx, 'Basketball_Y']
+
+        # Parametric equation of the shot line: (x(t), y(t)) = (release_x + t * shot_dx, release_y + t * shot_dy)
+        # Solve for t when x = final_x: t = (final_x - release_x) / shot_dx
+        if abs(shot_dx) < 1e-6:  # Avoid division by zero
+            logger.error("Shot direction x-component too small; cannot compute deviation.")
+            return None
+        t = (final_x - release_x) / shot_dx
+
+        # Expected y-position on the shot line at final_x
+        expected_y = release_y + t * shot_dy
+
+        # Lateral deviation (perpendicular distance from the shot line)
+        line_vec = np.array([shot_dx, shot_dy])
+        point_vec = np.array([final_x - release_x, actual_y - release_y])
+        line_len_sq = shot_dx**2 + shot_dy**2
+        if line_len_sq < 1e-6:  # Avoid division by zero
+            logger.error("Shot line length too small; cannot compute deviation.")
+            return None
+
+        # Cross product magnitude in 2D gives the area of parallelogram
+        cross = shot_dx * (actual_y - release_y) - shot_dy * (final_x - release_x)
+        deviation_inches = abs(cross) / np.sqrt(line_len_sq)  # Perpendicular distance
+        deviation_feet = deviation_inches * INCHES_TO_FEET
+
+        # Determine sign: positive if right of line, negative if left
+        sign = np.sign(cross)
+        if release_x < 0:  # Flip sign for left-side shots
+            sign *= -1
+        deviation_feet *= sign
+
+        return (deviation_feet, final_x, actual_y, expected_y)
+
+    except Exception as e:
+        logger.error(f"Error calculating lateral deviation: {str(e)}")
+        return None
 
 
 
@@ -1277,25 +1350,70 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
     
     return fig
 
-def calculate_lateral_deviation(df, release_index):
-    """Calculate lateral deviation from initial shot line"""
+def calculate_lateral_deviation(df, release_index, hoop_x=501.0, hoop_y=0.0):
+    """
+    Calculate lateral deviation of the ball from the intended shot line to the hoop, in feet.
+    
+    Parameters:
+    - df: DataFrame with 'Basketball_X', 'Basketball_Y', 'Basketball_Z' in inches.
+    - release_index: Index of the release frame.
+    - hoop_x: Hoop x-position in inches (default 501.0 or -501.0 based on shot side).
+    - hoop_y: Hoop y-position in inches (default 0.0, center of court).
+    
+    Returns:
+    - deviation: Lateral deviation in feet (positive = right, negative = left of intended line).
+    - final_x: Final x-position in inches where deviation is measured.
+    - actual_y: Actual y-position in inches at final_x.
+    - expected_y: Expected y-position in inches on the intended shot line at final_x.
+    """
+    INCHES_TO_FEET = 1 / 12
     try:
-        # Use next 5 frames after release to establish shot line
-        post_release = df.iloc[release_index+1:release_index+6]
-        x = post_release['Basketball_X'].values
-        y = post_release['Basketball_Y'].values
-        
-        # Fit linear regression
-        coeffs = np.polyfit(x, y, 1)
-        slope, intercept = coeffs
-        
-        # Find final position before ball descends below 10.5ft
-        final_idx = df[df['Basketball_Z'] >= 10.5].index[-1]
+        # Get release point coordinates (in inches)
+        release_x = df.loc[release_index, 'Basketball_X']
+        release_y = df.loc[release_index, 'Basketball_Y']
+
+        # Define the intended shot line from release point to hoop
+        shot_dx = hoop_x - release_x  # Delta x in inches
+        shot_dy = hoop_y - release_y  # Delta y in inches
+
+        # Find the last frame before the ball descends below hoop height (10 ft = 120 inches)
+        hoop_height = 120.0  # 10 feet in inches
+        final_idx = df[df['Basketball_Z'] >= hoop_height].index[-1]
         final_x = df.loc[final_idx, 'Basketball_X']
         actual_y = df.loc[final_idx, 'Basketball_Y']
-        predicted_y = slope * final_x + intercept
-        
-        return (actual_y - predicted_y, final_x, actual_y, predicted_y)
+
+        # Parametric equation of the shot line: (x(t), y(t)) = (release_x + t * shot_dx, release_y + t * shot_dy)
+        # Solve for t when x = final_x: t = (final_x - release_x) / shot_dx
+        if abs(shot_dx) < 1e-6:  # Avoid division by zero
+            return None
+        t = (final_x - release_x) / shot_dx
+
+        # Expected y-position on the shot line at final_x
+        expected_y = release_y + t * shot_dy
+
+        # Lateral deviation (perpendicular distance from the shot line)
+        # Use point-to-line distance formula in 2D
+        line_vec = np.array([shot_dx, shot_dy])
+        point_vec = np.array([final_x - release_x, actual_y - release_y])
+        line_len_sq = shot_dx**2 + shot_dy**2
+        if line_len_sq < 1e-6:  # Avoid division by zero
+            return None
+
+        # Cross product magnitude in 2D gives the area of parallelogram
+        cross = shot_dx * (actual_y - release_y) - shot_dy * (final_x - release_x)
+        deviation_inches = abs(cross) / np.sqrt(line_len_sq)  # Perpendicular distance
+        deviation_feet = deviation_inches * INCHES_TO_FEET
+
+        # Determine sign: positive if right of line, negative if left
+        # Use the sign of the cross product
+        sign = np.sign(cross)
+        # Adjust sign based on court orientation (if shooting from left side, flip)
+        if release_x < 0:
+            sign *= -1  # Flip sign for left-side shots
+        deviation_feet *= sign
+
+        return (deviation_feet, final_x, actual_y, expected_y)
+
     except Exception as e:
         logger.error(f"Error calculating lateral deviation: {str(e)}")
         return None
