@@ -1907,7 +1907,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
 
 def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     """
-    Create a visualization of joint flexion/extension angles during the shooting motion.
+    Create a side-by-side visualization of joint flexion/extension angles during the shooting motion.
     
     Parameters:
     - pose_df: DataFrame with pose data (e.g., 'RSHOULDER_X', 'RELBOW_X', etc.) in inches.
@@ -1916,7 +1916,8 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     - fps: Frames per second, default 60.
     
     Returns:
-    - figs: Dictionary with 'upper_body' and 'lower_body' Plotly figure objects.
+    - fig: Single Plotly figure object with two subplots.
+    - kpis: Dictionary of joint angle KPIs.
     """
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
@@ -1932,7 +1933,14 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         'release': 'rgba(255, 102, 102, 1)',     # Red
         'curvature': 'rgba(31, 120, 180, 1)',     # Blue for curvature
         'velocity': 'rgba(107, 174, 214, 1)',     # Light blue for velocity
-        'weighted_area': 'rgba(255, 102, 102, 0.3)'  # Red shaded area
+        'weighted_area': 'rgba(255, 102, 102, 0.3)',  # Red shaded area
+        # Pastel colors for joints
+        'elbow': 'rgba(173, 216, 230, 1)',       # Pastel blue
+        'shoulder': 'rgba(221, 160, 221, 1)',    # Pastel plum
+        'wrist': 'rgba(240, 230, 140, 1)',       # Pastel khaki
+        'hip': 'rgba(144, 238, 144, 1)',         # Pastel green
+        'knee': 'rgba(255, 218, 185, 1)',        # Pastel peach
+        'ankle': 'rgba(176, 224, 230, 1)'        # Pastel powder blue
     }
     DASH_STYLES = {
         'lift': 'dash',
@@ -2010,69 +2018,62 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     ball_segment['velocity'] = np.sqrt(
         ball_segment['velo_x']**2 + ball_segment['velo_y']**2 + ball_segment['velo_z']**2
     )
-    # Remove zeros and NaNs, then interpolate
     velocity_clean = ball_segment['velocity'].replace(0, np.nan).interpolate(method='linear').fillna(method='bfill').fillna(method='ffill')
     ball_segment['velocity'] = velocity_clean
 
-    # Create subplots for upper and lower body
-    figs = {}
-    
-    # Upper body plot
-    fig_upper = make_subplots(specs=[[{"secondary_y": True}]])
-    for angle, color in [('elbow_angle', 'blue'), ('shoulder_angle', 'black'), ('wrist_angle', 'cyan')]:
-        fig_upper.add_trace(
-            go.Scatter(
-                x=pose_segment['time'],
-                y=pose_segment[angle],
-                mode='lines',
-                name=angle.replace('_angle', '').capitalize(),
-                line=dict(color=color, width=2)
-            ),
-            secondary_y=False
-        )
-    fig_upper.add_trace(
-        go.Scatter(
-            x=ball_segment['time'],
-            y=ball_segment['velocity'],
-            mode='lines',
-            name='Ball Velocity',
-            line=dict(color=COLOR_PALETTE['velocity'], width=2)
-        ),
-        secondary_y=True
+    # Create a single figure with two side-by-side subplots
+    fig = make_subplots(
+        rows=1, cols=2,
+        subplot_titles=("Upper Body Joint Flexion/Extension", "Lower Body Joint Flexion/Extension"),
+        specs=[[{"secondary_y": True}, {"secondary_y": True}]],
+        horizontal_spacing=0.1
     )
-    # Add vertical lines for lift, set, and release
-    for event, idx in [('lift', lift_idx), ('set', set_idx), ('release', release_idx)]:
-        fig_upper.add_vline(
-            x=(idx - start_idx) / fps,
-            line=dict(color=COLOR_PALETTE[event], dash=DASH_STYLES[event], width=2),
-            name=event.capitalize()
-        )
-    fig_upper.update_layout(
-        title="Upper Body Joint Flexion/Extension",
-        xaxis_title="Time (s)",
-        yaxis_title="Angle (degrees)",
-        yaxis=dict(range=[0, 180]),
-        yaxis2=dict(title="Velocity (ft/s)", range=[0, 35], overlaying='y', side='right'),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
-        height=400,
-        width=800
-    )
-    figs['upper_body'] = fig_upper
 
-    # Lower body plot
-    fig_lower = make_subplots(specs=[[{"secondary_y": True}]])
-    for angle, color in [('hip_angle', 'blue'), ('knee_angle', 'black'), ('ankle_angle', 'cyan')]:
-        fig_lower.add_trace(
+    # Upper body traces (left subplot)
+    for angle in ['elbow_angle', 'shoulder_angle', 'wrist_angle']:
+        joint = angle.replace('_angle', '')
+        fig.add_trace(
             go.Scatter(
                 x=pose_segment['time'],
                 y=pose_segment[angle],
                 mode='lines',
-                name=angle.replace('_angle', '').capitalize(),
-                line=dict(color=color, width=2)
+                name=joint.capitalize(),
+                line=dict(color=COLOR_PALETTE[joint], width=2)
             ),
-            secondary_y=False
+            row=1, col=1, secondary_y=False
         )
-    fig_lower.add_trace(
+    fig.add_trace(
+        go.Scatter(
+            x=ball_segment['time'],
+            y=ball_segment['velocity'],
+            mode='lines',
+            name='Ball Velocity',
+            line=dict(color=COLOR_PALETTE['velocity'], width=2),
+            showlegend=False  # Show legend only in lower body plot
+        ),
+        row=1, col=1, secondary_y=True
+    )
+    for event, idx in [('lift', lift_idx), ('set', set_idx), ('release', release_idx)]:
+        fig.add_vline(
+            x=(idx - start_idx) / fps,
+            line=dict(color=COLOR_PALETTE[event], dash=DASH_STYLES[event], width=2),
+            row=1, col=1
+        )
+
+    # Lower body traces (right subplot)
+    for angle in ['hip_angle', 'knee_angle', 'ankle_angle']:
+        joint = angle.replace('_angle', '')
+        fig.add_trace(
+            go.Scatter(
+                x=pose_segment['time'],
+                y=pose_segment[angle],
+                mode='lines',
+                name=joint.capitalize(),
+                line=dict(color=COLOR_PALETTE[joint], width=2)
+            ),
+            row=1, col=2, secondary_y=False
+        )
+    fig.add_trace(
         go.Scatter(
             x=ball_segment['time'],
             y=ball_segment['velocity'],
@@ -2080,25 +2081,29 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             name='Ball Velocity',
             line=dict(color=COLOR_PALETTE['velocity'], width=2)
         ),
-        secondary_y=True
+        row=1, col=2, secondary_y=True
     )
     for event, idx in [('lift', lift_idx), ('set', set_idx), ('release', release_idx)]:
-        fig_lower.add_vline(
+        fig.add_vline(
             x=(idx - start_idx) / fps,
             line=dict(color=COLOR_PALETTE[event], dash=DASH_STYLES[event], width=2),
-            name=event.capitalize()
+            row=1, col=2
         )
-    fig_lower.update_layout(
-        title="Lower Body Joint Flexion/Extension",
-        xaxis_title="Time (s)",
-        yaxis_title="Angle (degrees)",
-        yaxis=dict(range=[0, 180]),
-        yaxis2=dict(title="Velocity (ft/s)", range=[0, 35], overlaying='y', side='right'),
+
+    # Update layout
+    fig.update_layout(
+        title="Joint Flexion/Extension Analysis",
+        height=300,  # Smaller height
+        width=900,   # Width to fit side-by-side
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
-        height=400,
-        width=800
+        margin=dict(l=50, r=50, t=80, b=50)
     )
-    figs['lower_body'] = fig_lower
+    fig.update_xaxes(title_text="Time (s)", row=1, col=1)
+    fig.update_xaxes(title_text="Time (s)", row=1, col=2)
+    fig.update_yaxes(title_text="Angle (degrees)", range=[0, 180], row=1, col=1, secondary_y=False)
+    fig.update_yaxes(title_text="Angle (degrees)", range=[0, 180], row=1, col=2, secondary_y=False)
+    fig.update_yaxes(title_text="Velocity (ft/s)", range=[0, 35], row=1, col=1, secondary_y=True)
+    fig.update_yaxes(title_text="Velocity (ft/s)", range=[0, 35], row=1, col=2, secondary_y=True)
 
     # Calculate KPIs
     kpis = {}
@@ -2113,7 +2118,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             'at_set': angles.iloc[set_idx - start_idx] if set_idx >= start_idx and set_idx <= end_idx else np.nan,
             'at_release': angles.iloc[release_idx - start_idx] if release_idx <= end_idx else np.nan,
             'range': angles.max() - angles.min(),
-            'rate_change': (angles.diff() / pose_segment['time'].diff()).max()  # Max rate of change (degrees/s)
+            'rate_change': (angles.diff() / pose_segment['time'].diff()).max()
         }
 
-    return figs, kpis
+    return fig, kpis

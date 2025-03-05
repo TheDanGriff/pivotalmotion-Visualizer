@@ -348,15 +348,10 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
 
     # New joint flexion/extension analysis
     st.subheader("Joint Flexion/Extension")
-    figs, kpis = plot_joint_flexion_analysis(df_pose, df_ball, metrics)
+    fig, kpis = plot_joint_flexion_analysis(df_pose, df_ball, metrics)
+    st.plotly_chart(fig, use_container_width=True)
 
-    # Display upper body plot
-    st.plotly_chart(figs['upper_body'], use_container_width=True)
-
-    # Display lower body plot
-    st.plotly_chart(figs['lower_body'], use_container_width=True)
-
-    # Display KPIs
+    # Display KPIs (unchanged)
     st.subheader("Joint Flexion/Extension KPIs")
     col1, col2, col3 = st.columns(3)
     for i, joint in enumerate(kpis.keys()):
@@ -365,6 +360,7 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
             st.metric(f"{joint.capitalize()} Max Flexion", f"{kpis[joint]['max_flexion']:.1f}°")
             st.metric(f"{joint.capitalize()} Min Flexion", f"{kpis[joint]['min_flexion']:.1f}°")
             st.metric(f"{joint.capitalize()} at Lift", f"{kpis[joint]['at_lift']:.1f}°")
+            st.metric(f"{joint.capitalize()} at Set", f"{kpis[joint]['at_set']:.1f}°")
             st.metric(f"{joint.capitalize()} at Release", f"{kpis[joint]['at_release']:.1f}°")
             st.metric(f"{joint.capitalize()} Range", f"{kpis[joint]['range']:.1f}°")
             st.metric(f"{joint.capitalize()} Max Rate", f"{kpis[joint]['rate_change']:.1f}°/s")
