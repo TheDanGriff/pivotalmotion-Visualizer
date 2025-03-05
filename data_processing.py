@@ -1650,8 +1650,8 @@ def plot_shot_location(ball_df, metrics):
     Create a 2D visualization of the shot location on a half basketball court.
     
     Parameters:
-    - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y' in inches.
-    - metrics: Dictionary from calculate_shot_metrics with 'release_idx', 'hoop_x', 'hoop_y'.
+    - ball_df: DataFrame with 'BALL_X', 'BALL_Y', 'OUTCOME' in inches.
+    - metrics: Dictionary with 'release_idx', 'hoop_x', 'hoop_y'.
     
     Returns:
     - fig: Plotly figure object.
@@ -1661,26 +1661,35 @@ def plot_shot_location(ball_df, metrics):
 
     INCHES_TO_FEET = 1 / 12
 
-    # Get shot location at release (convert to feet)
+    # Get shot location at release (in inches)
     release_idx = metrics['release_idx']
-    shot_x = ball_df.loc[release_idx, 'Basketball_X'] * INCHES_TO_FEET
-    shot_y = ball_df.loc[release_idx, 'Basketball_Y'] * INCHES_TO_FEET
+    shot_x = ball_df.loc[release_idx, 'BALL_X']  # Already in inches
+    shot_y = ball_df.loc[release_idx, 'BALL_Y']
+    outcome = ball_df.loc[release_idx, 'OUTCOME']  # 'Y' for make, 'N' for miss
 
-    # Court dimensions (in feet)
-    court_length = 47  # Half-court length
-    court_width = 50   # Full court width
-    hoop_x = 25        # Hoop at 25 ft from baseline (assuming baseline at x=0)
-    hoop_y = 0         # Center of court
-    free_throw_distance = 19  # Free throw line from baseline
-    three_point_radius = 23.75  # NBA 3-point line radius from hoop
+    # Determine marker based on shot outcome
+    marker_symbol = 'circle' if outcome == 'Y' else 'x'
+    marker_color = 'green' if outcome == 'Y' else 'red'
+
+    # Convert to feet for display (optional, but keeping inches for precision)
+    shot_x_ft = shot_x * INCHES_TO_FEET
+    shot_y_ft = shot_y * INCHES_TO_FEET
+
+    # Court dimensions in inches (centered at (0, 0))
+    court_length = 564  # Half-court length (47 ft = 564 inches)
+    court_width = 600   # Full width (50 ft = 600 inches)
+    hoop_x = 564        # Hoop at right end, midline (47 ft from center)
+    hoop_y = 0          # Center of court
+    free_throw_x = 336  # 19 ft = 228 inches from baseline, 564 - 228 = 336 inches from center
+    three_point_radius = 285  # 23.75 ft = 285 inches from hoop
 
     # Create figure
     fig = go.Figure()
 
-    # Court boundary (rectangle)
+    # Court boundary (rectangle, centered at (0, 0))
     fig.add_trace(
         go.Scatter(
-            x=[0, court_length, court_length, 0, 0],
+            x=[-court_length/2, court_length/2, court_length/2, -court_length/2, -court_length/2],
             y=[-court_width/2, -court_width/2, court_width/2, court_width/2, -court_width/2],
             mode='lines',
             line=dict(color='black', width=2),
@@ -1702,7 +1711,7 @@ def plot_shot_location(ball_df, metrics):
     # Free throw line
     fig.add_trace(
         go.Scatter(
-            x=[free_throw_distance, free_throw_distance],
+            x=[free_throw_x, free_throw_x],
             y=[-court_width/2, court_width/2],
             mode='lines',
             line=dict(color='black', width=2, dash='dash'),
@@ -1710,9 +1719,9 @@ def plot_shot_location(ball_df, metrics):
         )
     )
 
-    # 3-point arc (simplified as a semicircle centered at hoop)
+    # 3-point arc (semicircle centered at hoop)
     theta = np.linspace(-np.pi/2, np.pi/2, 100)  # Half circle from -90° to 90°
-    three_x = hoop_x + three_point_radius * np.cos(theta)
+    three_x = hoop_x - three_point_radius * np.cos(theta)  # Adjust for center at hoop
     three_y = hoop_y + three_point_radius * np.sin(theta)
     fig.add_trace(
         go.Scatter(
@@ -1724,10 +1733,11 @@ def plot_shot_location(ball_df, metrics):
         )
     )
 
-    # Extend 3-point line to sidelines (straight segments)
+    # Extend 3-point line to sidelines
+    three_point_start_x = hoop_x - three_point_radius  # Where arc meets straight line
     fig.add_trace(
         go.Scatter(
-            x=[0, hoop_x - three_point_radius],
+            x=[-court_length/2, three_point_start_x],
             y=[-three_point_radius, -three_point_radius],
             mode='lines',
             line=dict(color='black', width=2),
@@ -1736,7 +1746,7 @@ def plot_shot_location(ball_df, metrics):
     )
     fig.add_trace(
         go.Scatter(
-            x=[0, hoop_x - three_point_radius],
+            x=[-court_length/2, three_point_start_x],
             y=[three_point_radius, three_point_radius],
             mode='lines',
             line=dict(color='black', width=2),
@@ -1744,28 +1754,33 @@ def plot_shot_location(ball_df, metrics):
         )
     )
 
-    # Shot location (X marker)
+    # Shot location marker
     fig.add_trace(
         go.Scatter(
             x=[shot_x],
             y=[shot_y],
             mode='markers',
-            marker=dict(size=15, color='blue', symbol='x'),
-            name='Shot Location'
+            marker=dict(size=15, color=marker_color, symbol=marker_symbol),
+            name='Shot Location (Make)' if outcome == 'Y' else 'Shot Location (Miss)'
         )
     )
 
-    # Update layout
+    # Update layout with fixed size and equal aspect ratio
     fig.update_layout(
         title="Shot Location on Half Court",
-        xaxis_title="Distance from Baseline (ft)",
-        yaxis_title="Lateral Position (ft)",
-        xaxis=dict(range=[0, court_length], showgrid=False),
+        xaxis_title="X Position (inches)",
+        yaxis_title="Y Position (inches)",
+        xaxis=dict(range=[-court_length/2, court_length/2], showgrid=False),
         yaxis=dict(range=[-court_width/2, court_width/2], showgrid=False),
-        width=500,
-        height=500,
+        width=500,  # Fixed width
+        height=500,  # Fixed height for square aspect
+        autosize=False,
         showlegend=True,
-        template="plotly_white"
+        template="plotly_white",
+        margin=dict(l=50, r=50, t=50, b=50)
     )
+
+    # Ensure equal aspect ratio
+    fig.update_yaxes(scaleanchor="x", scaleratio=1)
 
     return fig

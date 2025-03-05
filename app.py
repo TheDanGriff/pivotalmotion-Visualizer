@@ -254,7 +254,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         'Release Time': {'value': metrics.get('release_time', 0), 'min': 0, 'max': 1},      # seconds
         'Apex Height': {'value': metrics.get('apex_height', 0), 'min': 0, 'max': 10},       # feet
         'Release Curvature': {'value': metrics.get('release_curvature', 0), 'min': 0, 'max': 0.5},  # 1/ft
-        'Lateral Deviation': {'value': metrics.get('lateral_deviation', 0), 'min': -0.5, 'max': 0.5}  # feet, adjusted range
+        'Lateral Deviation': {'value': metrics.get('lateral_deviation', 0), 'min': -0.5, 'max': 0.5}  # feet
     }
 
     # KPI Grid (two rows of four columns)
@@ -321,11 +321,11 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
                                min_value=kpis['Lateral Deviation']['min'],
                                max_value=kpis['Lateral Deviation']['max'])
 
-    # Shot Location Visualization (Full Width)
+    # Shot Location Visualization (Fixed Size, Proper Scale)
     if not df_ball.empty:
         st.subheader("Shot Location")
         shot_location_fig = plot_shot_location(df_ball, metrics)
-        st.plotly_chart(shot_location_fig, use_container_width=True)
+        st.plotly_chart(shot_location_fig)  # No use_container_width=True to respect fixed size
 
     # Existing Visualizations
     fig = plot_curvature_analysis(df_ball, metrics, weighting_exponent=3, num_interp=300, curvature_scale=2.3)
