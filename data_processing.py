@@ -1650,13 +1650,14 @@ def create_alignment_diagram(df, basket_position=(41.75, 0)):
     return fig
 
 
-def plot_shot_location(ball_df, metrics):
+def plot_shot_location(ball_df, metrics, pose_df=None):
     """
     Create a 2D visualization of the shot location on a half basketball court.
     
     Parameters:
     - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', and optionally 'OUTCOME' in inches.
-    - metrics: Dictionary with 'release_idx', 'hoop_x', 'hoop_y'.
+    - metrics: Dictionary with 'lift_idx', 'release_idx', 'hoop_x', 'hoop_y'.
+    - pose_df: Optional DataFrame with pose data (e.g., 'MIDHIP_X', 'MIDHIP_Y') for foot position.
     
     Returns:
     - fig: Plotly figure object.
@@ -1666,32 +1667,50 @@ def plot_shot_location(ball_df, metrics):
 
     INCHES_TO_FEET = 1 / 12
 
-    # Get shot location at release (in inches)
-    release_idx = metrics['release_idx']
-    shot_x = ball_df.loc[release_idx, 'Basketball_X']
-    shot_y = ball_df.loc[release_idx, 'Basketball_Y']
+    # Get shot location at lift_idx (prefer foot position, fallback to ball position)
+    lift_idx = metrics['lift_idx']
+    if pose_df is not None and 'MIDHIP_X' in pose_df.columns and 'MIDHIP_Y' in pose_df.columns:
+        shot_x = pose_df.loc[lift_idx, 'MIDHIP_X']  # Use mid-hip as proxy for foot position
+        shot_y = pose_df.loc[lift_idx, 'MIDHIP_Y']
+        source_note = " (Foot Position at Lift)"
+    else:
+        shot_x = ball_df.loc[lift_idx, 'Basketball_X']
+        shot_y = ball_df.loc[lift_idx, 'Basketball_Y']
+        source_note = " (Ball at Lift)"
+        logger.warning(f"Using ball position at lift_idx {lift_idx} as pose data is unavailable.")
 
     # Determine marker based on shot outcome
-    if 'OUTCOME' in ball_df.columns and not pd.isna(ball_df.loc[release_idx, 'OUTCOME']):
-        outcome = ball_df.loc[release_idx, 'OUTCOME']
-        marker_symbol = 'circle' if outcome == 'Y' else 'x'
-        marker_color = 'green' if outcome == 'Y' else 'red'
-        marker_name = 'Shot Location (Make)' if outcome == 'Y' else 'Shot Location (Miss)'
+    if 'OUTCOME' in ball_df.columns and not pd.isna(ball_df.loc[lift_idx, 'OUTCOME']):
+        outcome = ball_df.loc[lift_idx, 'OUTCOME']
+        if outcome == 'Y':
+            marker_symbol = 'circle'
+            marker_color = 'green'
+            marker_name = f'Shot Location (Make){source_note}'
+        elif outcome == 'N':
+            marker_symbol = 'x'
+            marker_color = 'red'
+            marker_name = f'Shot Location (Miss){source_note}'
+        else:
+            marker_symbol = 'x'
+            marker_color = 'grey'
+            marker_name = f'Shot Location (Unknown Outcome){source_note}'
+            logger.warning(f"Unexpected OUTCOME value '{outcome}' at lift_idx {lift_idx}. Using grey 'X'.")
     else:
         marker_symbol = 'x'
         marker_color = 'grey'
-        marker_name = 'Shot Location (Unknown Outcome)'
-        logger.warning(f"'OUTCOME' column missing or NaN at release_idx {release_idx}. Using grey 'X' marker.")
+        marker_name = f'Shot Location (Unknown Outcome){source_note}'
+        logger.warning(f"'OUTCOME' column missing or NaN at lift_idx {lift_idx}. Using grey 'X' marker.")
 
     # Court dimensions in inches (centered at (0, 0))
     court_length = 564  # Half-court length from center to right edge
     court_width = 600   # Full width (-300 to 300)
     hoop_x = 501        # Hoop position
     hoop_y = 0
-    free_throw_x = 336  # Free throw line x-coordinate
-    free_throw_y_min = -96
-    free_throw_y_max = 96
-    three_point_radius = 285  # Distance from hoop to peak (501 - 216)
+    free_throw_x = 336  # Free throw line x-coordinate (19 ft = 228 inches from baseline, 564 - 228)
+    paint_width = 192   # Paint width (16 ft = 192 inches, -96 to 96)
+    paint_left = free_throw_x  # Left edge of paint
+    paint_right = hoop_x       # Right edge at hoop
+    three_point_radius = 285   # Distance from hoop to peak (501 - 216 = 23.75 ft)
 
     # Create figure
     fig = go.Figure()
@@ -1718,14 +1737,14 @@ def plot_shot_location(ball_df, metrics):
         )
     )
 
-    # Free throw line (narrower span)
+    # Paint outline (rectangle from free throw line to hoop)
     fig.add_trace(
         go.Scatter(
-            x=[free_throw_x, free_throw_x],
-            y=[free_throw_y_min, free_throw_y_max],
+            x=[paint_left, paint_right, paint_right, paint_left, paint_left],
+            y=[-paint_width/2, -paint_width/2, paint_width/2, paint_width/2, -paint_width/2],
             mode='lines',
             line=dict(color='black', width=2, dash='dash'),
-            name='Free Throw Line'
+            name='Paint'
         )
     )
 
@@ -1749,10 +1768,10 @@ def plot_shot_location(ball_df, metrics):
         )
     )
 
-    # Extend 3-point line to sidelines at y = ±264
+    # Extend 3-point line to baseline (x = -282) at y = ±264
     fig.add_trace(
         go.Scatter(
-            x=[-court_length/2, 396],
+            x=[396, -court_length/2],  # From arc end to baseline
             y=[-264, -264],
             mode='lines',
             line=dict(color='black', width=2),
@@ -1761,7 +1780,7 @@ def plot_shot_location(ball_df, metrics):
     )
     fig.add_trace(
         go.Scatter(
-            x=[-court_length/2, 396],
+            x=[396, -court_length/2],  # From arc end to baseline
             y=[264, 264],
             mode='lines',
             line=dict(color='black', width=2),
