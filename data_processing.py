@@ -181,8 +181,8 @@ def separate_pose_and_ball_tracking(df_segment, source):
     possible_ball_columns = [
         ['Basketball_X', 'Basketball_Y', 'Basketball_Z'],
         ['Ball_X', 'Ball_Y', 'Ball_Z'],
-        ['ball_x', 'ball_y', 'ball_z'],  # Add common lowercase variants
-        ['BALL_X', 'BALL_Y', 'BALL_Z'],  # Add uppercase variants
+        ['ball_x', 'ball_y', 'ball_z'],
+        ['BALL_X', 'BALL_Y', 'BALL_Z'],
     ]
     
     # Find the first matching set of ball columns
@@ -193,22 +193,27 @@ def separate_pose_and_ball_tracking(df_segment, source):
             break
     
     if not active_ball_columns:
-        # Log a warning and return empty ball DataFrame if no ball columns are found
         logger.warning(f"No complete set of ball tracking columns found in DataFrame. Available columns: {list(df_segment.columns)}")
         pose_df = df_segment.copy()
         ball_df = pd.DataFrame()
         return pose_df, ball_df
     
-    # All non-ball columns are considered pose data
-    pose_columns = [col for col in df_segment.columns if col not in active_ball_columns]
+    # Include 'OUTCOME' in ball_df if it exists
+    ball_columns = active_ball_columns.copy()
+    if 'OUTCOME' in df_segment.columns:
+        ball_columns.append('OUTCOME')
+    
+    # All non-ball columns (except 'OUTCOME') are considered pose data
+    pose_columns = [col for col in df_segment.columns if col not in ball_columns]
     
     # Separate into pose and ball DataFrames
     pose_df = df_segment[pose_columns].copy()
-    ball_df = df_segment[active_ball_columns].copy()
+    ball_df = df_segment[ball_columns].copy()
     
     # Rename ball columns to standard 'Basketball_X/Y/Z' if needed
     if active_ball_columns != ['Basketball_X', 'Basketball_Y', 'Basketball_Z']:
-        ball_df.columns = ['Basketball_X', 'Basketball_Y', 'Basketball_Z']
+        rename_dict = {old: new for old, new in zip(active_ball_columns, ['Basketball_X', 'Basketball_Y', 'Basketball_Z'])}
+        ball_df = ball_df.rename(columns=rename_dict)
         logger.info(f"Renamed ball columns from {active_ball_columns} to {ball_df.columns.tolist()}")
     
     return pose_df, ball_df
@@ -1650,7 +1655,7 @@ def plot_shot_location(ball_df, metrics):
     Create a 2D visualization of the shot location on a half basketball court.
     
     Parameters:
-    - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', 'OUTCOME' in inches.
+    - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', and optionally 'OUTCOME' in inches.
     - metrics: Dictionary with 'release_idx', 'hoop_x', 'hoop_y'.
     
     Returns:
@@ -1663,13 +1668,20 @@ def plot_shot_location(ball_df, metrics):
 
     # Get shot location at release (in inches)
     release_idx = metrics['release_idx']
-    shot_x = ball_df.loc[release_idx, 'Basketball_X']  # Corrected column name
-    shot_y = ball_df.loc[release_idx, 'Basketball_Y']  # Corrected column name
-    outcome = ball_df.loc[release_idx, 'OUTCOME']      # Already correct
+    shot_x = ball_df.loc[release_idx, 'Basketball_X']
+    shot_y = ball_df.loc[release_idx, 'Basketball_Y']
 
     # Determine marker based on shot outcome
-    marker_symbol = 'circle' if outcome == 'Y' else 'x'
-    marker_color = 'green' if outcome == 'Y' else 'red'
+    if 'OUTCOME' in ball_df.columns and not pd.isna(ball_df.loc[release_idx, 'OUTCOME']):
+        outcome = ball_df.loc[release_idx, 'OUTCOME']
+        marker_symbol = 'circle' if outcome == 'Y' else 'x'
+        marker_color = 'green' if outcome == 'Y' else 'red'
+        marker_name = 'Shot Location (Make)' if outcome == 'Y' else 'Shot Location (Miss)'
+    else:
+        marker_symbol = 'x'
+        marker_color = 'grey'
+        marker_name = 'Shot Location (Unknown Outcome)'
+        logger.warning(f"'OUTCOME' column missing or NaN at release_idx {release_idx}. Using grey 'X' marker.")
 
     # Court dimensions in inches (centered at (0, 0))
     court_length = 564  # Half-court length from center to right edge
@@ -1764,7 +1776,7 @@ def plot_shot_location(ball_df, metrics):
             y=[shot_y],
             mode='markers',
             marker=dict(size=15, color=marker_color, symbol=marker_symbol),
-            name='Shot Location (Make)' if outcome == 'Y' else 'Shot Location (Miss)'
+            name=marker_name
         )
     )
 
@@ -1773,8 +1785,8 @@ def plot_shot_location(ball_df, metrics):
         title="Shot Location on Half Court",
         xaxis_title="X Position (inches)",
         yaxis_title="Y Position (inches)",
-        xaxis=dict(range=[-282, 564], showgrid=False),  # -court_length/2 to court_length
-        yaxis=dict(range=[-300, 300], showgrid=False),  # -court_width/2 to court_width/2
+        xaxis=dict(range=[-282, 564], showgrid=False),
+        yaxis=dict(range=[-300, 300], showgrid=False),
         width=500,
         height=500,
         autosize=False,
