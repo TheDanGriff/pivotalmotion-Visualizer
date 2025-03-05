@@ -1925,27 +1925,28 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
 
     INCHES_TO_FEET = 1 / 12
 
-    # Define color palette and dash styles
+    # Define color palette and dash styles with distinct pastel colors
     COLOR_PALETTE = {
         'trajectory': 'rgba(31, 119, 180, 1)',    # Blue for trajectory
-        'lift': 'rgba(147, 112, 219, 1)',        # Purple
-        'set': 'rgba(255, 182, 193, 1)',         # Pastel pink
-        'release': 'rgba(255, 102, 102, 1)',     # Red
+        'lift': 'rgba(147, 112, 219, 1)',        # Purple (distinct)
+        'set': 'rgba(255, 182, 193, 1)',         # Pastel pink (distinct)
+        'release': 'rgba(255, 102, 102, 1)',     # Red (distinct)
         'curvature': 'rgba(31, 120, 180, 1)',     # Blue for curvature
-        'velocity': 'rgba(107, 174, 214, 1)',     # Light blue for velocity
+        'velocity': 'rgba(70, 130, 180, 1)',      # Steel blue (distinct from joints)
         'weighted_area': 'rgba(255, 102, 102, 0.3)',  # Red shaded area
-        # Pastel colors for joints
+        # Distinct pastel colors for joints
         'elbow': 'rgba(173, 216, 230, 1)',       # Pastel blue
         'shoulder': 'rgba(221, 160, 221, 1)',    # Pastel plum
-        'wrist': 'rgba(240, 230, 140, 1)',       # Pastel khaki
-        'hip': 'rgba(144, 238, 144, 1)',         # Pastel green
-        'knee': 'rgba(255, 218, 185, 1)',        # Pastel peach
+        'wrist': 'rgba(152, 251, 152, 1)',       # Pastel pale green (replacing khaki)
+        'hip': 'rgba(240, 230, 140, 1)',         # Pastel khaki (replacing green)
+        'knee': 'rgba(255, 160, 122, 1)',        # Pastel coral (replacing peach)
         'ankle': 'rgba(176, 224, 230, 1)'        # Pastel powder blue
     }
     DASH_STYLES = {
         'lift': 'dash',
         'set': 'dot',
-        'release': 'dashdot'
+        'release': 'dashdot',
+        'velocity': 'dot'  # Added for dotted velocity line
     }
 
     # Extract key indices
@@ -2026,7 +2027,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         rows=1, cols=2,
         subplot_titles=("Upper Body Joint Flexion/Extension", "Lower Body Joint Flexion/Extension"),
         specs=[[{"secondary_y": True}, {"secondary_y": True}]],
-        horizontal_spacing=0.1
+        horizontal_spacing=0.15
     )
 
     # Upper body traces (left subplot)
@@ -2048,8 +2049,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             y=ball_segment['velocity'],
             mode='lines',
             name='Ball Velocity',
-            line=dict(color=COLOR_PALETTE['velocity'], width=2),
-            showlegend=False  # Show legend only in lower body plot
+            line=dict(color=COLOR_PALETTE['velocity'], width=2, dash=DASH_STYLES['velocity'])
         ),
         row=1, col=1, secondary_y=True
     )
@@ -2079,7 +2079,8 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             y=ball_segment['velocity'],
             mode='lines',
             name='Ball Velocity',
-            line=dict(color=COLOR_PALETTE['velocity'], width=2)
+            line=dict(color=COLOR_PALETTE['velocity'], width=2, dash=DASH_STYLES['velocity']),
+            showlegend=False  # Show legend only in upper body plot
         ),
         row=1, col=2, secondary_y=True
     )
@@ -2090,13 +2091,21 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             row=1, col=2
         )
 
-    # Update layout
+    # Update layout with larger size and spaced-out title/legend
     fig.update_layout(
         title="Joint Flexion/Extension Analysis",
-        height=300,
-        width=900,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
-        margin=dict(l=50, r=50, t=80, b=50)
+        title_x=0.5,  # Center the title
+        height=400,   # Increased height
+        width=1000,   # Increased width
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.2,   # Move legend below the plot
+            xanchor="center",
+            x=0.5,
+            font=dict(size=10)  # Smaller font for clarity
+        ),
+        margin=dict(l=50, r=50, t=100, b=150)  # Increased top/bottom margins
     )
     fig.update_xaxes(title_text="Time (s)", row=1, col=1)
     fig.update_xaxes(title_text="Time (s)", row=1, col=2)
