@@ -213,7 +213,8 @@ def plot_distance_over_height(df_ball):
 
 def plot_shot_analysis(df_ball, metrics):
     """Create interactive basketball shot analysis visualization with two 2D trajectory plots:
-    Ball Path (Side View) and Ball Path (Rear View), from lift_idx to release_idx, including set_idx.
+    Ball Path (Side View) shows X vs Z (horizontal movement toward hoop), 
+    Ball Path (Rear View) shows Y vs Z (lateral deviation), from lift_idx to release_idx, including set_idx.
     Both plots have a fixed Y-axis range of 3-11 ft. The Side View X-axis is 4 ft wide (dynamic range),
     and the Rear View X-axis is -2 to 2 ft (fixed, centered at 0)."""
     from plotly.subplots import make_subplots
@@ -252,7 +253,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig = make_subplots(
         rows=1, cols=2,
         subplot_titles=("Ball Path (Side View)", "Ball Path (Rear View)"),
-        horizontal_spacing=0.1  # Reduced spacing for larger plots
+        horizontal_spacing=0.1
     )
 
     def get_slice(data, start, end):
@@ -271,11 +272,23 @@ def plot_shot_analysis(df_ball, metrics):
     traj_y = get_slice(df_ball['Basketball_Y'], trajectory_start, trajectory_end + 1)  # feet
     traj_z = get_slice(df_ball['Basketball_Z'], trajectory_start, trajectory_end + 1)  # feet
 
-    # Adjust traj_y to be relative to the initial shot line at release (midline = 0)
-    release_y = df_ball.at[release_idx, 'Basketball_Y'] * INCHES_TO_FEET
-    traj_y_relative = traj_y - release_y  # Center at 0 based on release point
+    # Adjust traj_y to be relative to the hoop (center at 0 for Rear View)
+    hoop_y = metrics.get('hoop_y', 0.0) * INCHES_TO_FEET  # Hoop Y in feet
+    traj_y_relative = traj_y - hoop_y  # Center lateral deviation on hoop
 
-    # Side view X-range: 4 ft wide, centered dynamically
+    # Adjust traj_x based on shot direction (flip if needed)
+    flip = metrics.get('flip', False)
+    hoop_x = metrics.get('hoop_x', 501.0) * INCHES_TO_FEET  # Hoop X in feet
+    if flip:
+        # For shots beyond half-court, mirror X relative to court center (0 ft)
+        traj_x = -traj_x  # Reflect across X=0
+        hoop_x = -hoop_x  # Reflect hoop position
+    # Ensure parabola opens toward hoop by adjusting X direction
+    release_x = df_ball.at[release_idx, 'Basketball_X'] * INCHES_TO_FEET
+    if (hoop_x < release_x and not flip) or (hoop_x > release_x and flip):
+        traj_x = -traj_x  # Reverse X direction so parabola opens toward hoop
+
+    # Side View X-range: 4 ft wide, centered dynamically
     if len(traj_x) > 0:
         x_min, x_max = np.nanmin(traj_x), np.nanmax(traj_x)
         if pd.isna(x_min) or pd.isna(x_max) or x_max == x_min:
@@ -286,14 +299,14 @@ def plot_shot_analysis(df_ball, metrics):
     else:
         x_range = [-2, 2]  # Default fallback
 
-    # Rear view X-range: Fixed -2 to 2 ft
-    y_range = [-2, 2]  # Fixed ±2 ft range centered at 0
+    # Rear View X-range: Fixed -2 to 2 ft
+    y_range = [-2, 2]  # Fixed ±2 ft range centered at hoop
 
     # Fixed Y-range for both views
     z_range = [3, 11]  # Fixed 3-11 ft
 
     # Plot trajectories
-    # Side View (X vs Z)
+    # Side View (X vs Z) - Horizontal movement toward hoop
     if len(traj_x) > 0 and len(traj_z) > 0:
         fig.add_trace(
             go.Scatter(
@@ -310,6 +323,10 @@ def plot_shot_analysis(df_ball, metrics):
             idx = locals()[f"{phase}_idx"]
             if trajectory_start <= idx <= trajectory_end:
                 x_val = df_ball.at[idx, 'Basketball_X'] * INCHES_TO_FEET
+                if flip:
+                    x_val = -x_val  # Mirror for flipped shots
+                if (hoop_x < release_x and not flip) or (hoop_x > release_x and flip):
+                    x_val = -x_val  # Adjust direction
                 z_val = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
                 fig.add_trace(
                     go.Scatter(
@@ -326,7 +343,7 @@ def plot_shot_analysis(df_ball, metrics):
                     row=1, col=1
                 )
 
-    # Rear View (Y vs Z, centered at 0)
+    # Rear View (Y vs Z) - Lateral deviation
     if len(traj_y_relative) > 0 and len(traj_z) > 0:
         fig.add_trace(
             go.Scatter(
@@ -335,14 +352,14 @@ def plot_shot_analysis(df_ball, metrics):
                 mode='lines',
                 name='Trajectory',
                 line=dict(color=COLOR_PALETTE['trajectory'], width=4),
-                showlegend=False  # Avoid duplicate legend entry
+                showlegend=False
             ),
             row=1, col=2
         )
         for phase in ['lift', 'set', 'release']:
             idx = locals()[f"{phase}_idx"]
             if trajectory_start <= idx <= trajectory_end:
-                y_val = (df_ball.at[idx, 'Basketball_Y'] * INCHES_TO_FEET) - release_y
+                y_val = (df_ball.at[idx, 'Basketball_Y'] * INCHES_TO_FEET) - hoop_y
                 z_val = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
                 fig.add_trace(
                     go.Scatter(
@@ -354,16 +371,16 @@ def plot_shot_analysis(df_ball, metrics):
                             **MARKER_STYLES[phase]
                         ),
                         name=f'{phase.capitalize()}',
-                        showlegend=False  # Show legend only in Side View
+                        showlegend=False
                     ),
                     row=1, col=2
                 )
 
-    # Configure axes with title standoff to move subplot titles up
+    # Configure axes
     fig.update_xaxes(
         title_text="Horizontal Position (ft)",
         row=1, col=1,
-        range=x_range,  # 4 ft wide, dynamic
+        range=x_range,
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12)
@@ -371,17 +388,17 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_yaxes(
         title_text="Height (ft)",
         row=1, col=1,
-        range=z_range,  # Fixed 3-11 ft
+        range=z_range,
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12),
-        title_standoff=20  # Adds space between title and plot
+        title_standoff=20
     )
 
     fig.update_xaxes(
-        title_text="Lateral Deviation from Midline (ft)",
+        title_text="Lateral Deviation from Hoop (ft)",
         row=1, col=2,
-        range=y_range,  # Fixed -2 to 2 ft
+        range=y_range,
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12)
@@ -389,41 +406,41 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_yaxes(
         title_text="Height (ft)",
         row=1, col=2,
-        range=z_range,  # Fixed 3-11 ft
+        range=z_range,
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12),
-        title_standoff=20  # Adds space between title and plot
+        title_standoff=20
     )
 
-    # Update layout for larger size, white background, and proper title/legend placement
+    # Update layout
     fig.update_layout(
-        height=800,  # Increased height for larger graphs (was 600)
-        width=1400,  # Increased width for larger graphs (was 1200)
+        height=800,
+        width=1400,
         title_text="Ball Path Analysis (Lift to Release)",
-        title_x=0.38,  # Adjusted to center title as per your finding
+        title_x=0.38,
         title_font=dict(size=20),
-        margin=dict(t=120, b=100, l=80, r=80),  # Kept top margin for subplot title spacing
+        margin=dict(t=120, b=100, l=80, r=80),
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=-0.25,  # Legend stays below plots
+            y=-0.25,
             xanchor="center",
             x=0.5,
             font=dict(size=12)
         ),
-        plot_bgcolor='rgba(255, 255, 255, 1)',  # White background
-        paper_bgcolor='rgba(255, 255, 255, 1)',  # White paper background
+        plot_bgcolor='rgba(255, 255, 255, 1)',
+        paper_bgcolor='rgba(255, 255, 255, 1)',
         showlegend=True
     )
 
-    # Ensure equal aspect ratio for realistic proportions
+    # Ensure equal aspect ratio
     for col in [1, 2]:
         fig.update_xaxes(row=1, col=col, scaleanchor=f"y{col}", scaleratio=1)
 
     # Adjust subplot titles position
     for i, annotation in enumerate(fig.layout.annotations):
-        annotation.y = 1.05  # Move subplot titles up slightly from the top of the plot
+        annotation.y = 1.05
 
     return fig
 
