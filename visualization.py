@@ -397,8 +397,9 @@ def plot_shot_analysis(df_ball, metrics):
     # Update layout for larger size and proper title/legend placement
     fig.update_layout(
         height=600,  # Increased height for larger graphs
-        width=1200,  # Increased width to fill more of the Streamlit screen,
-        title_x=0.5,  # Center the main title
+        width=1200,  # Increased width to fill more of the Streamlit screen
+        title_text="Ball Path Analysis",
+        title_x=0.2,  # Center the main title
         title_font=dict(size=20),
         margin=dict(t=100, b=100, l=80, r=80),  # Adjusted margins for spacing
         legend=dict(
