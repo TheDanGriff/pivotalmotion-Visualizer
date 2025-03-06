@@ -256,7 +256,7 @@ def plot_shot_analysis(df_ball, metrics):
     # Create figure with two subplots side by side
     fig = make_subplots(
         rows=1, cols=2,
-        subplot_titles=("Ball Path (Side View)", "Ball Path (Rear View)"),  # Corrected titles
+        subplot_titles=("Ball Path (Side View)", "Ball Path (Rear View)"),
         horizontal_spacing=0.1
     )
 
