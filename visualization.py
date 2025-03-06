@@ -288,7 +288,7 @@ def plot_shot_analysis(df_ball, metrics):
         left_range = [-2, 2]
 
     # Right Plot (Rear View): Use the ball's Y data adjusted by release_y (midline corrected)
-    release_y = df_ball.at[release_idx, 'Basketball_X'] * INCHES_TO_FEET
+    release_y = df_ball.at[release_idx, 'Basketball_'] * INCHES_TO_FEET
     traj_y_relative = -(traj_y - release_y)
     right_range = [-2, 2]
 
