@@ -213,11 +213,11 @@ def plot_distance_over_height(df_ball):
 
 def plot_shot_analysis(df_ball, metrics):
     """Create interactive basketball shot analysis visualization with two 2D trajectory plots:
-    Ball Path (Side View) shows mirrored X vs Z (horizontal movement, no midline adjustment),
-    Ball Path (Rear View) shows mirrored Y vs Z (lateral deviation, centered on release_y),
+    Ball Path (Side View) shows mirrored Y vs Z (centered on release_y),
+    Ball Path (Rear View) shows mirrored X vs Z (no midline adjustment),
     from lift_idx to release_idx, including set_idx.
-    Both plots have a fixed Y-axis range of 3-11 ft. Side View X-axis is 4 ft wide (dynamic range),
-    Rear View X-axis is -2 to 2 ft (fixed)."""
+    Both plots have a fixed Y-axis range of 3-11 ft. Side View X-axis is -2 to 2 ft (fixed),
+    Rear View X-axis is 4 ft wide (dynamic range)."""
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
     import numpy as np
@@ -276,40 +276,40 @@ def plot_shot_analysis(df_ball, metrics):
     traj_y = get_slice(df_ball['Basketball_Y'], trajectory_start, trajectory_end + 1)  # feet
     traj_z = get_slice(df_ball['Basketball_Z'], trajectory_start, trajectory_end + 1)  # feet
 
-    # Rear View: Center on release_y and mirror
+    # Side View: Use what was Rear View data (mirrored Y vs Z, centered on release_y)
     release_y = df_ball.at[release_idx, 'Basketball_Y'] * INCHES_TO_FEET
     traj_y_relative = -(traj_y - release_y)  # Mirror and center on release_y
 
-    # Side View: Mirror X, no centering
+    # Rear View: Use what was Side View data (mirrored X vs Z, no centering)
     traj_x_mirrored = -traj_x  # Mirror X-direction, raw values
 
     logger.debug(f"Trajectory lengths - traj_x: {len(traj_x)}, traj_y: {len(traj_y)}, traj_z: {len(traj_z)}")
-    logger.debug(f"Side View - traj_x_mirrored min/max: {np.min(traj_x_mirrored) if len(traj_x_mirrored) > 0 else 'N/A'}/{np.max(traj_x_mirrored) if len(traj_x_mirrored) > 0 else 'N/A'}")
-    logger.debug(f"Rear View - traj_y_relative min/max: {np.min(traj_y_relative) if len(traj_y_relative) > 0 else 'N/A'}/{np.max(traj_y_relative) if len(traj_y_relative) > 0 else 'N/A'}")
+    logger.debug(f"Side View - traj_y_relative min/max: {np.min(traj_y_relative) if len(traj_y_relative) > 0 else 'N/A'}/{np.max(traj_y_relative) if len(traj_y_relative) > 0 else 'N/A'}")
+    logger.debug(f"Rear View - traj_x_mirrored min/max: {np.min(traj_x_mirrored) if len(traj_x_mirrored) > 0 else 'N/A'}/{np.max(traj_x_mirrored) if len(traj_x_mirrored) > 0 else 'N/A'}")
     logger.debug(f"release_y: {release_y}")
 
-    # Side View X-range: 4 ft wide, centered dynamically, no midline adjustment
-    if len(traj_x_mirrored) > 0:
-        x_min, x_max = np.nanmin(traj_x_mirrored), np.nanmax(traj_x_mirrored)
-        if pd.isna(x_min) or pd.isna(x_max) or x_max == x_min:
-            x_center = traj_x_mirrored[0] if len(traj_x_mirrored) > 0 else 0
-        else:
-            x_center = (x_min + x_max) / 2
-        x_range = [x_center - 2, x_center + 2]  # 4 ft wide, raw mirrored X
-    else:
-        x_range = [-2, 2]
+    # Side View X-range: Fixed -2 to 2 ft (since it’s now Y vs Z, centered)
+    x_range = [-2, 2]
 
-    # Rear View X-range: Fixed -2 to 2 ft, centered on release_y
-    y_range = [-2, 2]
+    # Rear View X-range: 4 ft wide, centered dynamically (since it’s now X vs Z)
+    if len(traj_x_mirrored) > 0:
+        y_min, y_max = np.nanmin(traj_x_mirrored), np.nanmax(traj_x_mirrored)
+        if pd.isna(y_min) or pd.isna(y_max) or y_max == y_min:
+            y_center = traj_x_mirrored[0] if len(traj_x_mirrored) > 0 else 0
+        else:
+            y_center = (y_min + y_max) / 2
+        y_range = [y_center - 2, y_center + 2]  # 4 ft wide
+    else:
+        y_range = [-2, 2]
 
     # Fixed Z-range for both views
     z_range = [3, 11]
 
-    # Plot Side View (mirrored X vs Z, no centering) - Left plot, col=1
-    if len(traj_x_mirrored) > 0 and len(traj_z) > 0:
+    # Plot Side View (mirrored Y vs Z, centered on release_y) - Left plot, col=1
+    if len(traj_y_relative) > 0 and len(traj_z) > 0:
         fig.add_trace(
             go.Scatter(
-                x=traj_x_mirrored,
+                x=traj_y_relative,
                 y=traj_z,
                 mode='lines',
                 name='Trajectory',
@@ -321,12 +321,12 @@ def plot_shot_analysis(df_ball, metrics):
         for phase in ['lift', 'set', 'release']:
             idx = locals()[f"{phase}_idx"]
             if trajectory_start <= idx <= trajectory_end:
-                x_val = -(df_ball.at[idx, 'Basketball_X'] * INCHES_TO_FEET)  # Mirror X, no centering
+                y_val = -((df_ball.at[idx, 'Basketball_Y'] * INCHES_TO_FEET) - release_y)  # Mirror and center on release_y
                 z_val = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
-                logger.debug(f"Side View {phase} - x: {x_val}, y: {z_val}")
+                logger.debug(f"Side View {phase} - x: {y_val}, y: {z_val}")
                 fig.add_trace(
                     go.Scatter(
-                        x=[x_val],
+                        x=[y_val],
                         y=[z_val],
                         mode='markers',
                         marker=dict(
@@ -351,11 +351,11 @@ def plot_shot_analysis(df_ball, metrics):
             row=1, col=1
         )
 
-    # Plot Rear View (mirrored Y vs Z, centered on release_y) - Right plot, col=2
-    if len(traj_y_relative) > 0 and len(traj_z) > 0:
+    # Plot Rear View (mirrored X vs Z, no centering) - Right plot, col=2
+    if len(traj_x_mirrored) > 0 and len(traj_z) > 0:
         fig.add_trace(
             go.Scatter(
-                x=traj_y_relative,
+                x=traj_x_mirrored,
                 y=traj_z,
                 mode='lines',
                 name='Trajectory',
@@ -367,12 +367,12 @@ def plot_shot_analysis(df_ball, metrics):
         for phase in ['lift', 'set', 'release']:
             idx = locals()[f"{phase}_idx"]
             if trajectory_start <= idx <= trajectory_end:
-                y_val = -((df_ball.at[idx, 'Basketball_Y'] * INCHES_TO_FEET) - release_y)  # Mirror and center on release_y
+                x_val = -(df_ball.at[idx, 'Basketball_X'] * INCHES_TO_FEET)  # Mirror X, no centering
                 z_val = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
-                logger.debug(f"Rear View {phase} - x: {y_val}, y: {z_val}")
+                logger.debug(f"Rear View {phase} - x: {x_val}, y: {z_val}")
                 fig.add_trace(
                     go.Scatter(
-                        x=[y_val],
+                        x=[x_val],
                         y=[z_val],
                         mode='markers',
                         marker=dict(
@@ -401,7 +401,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_xaxes(
         title_text="Horizontal Position (ft)",
         row=1, col=1,
-        range=x_range,
+        range=x_range,  # Fixed -2 to 2 ft for Y vs Z
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12)
@@ -419,7 +419,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_xaxes(
         title_text="Lateral Deviation from Release (ft)",
         row=1, col=2,
-        range=y_range,
+        range=y_range,  # Dynamic 4 ft for X vs Z
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12)
