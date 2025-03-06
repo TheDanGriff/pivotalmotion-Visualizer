@@ -223,6 +223,9 @@ def plot_shot_analysis(df_ball, metrics):
     import numpy as np
     import pandas as pd
     from scipy.signal import savgol_filter
+    import logging
+
+    logger = logging.getLogger(__name__)
 
     INCHES_TO_FEET = 1 / 12
     COLOR_PALETTE = {
@@ -250,6 +253,9 @@ def plot_shot_analysis(df_ball, metrics):
     trajectory_end = trajectory_indices[-1]   # release_idx
     set_idx = trajectory_indices[1]           # set_idx
 
+    logger.debug(f"Indices - lift_idx: {lift_idx}, set_idx: {set_idx}, release_idx: {release_idx}, max_idx: {max_idx}")
+    logger.debug(f"Trajectory - start: {trajectory_start}, end: {trajectory_end}")
+
     # Create figure with two subplots side by side
     fig = make_subplots(
         rows=1, cols=2,
@@ -273,13 +279,30 @@ def plot_shot_analysis(df_ball, metrics):
     traj_y = get_slice(df_ball['Basketball_Y'], trajectory_start, trajectory_end + 1)  # feet
     traj_z = get_slice(df_ball['Basketball_Z'], trajectory_start, trajectory_end + 1)  # feet
 
+    # Shot direction adjustments
+    hoop_x = metrics.get('hoop_x', 501.0) * INCHES_TO_FEET  # Hoop X in feet
+    hoop_y = metrics.get('hoop_y', 0.0) * INCHES_TO_FEET    # Hoop Y in feet (midline)
+    release_x = df_ball.at[release_idx, 'Basketball_X'] * INCHES_TO_FEET
+    flip = metrics.get('flip', False)
+
     # Mirror trajectories to flip parabolas
     traj_x_mirrored = -traj_x  # Flip X-direction
     traj_y_mirrored = -traj_y  # Flip Y-direction
 
-    # Adjust traj_y_mirrored to be relative to hoop_y (midline = 0)
-    hoop_y = metrics.get('hoop_y', 0.0) * INCHES_TO_FEET  # Hoop Y in feet
-    traj_y_relative = traj_y_mirrored - hoop_y  # Center on hoop
+    # Adjust based on shot direction
+    if flip:
+        traj_x_mirrored = -traj_x_mirrored  # Double negation if flipped shot
+        hoop_x = -hoop_x
+    if hoop_x < release_x:
+        traj_x_mirrored = -traj_x_mirrored  # Ensure Side View opens toward hoop
+
+    # Center Y trajectory on hoop_y for Rear View
+    traj_y_relative = traj_y_mirrored - hoop_y  # Lateral deviation centered on hoop
+
+    logger.debug(f"Trajectory lengths - traj_x: {len(traj_x)}, traj_y: {len(traj_y)}, traj_z: {len(traj_z)}")
+    logger.debug(f"Rear View - traj_y_relative min/max: {np.min(traj_y_relative) if len(traj_y_relative) > 0 else 'N/A'}/{np.max(traj_y_relative) if len(traj_y_relative) > 0 else 'N/A'}")
+    logger.debug(f"Side View - traj_x_mirrored min/max: {np.min(traj_x_mirrored) if len(traj_x_mirrored) > 0 else 'N/A'}/{np.max(traj_x_mirrored) if len(traj_x_mirrored) > 0 else 'N/A'}")
+    logger.debug(f"hoop_y: {hoop_y}, release_x: {release_x}, hoop_x: {hoop_x}, flip: {flip}")
 
     # Side View X-range: 4 ft wide, centered dynamically
     if len(traj_x_mirrored) > 0:
@@ -295,7 +318,7 @@ def plot_shot_analysis(df_ball, metrics):
     # Rear View X-range: Fixed -2 to 2 ft
     y_range = [-2, 2]
 
-    # Fixed Y-range for both views
+    # Fixed Z-range for both views
     z_range = [3, 11]
 
     # Plot Rear View (Y vs Z) - Lateral deviation (left plot, col=1)
@@ -314,8 +337,9 @@ def plot_shot_analysis(df_ball, metrics):
         for phase in ['lift', 'set', 'release']:
             idx = locals()[f"{phase}_idx"]
             if trajectory_start <= idx <= trajectory_end:
-                y_val = -(df_ball.at[idx, 'Basketball_Y'] * INCHES_TO_FEET) - hoop_y  # Mirror and center
+                y_val = -(df_ball.at[idx, 'Basketball_Y'] * INCHES_TO_FEET) - hoop_y  # Mirror and center on hoop_y
                 z_val = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
+                logger.debug(f"Rear View {phase} - x: {y_val}, y: {z_val}")
                 fig.add_trace(
                     go.Scatter(
                         x=[y_val],
@@ -330,6 +354,18 @@ def plot_shot_analysis(df_ball, metrics):
                     ),
                     row=1, col=1
                 )
+    else:
+        logger.warning("Rear View data empty. Adding placeholder.")
+        fig.add_trace(
+            go.Scatter(
+                x=[0], y=[3],
+                mode='text',
+                text=["No Data"],
+                textposition="middle center",
+                showlegend=False
+            ),
+            row=1, col=1
+        )
 
     # Plot Side View (X vs Z) - Horizontal movement (right plot, col=2)
     if len(traj_x_mirrored) > 0 and len(traj_z) > 0:
@@ -348,7 +384,12 @@ def plot_shot_analysis(df_ball, metrics):
             idx = locals()[f"{phase}_idx"]
             if trajectory_start <= idx <= trajectory_end:
                 x_val = -(df_ball.at[idx, 'Basketball_X'] * INCHES_TO_FEET)  # Mirror X
+                if flip:
+                    x_val = -x_val  # Adjust for flip
+                if hoop_x < release_x:
+                    x_val = -x_val  # Adjust direction toward hoop
                 z_val = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
+                logger.debug(f"Side View {phase} - x: {x_val}, y: {z_val}")
                 fig.add_trace(
                     go.Scatter(
                         x=[x_val],
@@ -363,6 +404,18 @@ def plot_shot_analysis(df_ball, metrics):
                     ),
                     row=1, col=2
                 )
+    else:
+        logger.warning("Side View data empty. Adding placeholder.")
+        fig.add_trace(
+            go.Scatter(
+                x=[0], y=[3],
+                mode='text',
+                text=["No Data"],
+                textposition="middle center",
+                showlegend=False
+            ),
+            row=1, col=2
+        )
 
     # Configure axes
     fig.update_xaxes(
