@@ -1918,7 +1918,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     
     Returns:
     - fig: Single Plotly figure object with two subplots.
-    - kpis: Dictionary of concise biomechanical KPIs.
+    - kpis: Dictionary of biomechanical KPIs with nested joint metrics.
     """
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
@@ -2094,15 +2094,20 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             kpis[joint] = {
                 'max_flexion': angles.max(),
                 'min_flexion': angles.min(),
-                'at_lift': angles.iloc[lift_idx - start_idx],
-                'at_set': angles.iloc[set_idx - start_idx],
-                'at_release': angles.iloc[release_idx - start_idx],
+                'at_lift': angles.iloc[lift_idx - start_idx] if lift_idx - start_idx < len(angles) else np.nan,
+                'at_set': angles.iloc[set_idx - start_idx] if set_idx - start_idx < len(angles) else np.nan,
+                'at_release': angles.iloc[release_idx - start_idx] if release_idx - start_idx < len(angles) else np.nan,
                 'range': angles.max() - angles.min(),
                 'rate_change': rate.max() if not rate.isna().all() else np.nan
             }
 
+    # Add shoulder rotation as a specific metric under 'shoulder'
+    if not pose_segment['shoulder_angle'].isna().all():
+        shoulder_lift = pose_segment['shoulder_angle'].iloc[lift_idx - start_idx] if lift_idx - start_idx < len(pose_segment) else np.nan
+        shoulder_release = pose_segment['shoulder_angle'].iloc[release_idx - start_idx] if release_idx - start_idx < len(pose_segment) else np.nan
+        kpis['shoulder']['rotation'] = abs(shoulder_release - shoulder_lift) if not pd.isna(shoulder_lift) and not pd.isna(shoulder_release) else np.nan
 
-    # 1. Kinematic Chain Score
+    # Kinematic Chain Score
     def calculate_kinematic_chain_score(pose_segment, lift_idx, set_idx, release_idx, start_idx, end_idx, fps):
         sequence_order = ['ankle', 'knee', 'hip', 'shoulder', 'elbow', 'wrist']
         score = 0
@@ -2155,47 +2160,27 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
 
     kpis['kinematic_chain_score'] = calculate_kinematic_chain_score(pose_segment, lift_idx, set_idx, release_idx, start_idx, end_idx, fps)
 
-    # 2. Max Knee Flexion
-    kpis['max_knee_flexion'] = pose_segment['knee_angle'].max() if not pose_segment['knee_angle'].isna().all() else np.nan
-
-    # 3. Max Elbow Flexion
-    kpis['max_elbow_flexion'] = pose_segment['elbow_angle'].max() if not pose_segment['elbow_angle'].isna().all() else np.nan
-
-    # 4. Shoulder Rotation (lift to release)
-    if not pose_segment['shoulder_angle'].isna().all():
-        shoulder_lift = pose_segment['shoulder_angle'].iloc[lift_idx - start_idx]
-        shoulder_release = pose_segment['shoulder_angle'].iloc[release_idx - start_idx]
-        kpis['shoulder_rotation'] = abs(shoulder_release - shoulder_lift)
-    else:
-        kpis['shoulder_rotation'] = np.nan
-
-    # 5. Center of Mass (COM) Movement
+    # Center of Mass (COM) Movement
     if all(col in pose_segment for col in ['MIDHIP_X', 'MIDHIP_Y', 'MIDHIP_Z']):
         com_x = pose_segment['MIDHIP_X']
         com_y = pose_segment['MIDHIP_Y']
         com_z = pose_segment['MIDHIP_Z']
         com_speed = np.sqrt((com_x.diff()**2 + com_y.diff()**2 + com_z.diff()**2)) * fps * INCHES_TO_FEET
         com_direction = np.arctan2(com_y.diff(), com_x.diff()) * 180 / np.pi  # Degrees from x-axis
-        kpis['com_speed'] = com_speed.iloc[set_idx - start_idx:release_idx - start_idx].mean() if not com_speed.isna().all() else np.nan
-        kpis['com_direction'] = com_direction.iloc[set_idx - start_idx:release_idx - start_idx].mean() if not com_direction.isna().all() else np.nan
+        kpis['com'] = {
+            'speed': com_speed.iloc[set_idx - start_idx:release_idx - start_idx].mean() if not com_speed.isna().all() else np.nan,
+            'direction': com_direction.iloc[set_idx - start_idx:release_idx - start_idx].mean() if not com_direction.isna().all() else np.nan
+        }
     else:
-        kpis['com_speed'] = np.nan
-        kpis['com_direction'] = np.nan
+        kpis['com'] = {'speed': np.nan, 'direction': np.nan}
 
-    # 6. Stability (Feet-to-Hip Ratio)
+    # Stability (Feet-to-Hip Ratio)
     if all(col in pose_segment for col in ['RBIGTOE_X', 'LBIGTOE_X', 'RHIP_X', 'LHIP_X']):
         feet_width = abs(pose_segment['RBIGTOE_X'] - pose_segment['LBIGTOE_X']).mean()
         hip_width = abs(pose_segment['RHIP_X'] - pose_segment['LHIP_X']).mean()
         kpis['stability_ratio'] = feet_width / hip_width if hip_width > 0 else np.nan
     else:
         kpis['stability_ratio'] = np.nan
-
-    logger.debug(f"KPIs computed: {kpis}")
-
-    # Kinematic Chain Score (keep as a separate top-level key)
-    kpis['kinematic_chain_score'] = calculate_kinematic_chain_score(
-        pose_segment, lift_idx, set_idx, release_idx, start_idx, end_idx, fps
-    )
 
     logger.debug(f"KPIs computed: {kpis}")
     return fig, kpis
