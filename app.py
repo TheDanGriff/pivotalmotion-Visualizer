@@ -343,6 +343,9 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             st.error(f"Visualization error: {str(e)}")
 
 def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
+    import streamlit as st
+    import pandas as pd
+
     st.header("Biomechanics Analysis")
     release_idx = metrics.get('release_idx', 0)
 
@@ -352,44 +355,30 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
 
     st.subheader("Joint Flexion/Extension KPIs")
     col1, col2, col3 = st.columns(3)
-    for i, joint in enumerate([j for j in kpis.keys() if j != 'kinematic_chain_score']):
+    joint_keys = ['elbow', 'shoulder', 'wrist', 'hip', 'knee', 'ankle']  # Explicitly list joints
+    for i, joint in enumerate([j for j in kpis.keys() if j in joint_keys]):
         col = [col1, col2, col3][i % 3]
         with col:
-            st.metric(f"{joint.capitalize()} Max Flexion", f"{kpis[joint]['max_flexion']:.1f}°")
-            st.metric(f"{joint.capitalize()} Min Flexion", f"{kpis[joint]['min_flexion']:.1f}°")
-            st.metric(f"{joint.capitalize()} at Lift", f"{kpis[joint]['at_lift']:.1f}°")
-            st.metric(f"{joint.capitalize()} at Set", f"{kpis[joint]['at_set']:.1f}°")
-            st.metric(f"{joint.capitalize()} at Release", f"{kpis[joint]['at_release']:.1f}°")
-            st.metric(f"{joint.capitalize()} Range", f"{kpis[joint]['range']:.1f}°")
-            st.metric(f"{joint.capitalize()} Max Rate", f"{kpis[joint]['rate_change']:.1f}°/s")
+            # Safely access KPIs with fallback to 'N/A'
+            max_flexion = kpis[joint].get('max_flexion', float('nan'))
+            min_flexion = kpis[joint].get('min_flexion', float('nan'))
+            at_lift = kpis[joint].get('at_lift', float('nan'))
+            at_set = kpis[joint].get('at_set', float('nan'))
+            at_release = kpis[joint].get('at_release', float('nan'))
+            range_val = kpis[joint].get('range', float('nan'))
+            rate_change = kpis[joint].get('rate_change', float('nan'))
+
+            st.metric(f"{joint.capitalize()} Max Flexion", f"{max_flexion:.1f}°" if not pd.isna(max_flexion) else "N/A")
+            st.metric(f"{joint.capitalize()} Min Flexion", f"{min_flexion:.1f}°" if not pd.isna(min_flexion) else "N/A")
+            st.metric(f"{joint.capitalize()} at Lift", f"{at_lift:.1f}°" if not pd.isna(at_lift) else "N/A")
+            st.metric(f"{joint.capitalize()} at Set", f"{at_set:.1f}°" if not pd.isna(at_set) else "N/A")
+            st.metric(f"{joint.capitalize()} at Release", f"{at_release:.1f}°" if not pd.isna(at_release) else "N/A")
+            st.metric(f"{joint.capitalize()} Range", f"{range_val:.1f}°" if not pd.isna(range_val) else "N/A")
+            st.metric(f"{joint.capitalize()} Max Rate", f"{rate_change:.1f}°/s" if not pd.isna(rate_change) else "N/A")
     
     st.subheader("Kinematic Chain Score")
-    st.metric("Kinematic Chain Score", f"{kpis['kinematic_chain_score']:.1f}/100")
-
-    
-    # Get hoop position and flip from metrics
-    hoop_x = metrics.get('hoop_x', 501.0)  # Default to 501 if not in metrics
-    hoop_y = metrics.get('hoop_y', 0.0)
-    flip = metrics.get('flip', False)
-
-    # Get alignment metrics with dynamic hoop position
-    alignment_metrics = calculate_body_alignment(df_pose, release_idx, hoop_x, hoop_y)
-    
-    # Create two columns for visuals
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        pose_row = df_pose.iloc[release_idx]
-        fig = create_body_alignment_visual(pose_row, hoop_x, hoop_y)
-        st.plotly_chart(fig, use_container_width=True)
-
-    with col2:
-        try:
-            frame_data = df_pose.iloc[release_idx]
-            fig_feet = create_foot_alignment_visual(frame_data, metrics['shot_distance'], flip=flip, hoop_x=hoop_x, hoop_y=hoop_y)
-            st.plotly_chart(fig_feet, use_container_width=True)
-        except KeyError as e:
-            st.error(f"Missing foot data: {e}")
+    kinematic_score = kpis.get('kinematic_chain_score', float('nan'))
+    st.metric("Kinematic Chain Score", f"{kinematic_score:.1f}/100" if not pd.isna(kinematic_score) else "N/A")
 
 def show_spin_analysis_page(df_spin):
     if not df_spin.empty:
