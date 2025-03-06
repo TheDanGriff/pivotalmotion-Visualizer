@@ -230,9 +230,9 @@ def plot_shot_analysis(df_ball, metrics):
         'release': 'rgba(255, 102, 102, 1)',     # Red
     }
     MARKER_STYLES = {
-        'lift': dict(symbol='circle', size=10, line=dict(width=2, color='white')),
-        'set': dict(symbol='diamond', size=10, line=dict(width=2, color='white')),
-        'release': dict(symbol='x', size=10, line=dict(width=2, color='white')),
+        'lift': dict(symbol='circle', size=12, line=dict(width=2, color='white')),
+        'set': dict(symbol='diamond', size=12, line=dict(width=2, color='white')),
+        'release': dict(symbol='x', size=12, line=dict(width=2, color='white')),
     }
 
     def clamp_index(idx, max_idx):
@@ -252,7 +252,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig = make_subplots(
         rows=1, cols=2,
         subplot_titles=("Ball Path (Side View)", "Ball Path (Rear View)"),
-        horizontal_spacing=0.15
+        horizontal_spacing=0.1  # Reduced spacing for larger plots
     )
 
     def get_slice(data, start, end):
@@ -301,7 +301,7 @@ def plot_shot_analysis(df_ball, metrics):
                 y=traj_z,
                 mode='lines',
                 name='Trajectory',
-                line=dict(color=COLOR_PALETTE['trajectory'], width=3),
+                line=dict(color=COLOR_PALETTE['trajectory'], width=4),
                 showlegend=True
             ),
             row=1, col=1
@@ -334,7 +334,7 @@ def plot_shot_analysis(df_ball, metrics):
                 y=traj_z,
                 mode='lines',
                 name='Trajectory',
-                line=dict(color=COLOR_PALETTE['trajectory'], width=3),
+                line=dict(color=COLOR_PALETTE['trajectory'], width=4),
                 showlegend=False  # Avoid duplicate legend entry
             ),
             row=1, col=2
@@ -364,41 +364,51 @@ def plot_shot_analysis(df_ball, metrics):
         title_text="Horizontal Position (ft)",
         row=1, col=1,
         range=x_range,  # 4 ft wide, dynamic
-        constrain='domain'
+        constrain='domain',
+        title_font=dict(size=14),
+        tickfont=dict(size=12)
     )
     fig.update_yaxes(
         title_text="Height (ft)",
         row=1, col=1,
         range=z_range,  # Fixed 3-11 ft
-        constrain='domain'
+        constrain='domain',
+        title_font=dict(size=14),
+        tickfont=dict(size=12)
     )
 
     fig.update_xaxes(
         title_text="Lateral Deviation from Midline (ft)",
         row=1, col=2,
         range=y_range,  # Fixed -2 to 2 ft
-        constrain='domain'
+        constrain='domain',
+        title_font=dict(size=14),
+        tickfont=dict(size=12)
     )
     fig.update_yaxes(
         title_text="Height (ft)",
         row=1, col=2,
         range=z_range,  # Fixed 3-11 ft
-        constrain='domain'
+        constrain='domain',
+        title_font=dict(size=14),
+        tickfont=dict(size=12)
     )
 
-    # Update layout
+    # Update layout for larger size and proper title/legend placement
     fig.update_layout(
-        height=500,  # Fixed height for consistency
-        width=900,   # Wide enough for two 4-ft-wide plots plus spacing
+        height=600,  # Increased height for larger graphs
+        width=1200,  # Increased width to fill more of the Streamlit screen
         title_text="Ball Path Analysis (Lift to Release)",
-        title_x=0.5,
-        margin=dict(t=80, b=50, l=50, r=50),
+        title_x=0.5,  # Center the main title
+        title_font=dict(size=20),
+        margin=dict(t=100, b=100, l=80, r=80),  # Adjusted margins for spacing
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=-0.2,
+            y=-0.25,  # Moved legend lower to avoid overlap with subplot titles
             xanchor="center",
-            x=0.5
+            x=0.5,
+            font=dict(size=12)
         ),
         plot_bgcolor='rgba(245, 245, 245, 1)',  # Light grey background
         showlegend=True
