@@ -2016,7 +2016,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         kf.P = np.array([[1.0]])  # Initial covariance
         kf.F = np.array([[1.0]])  # State transition model (simple 1D)
         kf.H = np.array([[1.0]])  # Measurement model
-        kf.R = np.array([[measurement_noise]])  # Measurement noise (Fixed typo: ADDR -> np.array)
+        kf.R = np.array([[measurement_noise]])  # Measurement noise (Corrected: ADDR -> np.array)
         kf.Q = np.array([[process_noise]])  # Process noise
 
         smoothed = []
@@ -2189,7 +2189,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         }
 
         # Force estimation before shot (from lift to set)
-        mass = 98  # Assume 70 kg (~154 lbs) player mass; adjust as needed
+        mass = 70  # Assume 70 kg (~154 lbs) player mass; adjust as needed
         com_speed_pre = com_speed.iloc[lift_idx - start_idx:set_idx - start_idx]
         if len(com_speed_pre) > 1:
             accel = com_speed_pre.diff().iloc[1:] / (1 / fps)  # Acceleration in ft/s^2
