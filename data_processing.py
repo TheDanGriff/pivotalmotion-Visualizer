@@ -2083,7 +2083,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
 
     # Update layout
     fig.update_layout(
-        title="Joint Flexion/Extension Analysis (Kalman Smoothed)",
+        title="Joint Flexion/Extension Analysis",
         title_x=0.5,
         height=600,
         width=1400,
