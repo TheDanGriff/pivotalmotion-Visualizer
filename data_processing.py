@@ -1980,26 +1980,33 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             logger.warning(f"Missing key for angle calculation: {e}")
             return np.nan
 
-    # Define joint angle calculations
+    # Define joint angle calculations (right side)
     joint_angles = {
-        'elbow': calculate_angle(pose_segment, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
-                                'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
-                                'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z'),
-        'shoulder': calculate_angle(pose_segment, 'MIDHIP_X', 'MIDHIP_Y', 'MIDHIP_Z',
-                                   'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
-                                   'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z'),
-        'wrist': calculate_angle(pose_segment, 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
-                                'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z',
-                                'RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z'),
-        'hip': calculate_angle(pose_segment, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
-                              'RHIP_X', 'RHIP_Y', 'RHIP_Z',
-                              'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z'),
-        'knee': calculate_angle(pose_segment, 'RHIP_X', 'RHIP_Y', 'RHIP_Z',
-                               'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
-                               'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z'),
-        'ankle': calculate_angle(pose_segment, 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
-                                'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z',
-                                'RBIGTOE_X', 'RBIGTOE_Y', 'RBIGTOE_Z')
+        'right_elbow': calculate_angle(pose_segment, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
+                                      'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
+                                      'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z'),
+        'right_shoulder': calculate_angle(pose_segment, 'MIDHIP_X', 'MIDHIP_Y', 'MIDHIP_Z',
+                                         'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
+                                         'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z'),
+        'right_wrist': calculate_angle(pose_segment, 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
+                                      'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z',
+                                      'RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z'),
+        'right_hip': calculate_angle(pose_segment, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
+                                    'RHIP_X', 'RHIP_Y', 'RHIP_Z',
+                                    'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z'),
+        'right_knee': calculate_angle(pose_segment, 'RHIP_X', 'RHIP_Y', 'RHIP_Z',
+                                     'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
+                                     'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z'),
+        'right_ankle': calculate_angle(pose_segment, 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
+                                      'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z',
+                                      'RBIGTOE_X', 'RBIGTOE_Y', 'RBIGTOE_Z'),
+        # Left side
+        'left_elbow': calculate_angle(pose_segment, 'LSHOULDER_X', 'LSHOULDER_Y', 'LSHOULDER_Z',
+                                     'LELBOW_X', 'LELBOW_Y', 'LELBOW_Z',
+                                     'LWRIST_X', 'LWRIST_Y', 'LWRIST_Z'),
+        'left_knee': calculate_angle(pose_segment, 'LHIP_X', 'LHIP_Y', 'LHIP_Z',
+                                    'LKNEE_X', 'LKNEE_Y', 'LKNEE_Z',
+                                    'LANKLE_X', 'LANKLE_Y', 'LANKLE_Z')
     }
 
     # Apply Kalman filter to smooth angles
@@ -2009,7 +2016,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         kf.P = np.array([[1.0]])  # Initial covariance
         kf.F = np.array([[1.0]])  # State transition model (simple 1D)
         kf.H = np.array([[1.0]])  # Measurement model
-        kf.R = np.array([[measurement_noise]])  # Measurement noise
+        kf.R = ADDR([[measurement_noise]])  # Measurement noise
         kf.Q = np.array([[process_noise]])  # Process noise
 
         smoothed = []
@@ -2034,9 +2041,9 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         horizontal_spacing=0.15
     )
 
-    # Upper body traces
-    for angle in ['elbow_angle', 'shoulder_angle', 'wrist_angle']:
-        joint = angle.replace('_angle', '')
+    # Upper body traces (right side only for visualization)
+    for angle in ['right_elbow_angle', 'right_shoulder_angle', 'right_wrist_angle']:
+        joint = angle.replace('_angle', '').replace('right_', '')
         fig.add_trace(
             go.Scatter(
                 x=pose_segment['time'],
@@ -2054,9 +2061,9 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             row=1, col=1
         )
 
-    # Lower body traces
-    for angle in ['hip_angle', 'knee_angle', 'ankle_angle']:
-        joint = angle.replace('_angle', '')
+    # Lower body traces (right side only for visualization)
+    for angle in ['right_hip_angle', 'right_knee_angle', 'right_ankle_angle']:
+        joint = angle.replace('_angle', '').replace('right_', '')
         fig.add_trace(
             go.Scatter(
                 x=pose_segment['time'],
@@ -2091,7 +2098,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
 
     # Calculate KPIs using smoothed angles
     kpis = {}
-    joints = ['elbow', 'shoulder', 'wrist', 'hip', 'knee', 'ankle']
+    joints = ['right_elbow', 'right_shoulder', 'right_wrist', 'right_hip', 'right_knee', 'right_ankle', 'left_elbow', 'left_knee']
 
     for joint in joints:
         angles = pose_segment[f'{joint}_angle']
@@ -2117,19 +2124,12 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
                 'rate_change': rate.max() if not rate.isna().all() else np.nan
             }
 
-    # Add shoulder rotation
-    if not pose_segment['shoulder_angle'].isna().all():
-        shoulder_lift = pose_segment['shoulder_angle'].iloc[lift_idx - start_idx] if 0 <= lift_idx - start_idx < len(pose_segment) else np.nan
-        shoulder_release = pose_segment['shoulder_angle'].iloc[release_idx - start_idx] if 0 <= release_idx - start_idx < len(pose_segment) else np.nan
-        kpis['shoulder']['rotation'] = abs(shoulder_release - shoulder_lift) if not pd.isna(shoulder_lift) and not pd.isna(shoulder_release) else np.nan
-
     # Kinematic Chain Score
     def calculate_kinematic_chain_score(pose_segment, lift_idx, set_idx, release_idx, start_idx, end_idx, fps):
-        sequence_order = ['ankle', 'knee', 'hip', 'shoulder', 'elbow', 'wrist']
+        sequence_order = ['right_ankle', 'right_knee', 'right_hip', 'right_shoulder', 'right_elbow', 'right_wrist']
         score = 0
         max_score = 100
 
-        # Fixed typo: Use dict() instead of Dictionary()
         peak_rate_times = dict()
         for joint in sequence_order:
             angles = pose_segment[f'{joint}_angle']
@@ -2149,7 +2149,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         score += timing_score
 
         range_score = 0
-        optimal_ranges = {'ankle': 50, 'knee': 70, 'hip': 60, 'shoulder': 90, 'elbow': 70, 'wrist': 30}
+        optimal_ranges = {'right_ankle': 50, 'right_knee': 70, 'right_hip': 60, 'right_shoulder': 90, 'right_elbow': 70, 'right_wrist': 30}
         for joint in sequence_order:
             angles = pose_segment[f'{joint}_angle']
             if angles.isna().all():
@@ -2160,13 +2160,13 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
 
         release_angles = {
             joint: pose_segment[f'{joint}_angle'].iloc[release_idx - start_idx]
-            for joint in ['shoulder', 'elbow', 'wrist'] if not pose_segment[f'{joint}_angle'].isna().all()
+            for joint in ['right_shoulder', 'right_elbow', 'right_wrist'] if not pose_segment[f'{joint}_angle'].isna().all()
         }
         release_score = 0
         if len(release_angles) == 3:
-            if release_angles['elbow'] > 120 and release_angles['shoulder'] > 110 and 130 <= release_angles['wrist'] <= 150:
+            if release_angles['right_elbow'] > 120 and release_angles['right_shoulder'] > 110 and 130 <= release_angles['right_wrist'] <= 150:
                 release_score = 30
-            elif release_angles['elbow'] > 100 and release_angles['shoulder'] > 90:
+            elif release_angles['right_elbow'] > 100 and release_angles['right_shoulder'] > 90:
                 release_score = 15
         score += release_score
 
@@ -2174,19 +2174,34 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
 
     kpis['kinematic_chain_score'] = calculate_kinematic_chain_score(pose_segment, lift_idx, set_idx, release_idx, start_idx, end_idx, fps)
 
-    # Center of Mass (COM) Movement
-    if all(col in pose_segment for col in ['MIDHIP_X', 'MIDHIP_Y', 'MIDHIP_Z']):
-        com_x = pose_segment['MIDHIP_X']
-        com_y = pose_segment['MIDHIP_Y']
-        com_z = pose_segment['MIDHIP_Z']
+    # Center of Mass (COM) Movement using CENTROID
+    if all(col in pose_segment for col in ['CENTROID_X', 'CENTROID_Y', 'CENTROID_Z']):
+        com_x = pose_segment['CENTROID_X']
+        com_y = pose_segment['CENTROID_Y']
+        com_z = pose_segment['CENTROID_Z']
         com_speed = np.sqrt((com_x.diff()**2 + com_y.diff()**2 + com_z.diff()**2)) * fps * INCHES_TO_FEET
         com_direction = np.arctan2(com_y.diff(), com_x.diff()) * 180 / np.pi
+
+        # Speed and direction from set to release
         kpis['com'] = {
             'speed': com_speed.iloc[set_idx - start_idx:release_idx - start_idx].mean() if not com_speed.isna().all() else np.nan,
             'direction': com_direction.iloc[set_idx - start_idx:release_idx - start_idx].mean() if not com_direction.isna().all() else np.nan
         }
+
+        # Force estimation before shot (from lift to set)
+        mass = 70  # Assume 70 kg (~154 lbs) player mass; adjust as needed
+        com_speed_pre = com_speed.iloc[lift_idx - start_idx:set_idx - start_idx]
+        if len(com_speed_pre) > 1:
+            accel = com_speed_pre.diff().iloc[1:] / (1 / fps)  # Acceleration in ft/s^2
+            force = mass * accel.mean() * 0.3048  # Convert ft/s^2 to m/s^2, force in Newtons
+            force_direction = com_direction.iloc[lift_idx - start_idx:set_idx - start_idx].mean()
+            kpis['com']['force'] = force if not pd.isna(force) else np.nan
+            kpis['com']['force_direction'] = force_direction if not pd.isna(force_direction) else np.nan
+        else:
+            kpis['com']['force'] = np.nan
+            kpis['com']['force_direction'] = np.nan
     else:
-        kpis['com'] = {'speed': np.nan, 'direction': np.nan}
+        kpis['com'] = {'speed': np.nan, 'direction': np.nan, 'force': np.nan, 'force_direction': np.nan}
 
     # Stability (Feet-to-Hip Ratio)
     if all(col in pose_segment for col in ['RBIGTOE_X', 'LBIGTOE_X', 'RHIP_X', 'LHIP_X']):
@@ -2195,6 +2210,16 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         kpis['stability_ratio'] = feet_width / hip_width if hip_width > 0 else np.nan
     else:
         kpis['stability_ratio'] = np.nan
+
+    # Asymmetry Score (comparing left and right knee/elbow at release)
+    if all(angle in pose_segment for angle in ['left_knee_angle', 'right_knee_angle', 'left_elbow_angle', 'right_elbow_angle']):
+        knee_asym = abs(pose_segment['left_knee_angle'].iloc[release_idx - start_idx] - 
+                        pose_segment['right_knee_angle'].iloc[release_idx - start_idx])
+        elbow_asym = abs(pose_segment['left_elbow_angle'].iloc[release_idx - start_idx] - 
+                         pose_segment['right_elbow_angle'].iloc[release_idx - start_idx])
+        kpis['asymmetry_score'] = (knee_asym + elbow_asym) / 2  # Average difference in degrees
+    else:
+        kpis['asymmetry_score'] = np.nan
 
     logger.debug(f"KPIs computed: {kpis}")
     return fig, kpis
