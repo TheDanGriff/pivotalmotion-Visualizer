@@ -288,7 +288,7 @@ def plot_shot_analysis(df_ball, metrics):
         left_range = [-2, 2]
 
     # Right Plot (Rear View): Use the ball's Y data adjusted by release_y (midline corrected)
-    release_y = df_ball.at[release_idx, 'Basketball_'] * INCHES_TO_FEET
+    release_y = df_ball.at[release_idx, 'Basketball_Y'] * INCHES_TO_FEET
     traj_y_relative = -(traj_y - release_y)
     right_range = [-2, 2]
 
@@ -315,7 +315,7 @@ def plot_shot_analysis(df_ball, metrics):
         for phase in ['lift', 'set', 'release']:
             idx = locals()[f"{phase}_idx"]
             if trajectory_start <= idx <= trajectory_end:
-                marker_x = -(df_ball.at[idx, 'Basketball_Y'] * INCHES_TO_FEET)
+                marker_x = -(df_ball.at[idx, 'Basketball_X'] * INCHES_TO_FEET)
                 marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
                 fig.add_trace(
                     go.Scatter(
@@ -351,7 +351,7 @@ def plot_shot_analysis(df_ball, metrics):
         for phase in ['lift', 'set', 'release']:
             idx = locals()[f"{phase}_idx"]
             if trajectory_start <= idx <= trajectory_end:
-                marker_y = -((df_ball.at[idx, 'Basketball_X'] * INCHES_TO_FEET) - release_y)
+                marker_y = -((df_ball.at[idx, 'Basketball_Y'] * INCHES_TO_FEET) - release_y)
                 marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
                 fig.add_trace(
                     go.Scatter(
