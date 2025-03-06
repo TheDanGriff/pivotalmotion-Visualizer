@@ -409,7 +409,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_yaxes(
         title_text="Height (ft)",
         row=1, col=1,
-        quick questionrange=z_range,
+        questionrange=z_range,
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12),
