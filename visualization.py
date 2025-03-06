@@ -339,7 +339,7 @@ def plot_shot_analysis(df_ball, metrics):
                 x=x_data,
                 y=z_data,
                 mode='lines+markers',
-                name='Trajectory',
+                name='Path',
                 line=dict(color=COLOR_PALETTE['trajectory'], width=4 * scale_factor),
                 marker=dict(size=6 * scale_factor),
                 showlegend=col == 1
