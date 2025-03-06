@@ -359,7 +359,7 @@ def plot_shot_analysis(df_ball, metrics):
                     row=1, col=2
                 )
 
-    # Configure axes
+    # Configure axes with title standoff to move subplot titles up
     fig.update_xaxes(
         title_text="Horizontal Position (ft)",
         row=1, col=1,
@@ -374,7 +374,8 @@ def plot_shot_analysis(df_ball, metrics):
         range=z_range,  # Fixed 3-11 ft
         constrain='domain',
         title_font=dict(size=14),
-        tickfont=dict(size=12)
+        tickfont=dict(size=12),
+        title_standoff=20  # Adds space between title and plot
     )
 
     fig.update_xaxes(
@@ -391,32 +392,38 @@ def plot_shot_analysis(df_ball, metrics):
         range=z_range,  # Fixed 3-11 ft
         constrain='domain',
         title_font=dict(size=14),
-        tickfont=dict(size=12)
+        tickfont=dict(size=12),
+        title_standoff=20  # Adds space between title and plot
     )
 
-    # Update layout for larger size and proper title/legend placement
+    # Update layout for larger size, white background, and proper title/legend placement
     fig.update_layout(
         height=600,  # Increased height for larger graphs
         width=1200,  # Increased width to fill more of the Streamlit screen
-        title_text="Ball Path Analysis",
-        title_x=0.35,  # Center the main title
+        title_text="Ball Path Analysis (Lift to Release)",
+        title_x=0.5,  # Center the main title
         title_font=dict(size=20),
-        margin=dict(t=100, b=100, l=80, r=80),  # Adjusted margins for spacing
+        margin=dict(t=120, b=100, l=80, r=80),  # Increased top margin for subplot title spacing
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=-0.25,  # Moved legend lower to avoid overlap with subplot titles
+            y=-0.25,  # Legend stays below plots
             xanchor="center",
             x=0.5,
             font=dict(size=12)
         ),
-        plot_bgcolor='rgba(245, 245, 245, 1)',  # Light grey background
+        plot_bgcolor='rgba(255, 255, 255, 1)',  # White background
+        paper_bgcolor='rgba(255, 255, 255, 1)',  # White paper background
         showlegend=True
     )
 
     # Ensure equal aspect ratio for realistic proportions
     for col in [1, 2]:
         fig.update_xaxes(row=1, col=col, scaleanchor=f"y{col}", scaleratio=1)
+
+    # Adjust subplot titles position
+    for i, annotation in enumerate(fig.layout.annotations):
+        annotation.y = 1.05  # Move subplot titles up slightly from the top of the plot
 
     return fig
 
