@@ -253,7 +253,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         'Release Angle': {'value': metrics.get('release_angle', 0), 'min': 0, 'max': 90},    # degrees
         'Release Velocity': {'value': metrics.get('release_velocity', 0), 'min': 0, 'max': 30},  # feet/s
         'Release Time': {'value': metrics.get('release_time', 0), 'min': 0, 'max': 1},      # seconds
-        'Apex Height': {'value': metrics.get('apex_height', 0), 'min': 0, 'max': 10},       # feet
+        'Apex Height': {'value': metrics.get('apex_height', 0), 'min': 0, 'max': 20},       # feet (adjusted max for realism)
         'Release Curvature': {'value': metrics.get('release_curvature', 0), 'min': 0, 'max': 0.5},  # 1/ft
         'Lateral Deviation': {'value': metrics.get('lateral_deviation', 0), 'min': -0.5, 'max': 0.5}  # feet
     }
@@ -261,66 +261,97 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
     # KPI Grid (two rows of four columns)
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        animated_flip_kpi_card("Release Height",
-                               kpis['Release Height']['value'],
-                               "ft",
-                               player_average=player_averages['Release Height'] if player_averages is not None else None,
-                               min_value=kpis['Release Height']['min'],
-                               max_value=kpis['Release Height']['max'])
+        animated_flip_kpi_card(
+            "Release Height",
+            kpis['Release Height']['value'],
+            "ft",
+            player_average=player_averages.get('Release Height') if player_averages else None,
+            min_value=kpis['Release Height']['min'],
+            max_value=kpis['Release Height']['max'],
+            description="Good range: 7-10 ft. Height at release impacts arc and entry angle.",
+            calculation_info="Ball's Z-coordinate at release frame, converted from inches to feet."
+        )
     with col2:
-        animated_flip_kpi_card("Shot Distance",
-                               kpis['Shot Distance']['value'],
-                               "ft",
-                               player_average=player_averages['Shot Distance'] if player_averages is not None else None,
-                               min_value=kpis['Shot Distance']['min'],
-                               max_value=kpis['Shot Distance']['max'])
+        animated_flip_kpi_card(
+            "Shot Distance",
+            kpis['Shot Distance']['value'],
+            "ft",
+            player_average=player_averages.get('Shot Distance') if player_averages else None,
+            min_value=kpis['Shot Distance']['min'],
+            max_value=kpis['Shot Distance']['max'],
+            description="Ranges: <15 ft (Free Throw), 15-22 ft (Mid Range), >22 ft (3-Point).",
+            calculation_info="Horizontal distance from release point to hoop, adjusted for court side."
+        )
     with col3:
         classification = metrics.get("release_class", {})
-        extra_info = f"<p>Class: {classification.get('classification', 'Unknown')}<br>Optimal: {classification.get('optimal_range', 'N/A')}</p>"
-        animated_flip_kpi_card("Release Angle",
-                               kpis['Release Angle']['value'],
-                               "°",
-                               player_average=player_averages['Release Angle'] if player_averages is not None else None,
-                               min_value=kpis['Release Angle']['min'],
-                               max_value=kpis['Release Angle']['max'],
-                               extra_html=extra_info)
+        class_info = f"Class: {classification.get('classification', 'Unknown')}, Optimal: {classification.get('optimal_range', 'N/A')}"
+        animated_flip_kpi_card(
+            "Release Angle",
+            kpis['Release Angle']['value'],
+            "°",
+            player_average=player_averages.get('Release Angle') if player_averages else None,
+            min_value=kpis['Release Angle']['min'],
+            max_value=kpis['Release Angle']['max'],
+            description=f"Good range: 43-47°. {class_info}. Optimal varies with distance.",
+            calculation_info="Angle of ball trajectory post-release using arctan(dz/dxy) over 3 frames."
+        )
     with col4:
-        animated_flip_kpi_card("Release Velocity",
-                               kpis['Release Velocity']['value'],
-                               "ft/s",
-                               player_average=player_averages['Release Velocity'] if player_averages is not None else None,
-                               min_value=kpis['Release Velocity']['min'],
-                               max_value=kpis['Release Velocity']['max'])
+        animated_flip_kpi_card(
+            "Release Velocity",
+            kpis['Release Velocity']['value'],
+            "ft/s",
+            player_average=player_averages.get('Release Velocity') if player_averages else None,
+            min_value=kpis['Release Velocity']['min'],
+            max_value=kpis['Release Velocity']['max'],
+            description="Good range: 20-25 ft/s. Higher speeds suit longer shots.",
+            calculation_info="Magnitude of velocity vector (vx, vy, vz) at release, converted to ft/s."
+        )
 
     col5, col6, col7, col8 = st.columns(4)
     with col5:
-        animated_flip_kpi_card("Release Time",
-                               kpis['Release Time']['value'],
-                               "s",
-                               player_average=player_averages['Release Time'] if player_averages is not None else None,
-                               min_value=kpis['Release Time']['min'],
-                               max_value=kpis['Release Time']['max'])
+        animated_flip_kpi_card(
+            "Release Time",
+            kpis['Release Time']['value'],
+            "s",
+            player_average=player_averages.get('Release Time') if player_averages else None,
+            min_value=kpis['Release Time']['min'],
+            max_value=kpis['Release Time']['max'],
+            description="Good range: 0.3-0.6 s. Quicker releases reduce defender impact.",
+            calculation_info="Time from lift index to release index, divided by FPS (default 60)."
+        )
     with col6:
-        animated_flip_kpi_card("Apex Height",
-                               kpis['Apex Height']['value'],
-                               "ft",
-                               player_average=player_averages['Apex Height'] if player_averages is not None else None,
-                               min_value=kpis['Apex Height']['min'],
-                               max_value=kpis['Apex Height']['max'])
+        animated_flip_kpi_card(
+            "Apex Height",
+            kpis['Apex Height']['value'],
+            "ft",
+            player_average=player_averages.get('Apex Height') if player_averages else None,
+            min_value=kpis['Apex Height']['min'],
+            max_value=kpis['Apex Height']['max'],
+            description="Good range: 12-16 ft. Higher apex aids shot clearance.",
+            calculation_info="Maximum Z-coordinate of ball trajectory, converted to feet."
+        )
     with col7:
-        animated_flip_kpi_card("Release Curvature",
-                               kpis['Release Curvature']['value'],
-                               "1/ft",
-                               player_average=player_averages['Release Curvature'] if player_averages is not None else None,
-                               min_value=kpis['Release Curvature']['min'],
-                               max_value=kpis['Release Curvature']['max'])
+        animated_flip_kpi_card(
+            "Release Curvature",
+            kpis['Release Curvature']['value'],
+            "1/ft",
+            player_average=player_averages.get('Release Curvature') if player_averages else None,
+            min_value=kpis['Release Curvature']['min'],
+            max_value=kpis['Release Curvature']['max'],
+            description="Good range: 0.05-0.15 1/ft. Moderate curvature optimizes arc.",
+            calculation_info="Second derivative of ball's X-position at release, scaled to 1/ft."
+        )
     with col8:
-        animated_flip_kpi_card("Lateral Deviation",
-                               kpis['Lateral Deviation']['value'],
-                               "ft",
-                               player_average=player_averages['Lateral Deviation'] if player_averages is not None else None,
-                               min_value=kpis['Lateral Deviation']['min'],
-                               max_value=kpis['Lateral Deviation']['max'])
+        animated_flip_kpi_card(
+            "Lateral Deviation",
+            kpis['Lateral Deviation']['value'],
+            "ft",
+            player_average=player_averages.get('Lateral Deviation') if player_averages else None,
+            min_value=kpis['Lateral Deviation']['min'],
+            max_value=kpis['Lateral Deviation']['max'],
+            description="Good range: -0.1 to 0.1 ft. Closer to 0 indicates better aim.",
+            calculation_info="Perpendicular distance from shot line to ball at hoop height, in feet."
+        )
 
     # Shot Location Visualization (Fixed Size, Proper Scale)
     if not df_ball.empty:
