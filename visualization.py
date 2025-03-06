@@ -212,12 +212,13 @@ def plot_distance_over_height(df_ball):
 
 
 def plot_shot_analysis(df_ball, metrics):
-    """Create interactive basketball shot analysis visualization with two 2D trajectory plots:
-    Ball Path (Side View) shows mirrored Y vs Z (centered on release_y),
-    Ball Path (Rear View) shows mirrored X vs Z (no midline adjustment),
-    from lift_idx to release_idx, including set_idx.
-    Both plots have a fixed Y-axis range of 3-11 ft. Side View X-axis is -2 to 2 ft (fixed),
-    Rear View X-axis is 4 ft wide (dynamic range)."""
+    """
+    Create interactive basketball shot analysis visualization with two 2D trajectory plots:
+    - Ball Path (Side View) shows mirrored Y vs Z (centered on release_y) with a dynamic 4 ft range 
+      based on the horizontal position of the shot.
+    - Ball Path (Rear View) shows mirrored X vs Z (no centering) with a fixed -2 to 2 ft range.
+    Both plots have a fixed Z-axis (height) range of 3-11 ft.
+    """
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
     import numpy as np
@@ -230,9 +231,9 @@ def plot_shot_analysis(df_ball, metrics):
     INCHES_TO_FEET = 1 / 12
     COLOR_PALETTE = {
         'trajectory': 'rgba(31, 119, 180, 1)',    # Blue for trajectory
-        'lift': 'rgba(147, 112, 219, 1)',        # Purple
-        'set': 'rgba(255, 182, 193, 1)',         # Pastel pink
-        'release': 'rgba(255, 102, 102, 1)',     # Red
+        'lift': 'rgba(147, 112, 219, 1)',           # Purple
+        'set': 'rgba(255, 182, 193, 1)',            # Pastel pink
+        'release': 'rgba(255, 102, 102, 1)',        # Red
     }
     MARKER_STYLES = {
         'lift': dict(symbol='circle', size=12, line=dict(width=2, color='white')),
@@ -251,7 +252,7 @@ def plot_shot_analysis(df_ball, metrics):
     trajectory_indices = sorted([lift_idx, set_idx, release_idx])
     trajectory_start = trajectory_indices[0]  # lift_idx
     trajectory_end = trajectory_indices[-1]   # release_idx
-    set_idx = trajectory_indices[1]           # set_idx
+    set_idx = trajectory_indices[1]             # set_idx
 
     # Create figure with two subplots side by side
     fig = make_subplots(
@@ -276,34 +277,33 @@ def plot_shot_analysis(df_ball, metrics):
     traj_y = get_slice(df_ball['Basketball_Y'], trajectory_start, trajectory_end + 1)  # feet
     traj_z = get_slice(df_ball['Basketball_Z'], trajectory_start, trajectory_end + 1)  # feet
 
-    # Side View: Use what was Rear View data (mirrored Y vs Z, centered on release_y)
+    # For Side View: mirror Y vs Z, centered on release_y
     release_y = df_ball.at[release_idx, 'Basketball_Y'] * INCHES_TO_FEET
     traj_y_relative = -(traj_y - release_y)  # Mirror and center on release_y
 
-    # Rear View: Use what was Side View data (mirrored X vs Z, no centering)
-    traj_x_mirrored = -traj_x  # Mirror X-direction, raw values
+    # For Rear View: mirror X vs Z (no centering)
+    traj_x_mirrored = -traj_x  # Mirror X-direction
 
     logger.debug(f"Trajectory lengths - traj_x: {len(traj_x)}, traj_y: {len(traj_y)}, traj_z: {len(traj_z)}")
     logger.debug(f"Side View - traj_y_relative min/max: {np.min(traj_y_relative) if len(traj_y_relative) > 0 else 'N/A'}/{np.max(traj_y_relative) if len(traj_y_relative) > 0 else 'N/A'}")
     logger.debug(f"Rear View - traj_x_mirrored min/max: {np.min(traj_x_mirrored) if len(traj_x_mirrored) > 0 else 'N/A'}/{np.max(traj_x_mirrored) if len(traj_x_mirrored) > 0 else 'N/A'}")
     logger.debug(f"release_y: {release_y}")
 
-    # Side View X-range: Fixed -2 to 2 ft (since it’s now Y vs Z, centered)
-    x_range = [-2, 2]
-
-    # Rear View X-range: 4 ft wide, centered dynamically (since it’s now X vs Z)
-    if len(traj_x_mirrored) > 0:
-        y_min, y_max = np.nanmin(traj_x_mirrored), np.nanmax(traj_x_mirrored)
-        if pd.isna(y_min) or pd.isna(y_max) or y_max == y_min:
-            y_center = traj_x_mirrored[0] if len(traj_x_mirrored) > 0 else 0
+    # ----------------------------------------------------------
+    # Compute dynamic x-range for Side View (left plot) from traj_y_relative
+    if len(traj_y_relative) > 0:
+        side_x_min, side_x_max = np.nanmin(traj_y_relative), np.nanmax(traj_y_relative)
+        if pd.isna(side_x_min) or pd.isna(side_x_max) or side_x_max == side_x_min:
+            side_x_center = traj_y_relative[0] if len(traj_y_relative) > 0 else 0
         else:
-            y_center = (y_min + y_max) / 2
-        y_range = [y_center - 2, y_center + 2]  # 4 ft wide
+            side_x_center = (side_x_min + side_x_max) / 2
+        side_x_range = [side_x_center - 2, side_x_center + 2]  # 4 ft wide range
     else:
-        y_range = [-2, 2]
+        side_x_range = [-2, 2]
 
-    # Fixed Z-range for both views
-    z_range = [3, 11]
+    # Set fixed x-range for Rear View (right plot) to -2 to 2 ft
+    rear_x_range = [-2, 2]
+    # ----------------------------------------------------------
 
     # Plot Side View (mirrored Y vs Z, centered on release_y) - Left plot, col=1
     if len(traj_y_relative) > 0 and len(traj_z) > 0:
@@ -398,10 +398,11 @@ def plot_shot_analysis(df_ball, metrics):
         )
 
     # Configure axes
+    # Side View (left plot) now uses the dynamic 4 ft range from traj_y_relative
     fig.update_xaxes(
         title_text="Horizontal Position (ft)",
         row=1, col=1,
-        range=y_range,  # Fixed -2 to 2 ft for Y vs Z
+        range=side_x_range,
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12)
@@ -409,17 +410,18 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_yaxes(
         title_text="Height (ft)",
         row=1, col=1,
-        range=z_range,
+        range=[3, 11],
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12),
         title_standoff=20
     )
 
+    # Rear View (right plot) now has fixed x-range of -2 to 2 ft
     fig.update_xaxes(
         title_text="Lateral Deviation from Release (ft)",
         row=1, col=2,
-        range=x_range,  # Dynamic 4 ft for X vs Z
+        range=rear_x_range,
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12)
@@ -427,7 +429,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_yaxes(
         title_text="Height (ft)",
         row=1, col=2,
-        range=z_range,
+        range=[3, 11],
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12),
@@ -464,6 +466,7 @@ def plot_shot_analysis(df_ball, metrics):
         annotation.y = 1.05
 
     return fig
+
 
 def plot_foot_alignment(df):
     """Professional foot alignment visualization with error handling"""
