@@ -273,24 +273,13 @@ def plot_shot_analysis(df_ball, metrics):
     traj_y = get_slice(df_ball['Basketball_Y'], trajectory_start, trajectory_end + 1)  # feet
     traj_z = get_slice(df_ball['Basketball_Z'], trajectory_start, trajectory_end + 1)  # feet
 
-    # Shot direction adjustments
-    hoop_x = metrics.get('hoop_x', 501.0) * INCHES_TO_FEET  # Hoop X in feet
-    hoop_y = metrics.get('hoop_y', 0.0) * INCHES_TO_FEET    # Hoop Y in feet
-    release_x = df_ball.at[release_idx, 'Basketball_X'] * INCHES_TO_FEET
-    flip = metrics.get('flip', False)
-
     # Mirror trajectories to flip parabolas
     traj_x_mirrored = -traj_x  # Flip X-direction
     traj_y_mirrored = -traj_y  # Flip Y-direction
-    # Adjust based on shot direction
-    if flip:
-        traj_x_mirrored = -traj_x_mirrored  # Double negation if flipped shot
-        hoop_x = -hoop_x
-    if hoop_x < release_x:
-        traj_x_mirrored = -traj_x_mirrored  # Ensure Side View opens toward hoop
 
-    # Adjust traj_y_mirrored to center on hoop_y for Rear View
-    traj_y_relative = traj_y_mirrored - hoop_y  # Center lateral deviation on hoop
+    # Adjust traj_y_mirrored to be relative to hoop_y (midline = 0)
+    hoop_y = metrics.get('hoop_y', 0.0) * INCHES_TO_FEET  # Hoop Y in feet
+    traj_y_relative = traj_y_mirrored - hoop_y  # Center on hoop
 
     # Side View X-range: 4 ft wide, centered dynamically
     if len(traj_x_mirrored) > 0:
@@ -325,7 +314,7 @@ def plot_shot_analysis(df_ball, metrics):
         for phase in ['lift', 'set', 'release']:
             idx = locals()[f"{phase}_idx"]
             if trajectory_start <= idx <= trajectory_end:
-                y_val = -(df_ball.at[idx, 'Basketball_Y'] * INCHES_TO_FEET) - hoop_y  # Mirror Y
+                y_val = -(df_ball.at[idx, 'Basketball_Y'] * INCHES_TO_FEET) - hoop_y  # Mirror and center
                 z_val = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
                 fig.add_trace(
                     go.Scatter(
@@ -358,12 +347,7 @@ def plot_shot_analysis(df_ball, metrics):
         for phase in ['lift', 'set', 'release']:
             idx = locals()[f"{phase}_idx"]
             if trajectory_start <= idx <= trajectory_end:
-                x_val = df_ball.at[idx, 'Basketball_X'] * INCHES_TO_FEET
-                x_val = -x_val  # Mirror X
-                if flip:
-                    x_val = -x_val  # Adjust for flip
-                if hoop_x < release_x:
-                    x_val = -x_val  # Adjust direction toward hoop
+                x_val = -(df_ball.at[idx, 'Basketball_X'] * INCHES_TO_FEET)  # Mirror X
                 z_val = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
                 fig.add_trace(
                     go.Scatter(
