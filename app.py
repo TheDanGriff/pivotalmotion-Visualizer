@@ -350,9 +350,9 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
     st.header("Biomechanics Analysis")
     release_idx = metrics.get('release_idx', 0)
 
-    # Get player averages (assuming you have a function to fetch these for biomechanical KPIs)
-    player_name = st.session_state.get('username', 'Unknown')  # Adjust based on your session state
-    shot_type = st.session_state.get('shot_type', 'Unknown')  # Adjust if stored elsewhere
+    # Get player averages
+    player_name = st.session_state.get('username', 'Unknown')
+    shot_type = st.session_state.get('shot_type', 'Unknown')
     player_averages = get_player_kpi_averages(player_name, shot_type) or {}
 
     # Compute KPIs from joint flexion analysis
@@ -361,14 +361,13 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
     # Define KPI ranges for metallic color scaling
     kpi_ranges = {
         'Kinematic Chain Score': {'min': 0, 'max': 100},
-        'Elbow Max Flexion': {'min': 0, 'max': 180},
-        'Shoulder Max Flexion': {'min': 0, 'max': 180},
-        'Wrist Max Flexion': {'min': 0, 'max': 180},
-        'Hip Max Flexion': {'min': 0, 'max': 180},
-        'Knee Max Flexion': {'min': 0, 'max': 180},
-        'Ankle Max Flexion': {'min': 0, 'max': 180},
         'Stability Ratio': {'min': 0, 'max': 2},
-        'COM Speed': {'min': 0, 'max': 10}  # Adjust ranges as needed
+        'Max Knee Flexion': {'min': 0, 'max': 180},
+        'Max Elbow Flexion': {'min': 0, 'max': 180},
+        'Asymmetry Score': {'min': 0, 'max': 180},  # Max difference possible
+        'COM Speed': {'min': 0, 'max': 10},
+        'COM Direction': {'min': -180, 'max': 180},
+        'COM Force': {'min': 0, 'max': 500}
     }
 
     # --- KPI Cards Section ---
@@ -385,68 +384,70 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
         )
     with col2:
         animated_flip_kpi_card(
-            "Elbow Max Flexion",
-            kpis.get('elbow', {}).get('max_flexion', 0),
-            "°",
-            player_average=player_averages.get('Elbow Max Flexion'),
-            min_value=kpi_ranges['Elbow Max Flexion']['min'],
-            max_value=kpi_ranges['Elbow Max Flexion']['max']
-        )
-    with col3:
-        animated_flip_kpi_card(
-            "Shoulder Max Flexion",
-            kpis.get('shoulder', {}).get('max_flexion', 0),
-            "°",
-            player_average=player_averages.get('Shoulder Max Flexion'),
-            min_value=kpi_ranges['Shoulder Max Flexion']['min'],
-            max_value=kpi_ranges['Shoulder Max Flexion']['max']
-        )
-    with col4:
-        animated_flip_kpi_card(
-            "Knee Max Flexion",
-            kpis.get('knee', {}).get('max_flexion', 0),
-            "°",
-            player_average=player_averages.get('Knee Max Flexion'),
-            min_value=kpi_ranges['Knee Max Flexion']['min'],
-            max_value=kpi_ranges['Knee Max Flexion']['max']
-        )
-
-    col5, col6, col7, col8 = st.columns(4)
-    with col5:
-        animated_flip_kpi_card(
-            "Wrist Max Flexion",
-            kpis.get('wrist', {}).get('max_flexion', 0),
-            "°",
-            player_average=player_averages.get('Wrist Max Flexion'),
-            min_value=kpi_ranges['Wrist Max Flexion']['min'],
-            max_value=kpi_ranges['Wrist Max Flexion']['max']
-        )
-    with col6:
-        animated_flip_kpi_card(
-            "Hip Max Flexion",
-            kpis.get('hip', {}).get('max_flexion', 0),
-            "°",
-            player_average=player_averages.get('Hip Max Flexion'),
-            min_value=kpi_ranges['Hip Max Flexion']['min'],
-            max_value=kpi_ranges['Hip Max Flexion']['max']
-        )
-    with col7:
-        animated_flip_kpi_card(
-            "Ankle Max Flexion",
-            kpis.get('ankle', {}).get('max_flexion', 0),
-            "°",
-            player_average=player_averages.get('Ankle Max Flexion'),
-            min_value=kpi_ranges['Ankle Max Flexion']['min'],
-            max_value=kpi_ranges['Ankle Max Flexion']['max']
-        )
-    with col8:
-        animated_flip_kpi_card(
             "Stability Ratio",
             kpis.get('stability_ratio', 0),
             "",
             player_average=player_averages.get('Stability Ratio'),
             min_value=kpi_ranges['Stability Ratio']['min'],
             max_value=kpi_ranges['Stability Ratio']['max']
+        )
+    with col3:
+        animated_flip_kpi_card(
+            "Max Knee Flexion",
+            kpis.get('right_knee', {}).get('max_flexion', 0),  # Updated to 'right_knee'
+            "°",
+            player_average=player_averages.get('Max Knee Flexion'),
+            min_value=kpi_ranges['Max Knee Flexion']['min'],
+            max_value=kpi_ranges['Max Knee Flexion']['max']
+        )
+    with col4:
+        animated_flip_kpi_card(
+            "Max Elbow Flexion",
+            kpis.get('right_elbow', {}).get('max_flexion', 0),  # Updated to 'right_elbow'
+            "°",
+            player_average=player_averages.get('Max Elbow Flexion'),
+            min_value=kpi_ranges['Max Elbow Flexion']['min'],
+            max_value=kpi_ranges['Max Elbow Flexion']['max']
+        )
+
+    col5, col6, col7, col8 = st.columns(4)
+    with col5:
+        animated_flip_kpi_card(
+            "Asymmetry Score",
+            kpis.get('asymmetry_score', 0),
+            "°",
+            player_average=player_averages.get('Asymmetry Score'),
+            min_value=kpi_ranges['Asymmetry Score']['min'],
+            max_value=kpi_ranges['Asymmetry Score']['max'],
+            extra_html="<p>Lower is better (more symmetric)</p>"
+        )
+    with col6:
+        animated_flip_kpi_card(
+            "COM Speed",
+            kpis.get('com', {}).get('speed', 0),
+            "ft/s",
+            player_average=player_averages.get('COM Speed'),
+            min_value=kpi_ranges['COM Speed']['min'],
+            max_value=kpi_ranges['COM Speed']['max']
+        )
+    with col7:
+        animated_flip_kpi_card(
+            "COM Direction",
+            kpis.get('com', {}).get('direction', 0),
+            "°",
+            player_average=player_averages.get('COM Direction'),
+            min_value=kpi_ranges['COM Direction']['min'],
+            max_value=kpi_ranges['COM Direction']['max']
+        )
+    with col8:
+        animated_flip_kpi_card(
+            "COM Force",
+            kpis.get('com', {}).get('force', 0),
+            "N",
+            player_average=player_averages.get('COM Force'),
+            min_value=kpi_ranges['COM Force']['min'],
+            max_value=kpi_ranges['COM Force']['max'],
+            extra_html=f"<p>Direction: {kpis.get('com', {}).get('force_direction', 0):.1f}°</p>"
         )
 
     # --- Joint Flexion/Extension Visuals ---
@@ -455,23 +456,20 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
 
     # --- Body Alignment Visuals ---
     if not df_pose.empty and release_idx < len(df_pose):
-        frame_data = df_pose.iloc[release_idx]  # Use release frame for alignment visuals
-
+        frame_data = df_pose.iloc[release_idx]
         st.subheader("Body Alignment Visuals")
         col1, col2 = st.columns(2)
-
         with col1:
             st.write("Body Alignment (Feet, Hips, Shoulders)")
             body_fig = create_body_alignment_visual(frame_data, hoop_x=501.0, hoop_y=0.0)
             st.plotly_chart(body_fig, use_container_width=True)
-
         with col2:
             st.write("Foot Alignment")
             foot_fig = create_foot_alignment_visual(
                 frame_data,
-                shot_distance=metrics.get('shot_distance', 0) / 12,  # Convert inches to feet
-                flip=False,  # Adjust based on your data or add logic to determine flip
-                hoop_x=41.75,  # Default hoop position in feet
+                shot_distance=metrics.get('shot_distance', 0) / 12,
+                flip=False,
+                hoop_x=41.75,
                 hoop_y=0.0
             )
             st.plotly_chart(foot_fig, use_container_width=True)
