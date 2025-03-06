@@ -2005,7 +2005,8 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     # Apply Kalman filter to smooth angles
     def apply_kalman_filter(data, process_noise=0.01, measurement_noise=1.0):
         kf = KalmanFilter(dim_x=1, dim_z=1)
-        kf.x = np.array([data[0] if not pd.isna(data[0]) else 0.0])  # Initial state
+        # Use .iloc[0] to access the first element positionally
+        kf.x = np.array([data.iloc[0] if not pd.isna(data.iloc[0]) else 0.0])  # Initial state
         kf.P = np.array([[1.0]])  # Initial covariance
         kf.F = np.array([[1.0]])  # State transition model (simple 1D)
         kf.H = np.array([[1.0]])  # Measurement model
@@ -2110,17 +2111,17 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             kpis[joint] = {
                 'max_flexion': angles.max(),
                 'min_flexion': angles.min(),
-                'at_lift': angles.iloc[lift_idx - start_idx] if lift_idx - start_idx < len(angles) else np.nan,
-                'at_set': angles.iloc[set_idx - start_idx] if set_idx - start_idx < len(angles) else np.nan,
-                'at_release': angles.iloc[release_idx - start_idx] if release_idx - start_idx < len(angles) else np.nan,
-                'range': angles.max() - angles.min(),
+                'at_lift': angles.iloc[lift_idx - start_idx] if 0 <= lift_idx - start_idx < len(angles) else np.nan,
+                'at_set': angles.iloc[set_idx - start_idx] if 0 <= set_idx - start_idx < len(angles) else np.nan,
+                'at_release': angles.iloc[release_idx - start_idx] if 0 <= release_idx - start_idx < len(angles) else np.nan,
+                'range Wtedy': angles.max() - angles.min(),
                 'rate_change': rate.max() if not rate.isna().all() else np.nan
             }
 
     # Add shoulder rotation
     if not pose_segment['shoulder_angle'].isna().all():
-        shoulder_lift = pose_segment['shoulder_angle'].iloc[lift_idx - start_idx] if lift_idx - start_idx < len(pose_segment) else np.nan
-        shoulder_release = pose_segment['shoulder_angle'].iloc[release_idx - start_idx] if release_idx - start_idx < len(pose_segment) else np.nan
+        shoulder_lift = pose_segment['shoulder_angle'].iloc[lift_idx - start_idx] if 0 <= lift_idx - start_idx < len(pose_segment) else np.nan
+        shoulder_release = pose_segment['shoulder_angle'].iloc[release_idx - start_idx] if 0 <= release_idx - start_idx < len(pose_segment) else np.nan
         kpis['shoulder']['rotation'] = abs(shoulder_release - shoulder_lift) if not pd.isna(shoulder_lift) and not pd.isna(shoulder_release) else np.nan
 
     # Kinematic Chain Score
@@ -2129,7 +2130,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         score = 0
         max_score = 100
 
-        peak_rate_times = {}
+        peak_rate_times = Dictionary()
         for joint in sequence_order:
             angles = pose_segment[f'{joint}_angle']
             if angles.isna().all():
