@@ -214,9 +214,9 @@ def plot_distance_over_height(df_ball):
 def plot_shot_analysis(df_ball, metrics):
     """
     Create interactive basketball shot analysis visualization with two 2D trajectory plots:
-    - Ball Path (Side View): Displays the ball's X vs Z trajectory (mirrored X) with a dynamic 4-ft 
+    - Ball Path (Side View): Displays the ball's X vs Z trajectory (mirrored) with a dynamic 4-ft 
       horizontal range computed from the shot's X values.
-    - Ball Path (Rear View): Displays the ball's Y vs Z trajectory (with midline correction using release_y)
+    - Ball Path (Rear View): Displays the ball's Y vs Z trajectory (midline-corrected using release_y)
       with a fixed x-axis range of -2 to 2 ft.
     Both plots have a fixed vertical (Z) range of 3-11 ft.
     """
@@ -255,7 +255,7 @@ def plot_shot_analysis(df_ball, metrics):
     trajectory_end = trajectory_indices[-1]
     set_idx = trajectory_indices[1]
 
-    # Create figure with two subplots (left = side view, right = rear view)
+    # Create figure with two subplots
     fig = make_subplots(
         rows=1, cols=2,
         subplot_titles=("Ball Path (Side View)", "Ball Path (Rear View)"),
@@ -278,23 +278,23 @@ def plot_shot_analysis(df_ball, metrics):
     traj_y = get_slice(df_ball['Basketball_Y'], trajectory_start, trajectory_end + 1)
     traj_z = get_slice(df_ball['Basketball_Z'], trajectory_start, trajectory_end + 1)
 
-    # --- Data Setup After Swapping ---
-    # Left Plot (Side View): Use the ball's X data (mirrored) with a dynamic 4-ft range.
+    # --- Data Setup After Swapping Inputs ---
+    # Left Plot (Side View): Use ball's X data (mirrored)
     traj_x_mirrored = -traj_x
     if len(traj_x_mirrored) > 0:
-        left_center = (np.nanmin(traj_x_mirrored) + np.nanmax(traj_x_mirrored)) / 2
-        left_range = [left_center - 2, left_center + 2]
+        center_left = (np.nanmin(traj_x_mirrored) + np.nanmax(traj_x_mirrored)) / 2
+        left_range = [center_left - 2, center_left + 2]
     else:
         left_range = [-2, 2]
 
-    # Right Plot (Rear View): Use the ball's Y data adjusted by release_y (midline corrected)
+    # Right Plot (Rear View): Use ball's Y data corrected by release_y (midline adjustment)
     release_y = df_ball.at[release_idx, 'Basketball_Y'] * INCHES_TO_FEET
     traj_y_relative = -(traj_y - release_y)
     right_range = [-2, 2]
 
-    logger.debug(f"Side View (X) - min/max: {np.nanmin(traj_x_mirrored) if len(traj_x_mirrored)>0 else 'N/A'}/"
+    logger.debug(f"Left Plot (X) - min/max: {np.nanmin(traj_x_mirrored) if len(traj_x_mirrored)>0 else 'N/A'}/"
                  f"{np.nanmax(traj_x_mirrored) if len(traj_x_mirrored)>0 else 'N/A'}")
-    logger.debug(f"Rear View (Y relative) - min/max: {np.nanmin(traj_y_relative) if len(traj_y_relative)>0 else 'N/A'}/"
+    logger.debug(f"Right Plot (Y relative) - min/max: {np.nanmin(traj_y_relative) if len(traj_y_relative)>0 else 'N/A'}/"
                  f"{np.nanmax(traj_y_relative) if len(traj_y_relative)>0 else 'N/A'}")
     logger.debug(f"release_y: {release_y}")
 
@@ -312,6 +312,7 @@ def plot_shot_analysis(df_ball, metrics):
             ),
             row=1, col=1
         )
+        # Markers using Basketball_X values
         for phase in ['lift', 'set', 'release']:
             idx = locals()[f"{phase}_idx"]
             if trajectory_start <= idx <= trajectory_end:
@@ -348,6 +349,7 @@ def plot_shot_analysis(df_ball, metrics):
             ),
             row=1, col=2
         )
+        # Markers using Basketball_Y values (corrected by release_y)
         for phase in ['lift', 'set', 'release']:
             idx = locals()[f"{phase}_idx"]
             if trajectory_start <= idx <= trajectory_end:
@@ -431,6 +433,7 @@ def plot_shot_analysis(df_ball, metrics):
         annotation.y = 1.05
 
     return fig
+
 
 
 
