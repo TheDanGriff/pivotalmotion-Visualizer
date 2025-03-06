@@ -401,7 +401,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_xaxes(
         title_text="Horizontal Position (ft)",
         row=1, col=1,
-        range=x_range,  # Fixed -2 to 2 ft for Y vs Z
+        range=y_range,  # Fixed -2 to 2 ft for Y vs Z
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12)
@@ -419,7 +419,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_xaxes(
         title_text="Lateral Deviation from Release (ft)",
         row=1, col=2,
-        range=y_range,  # Dynamic 4 ft for X vs Z
+        range=x_range,  # Dynamic 4 ft for X vs Z
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12)
