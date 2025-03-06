@@ -213,7 +213,7 @@ def plot_distance_over_height(df_ball):
 
 def plot_shot_analysis(df_ball, metrics):
     """Create interactive basketball shot analysis visualization with two 2D trajectory plots:
-    Ball Path (Side View) shows X vs Z (horizontal movement toward hoop), 
+    Ball Path (Side View) shows X vs Z (horizontal movement toward hoop),
     Ball Path (Rear View) shows Y vs Z (lateral deviation), from lift_idx to release_idx, including set_idx.
     Both plots have a fixed Y-axis range of 3-11 ft. The Side View X-axis is 4 ft wide (dynamic range),
     and the Rear View X-axis is -2 to 2 ft (fixed, centered at 0)."""
@@ -272,45 +272,47 @@ def plot_shot_analysis(df_ball, metrics):
     traj_y = get_slice(df_ball['Basketball_Y'], trajectory_start, trajectory_end + 1)  # feet
     traj_z = get_slice(df_ball['Basketball_Z'], trajectory_start, trajectory_end + 1)  # feet
 
-    # Adjust traj_y to be relative to the hoop (center at 0 for Rear View)
-    hoop_y = metrics.get('hoop_y', 0.0) * INCHES_TO_FEET  # Hoop Y in feet
-    traj_y_relative = traj_y - hoop_y  # Center lateral deviation on hoop
-
-    # Adjust traj_x based on shot direction (flip if needed)
-    flip = metrics.get('flip', False)
+    # Shot direction adjustments
     hoop_x = metrics.get('hoop_x', 501.0) * INCHES_TO_FEET  # Hoop X in feet
-    if flip:
-        # For shots beyond half-court, mirror X relative to court center (0 ft)
-        traj_x = -traj_x  # Reflect across X=0
-        hoop_x = -hoop_x  # Reflect hoop position
-    # Ensure parabola opens toward hoop by adjusting X direction
+    hoop_y = metrics.get('hoop_y', 0.0) * INCHES_TO_FEET    # Hoop Y in feet
     release_x = df_ball.at[release_idx, 'Basketball_X'] * INCHES_TO_FEET
-    if (hoop_x < release_x and not flip) or (hoop_x > release_x and flip):
-        traj_x = -traj_x  # Reverse X direction so parabola opens toward hoop
+    flip = metrics.get('flip', False)
+
+    # Adjust traj_x for Side View to ensure parabola opens toward hoop
+    traj_x_adjusted = traj_x.copy()
+    if flip:
+        # For shots beyond half-court, mirror across court center (X=0)
+        traj_x_adjusted = -traj_x_adjusted
+        hoop_x = -hoop_x
+    # Ensure parabola opens toward hoop (left if hoop_x < release_x, right if hoop_x > release_x)
+    if hoop_x < release_x:
+        traj_x_adjusted = -traj_x_adjusted  # Reverse X so parabola opens left
+
+    # Adjust traj_y for Rear View to center on hoop_y
+    traj_y_relative = traj_y - hoop_y  # Lateral deviation from hoop center
 
     # Side View X-range: 4 ft wide, centered dynamically
-    if len(traj_x) > 0:
-        x_min, x_max = np.nanmin(traj_x), np.nanmax(traj_x)
+    if len(traj_x_adjusted) > 0:
+        x_min, x_max = np.nanmin(traj_x_adjusted), np.nanmax(traj_x_adjusted)
         if pd.isna(x_min) or pd.isna(x_max) or x_max == x_min:
-            x_center = traj_x[0] if len(traj_x) > 0 else 0
+            x_center = traj_x_adjusted[0] if len(traj_x_adjusted) > 0 else 0
         else:
             x_center = (x_min + x_max) / 2
         x_range = [x_center - 2, x_center + 2]  # 4 ft wide
     else:
-        x_range = [-2, 2]  # Default fallback
+        x_range = [-2, 2]
 
     # Rear View X-range: Fixed -2 to 2 ft
-    y_range = [-2, 2]  # Fixed ±2 ft range centered at hoop
+    y_range = [-2, 2]
 
     # Fixed Y-range for both views
-    z_range = [3, 11]  # Fixed 3-11 ft
+    z_range = [3, 11]
 
-    # Plot trajectories
-    # Side View (X vs Z) - Horizontal movement toward hoop
-    if len(traj_x) > 0 and len(traj_z) > 0:
+    # Plot Side View (X vs Z) - Horizontal movement toward hoop
+    if len(traj_x_adjusted) > 0 and len(traj_z) > 0:
         fig.add_trace(
             go.Scatter(
-                x=traj_x,
+                x=traj_x_adjusted,
                 y=traj_z,
                 mode='lines',
                 name='Trajectory',
@@ -324,9 +326,9 @@ def plot_shot_analysis(df_ball, metrics):
             if trajectory_start <= idx <= trajectory_end:
                 x_val = df_ball.at[idx, 'Basketball_X'] * INCHES_TO_FEET
                 if flip:
-                    x_val = -x_val  # Mirror for flipped shots
-                if (hoop_x < release_x and not flip) or (hoop_x > release_x and flip):
-                    x_val = -x_val  # Adjust direction
+                    x_val = -x_val
+                if hoop_x < release_x:
+                    x_val = -x_val  # Adjust direction toward hoop
                 z_val = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
                 fig.add_trace(
                     go.Scatter(
@@ -343,7 +345,7 @@ def plot_shot_analysis(df_ball, metrics):
                     row=1, col=1
                 )
 
-    # Rear View (Y vs Z) - Lateral deviation
+    # Plot Rear View (Y vs Z) - Lateral deviation
     if len(traj_y_relative) > 0 and len(traj_z) > 0:
         fig.add_trace(
             go.Scatter(
