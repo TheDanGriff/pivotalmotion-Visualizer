@@ -213,8 +213,9 @@ def plot_distance_over_height(df_ball):
 
 def plot_shot_analysis(df_ball, metrics):
     """Create interactive basketball shot analysis visualization with two 2D trajectory plots:
+    Ball Path (Rear View) shows Y vs Z (lateral deviation from hoop),
     Ball Path (Side View) shows X vs Z (horizontal movement toward hoop),
-    Ball Path (Rear View) shows Y vs Z (lateral deviation), from lift_idx to release_idx, including set_idx.
+    from lift_idx to release_idx, including set_idx.
     Both plots have a fixed Y-axis range of 3-11 ft. The Side View X-axis is 4 ft wide (dynamic range),
     and the Rear View X-axis is -2 to 2 ft (fixed, centered at 0)."""
     from plotly.subplots import make_subplots
@@ -252,7 +253,7 @@ def plot_shot_analysis(df_ball, metrics):
     # Create figure with two subplots side by side
     fig = make_subplots(
         rows=1, cols=2,
-        subplot_titles=("Ball Path (Side View)", "Ball Path (Rear View)"),
+        subplot_titles=("Ball Path (Rear View)", "Ball Path (Side View)"),
         horizontal_spacing=0.1
     )
 
@@ -281,15 +282,16 @@ def plot_shot_analysis(df_ball, metrics):
     # Adjust traj_x for Side View to ensure parabola opens toward hoop
     traj_x_adjusted = traj_x.copy()
     if flip:
-        # For shots beyond half-court, mirror across court center (X=0)
-        traj_x_adjusted = -traj_x_adjusted
+        traj_x_adjusted = -traj_x_adjusted  # Mirror across X=0 for flipped shots
         hoop_x = -hoop_x
-    # Ensure parabola opens toward hoop (left if hoop_x < release_x, right if hoop_x > release_x)
     if hoop_x < release_x:
-        traj_x_adjusted = -traj_x_adjusted  # Reverse X so parabola opens left
+        traj_x_adjusted = -traj_x_adjusted  # Reverse X so parabola opens left toward hoop
 
     # Adjust traj_y for Rear View to center on hoop_y
     traj_y_relative = traj_y - hoop_y  # Lateral deviation from hoop center
+
+    # Rear View X-range: Fixed -2 to 2 ft
+    y_range = [-2, 2]
 
     # Side View X-range: 4 ft wide, centered dynamically
     if len(traj_x_adjusted) > 0:
@@ -302,13 +304,43 @@ def plot_shot_analysis(df_ball, metrics):
     else:
         x_range = [-2, 2]
 
-    # Rear View X-range: Fixed -2 to 2 ft
-    y_range = [-2, 2]
-
     # Fixed Y-range for both views
     z_range = [3, 11]
 
-    # Plot Side View (X vs Z) - Horizontal movement toward hoop
+    # Plot Rear View (Y vs Z) - Lateral deviation (left plot, col=1)
+    if len(traj_y_relative) > 0 and len(traj_z) > 0:
+        fig.add_trace(
+            go.Scatter(
+                x=traj_y_relative,
+                y=traj_z,
+                mode='lines',
+                name='Trajectory',
+                line=dict(color=COLOR_PALETTE['trajectory'], width=4),
+                showlegend=True
+            ),
+            row=1, col=1
+        )
+        for phase in ['lift', 'set', 'release']:
+            idx = locals()[f"{phase}_idx"]
+            if trajectory_start <= idx <= trajectory_end:
+                y_val = (df_ball.at[idx, 'Basketball_Y'] * INCHES_TO_FEET) - hoop_y
+                z_val = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
+                fig.add_trace(
+                    go.Scatter(
+                        x=[y_val],
+                        y=[z_val],
+                        mode='markers',
+                        marker=dict(
+                            color=COLOR_PALETTE[phase],
+                            **MARKER_STYLES[phase]
+                        ),
+                        name=f'{phase.capitalize()}',
+                        showlegend=True
+                    ),
+                    row=1, col=1
+                )
+
+    # Plot Side View (X vs Z) - Horizontal movement toward hoop (right plot, col=2)
     if len(traj_x_adjusted) > 0 and len(traj_z) > 0:
         fig.add_trace(
             go.Scatter(
@@ -317,9 +349,9 @@ def plot_shot_analysis(df_ball, metrics):
                 mode='lines',
                 name='Trajectory',
                 line=dict(color=COLOR_PALETTE['trajectory'], width=4),
-                showlegend=True
+                showlegend=False
             ),
-            row=1, col=1
+            row=1, col=2
         )
         for phase in ['lift', 'set', 'release']:
             idx = locals()[f"{phase}_idx"]
@@ -340,39 +372,6 @@ def plot_shot_analysis(df_ball, metrics):
                             **MARKER_STYLES[phase]
                         ),
                         name=f'{phase.capitalize()}',
-                        showlegend=True
-                    ),
-                    row=1, col=1
-                )
-
-    # Plot Rear View (Y vs Z) - Lateral deviation
-    if len(traj_y_relative) > 0 and len(traj_z) > 0:
-        fig.add_trace(
-            go.Scatter(
-                x=traj_y_relative,
-                y=traj_z,
-                mode='lines',
-                name='Trajectory',
-                line=dict(color=COLOR_PALETTE['trajectory'], width=4),
-                showlegend=False
-            ),
-            row=1, col=2
-        )
-        for phase in ['lift', 'set', 'release']:
-            idx = locals()[f"{phase}_idx"]
-            if trajectory_start <= idx <= trajectory_end:
-                y_val = (df_ball.at[idx, 'Basketball_Y'] * INCHES_TO_FEET) - hoop_y
-                z_val = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
-                fig.add_trace(
-                    go.Scatter(
-                        x=[y_val],
-                        y=[z_val],
-                        mode='markers',
-                        marker=dict(
-                            color=COLOR_PALETTE[phase],
-                            **MARKER_STYLES[phase]
-                        ),
-                        name=f'{phase.capitalize()}',
                         showlegend=False
                     ),
                     row=1, col=2
@@ -380,9 +379,9 @@ def plot_shot_analysis(df_ball, metrics):
 
     # Configure axes
     fig.update_xaxes(
-        title_text="Horizontal Position (ft)",
+        title_text="Lateral Deviation from Hoop (ft)",
         row=1, col=1,
-        range=x_range,
+        range=y_range,
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12)
@@ -398,9 +397,9 @@ def plot_shot_analysis(df_ball, metrics):
     )
 
     fig.update_xaxes(
-        title_text="Lateral Deviation from Hoop (ft)",
+        title_text="Horizontal Position (ft)",
         row=1, col=2,
-        range=y_range,
+        range=x_range,
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12)
