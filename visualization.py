@@ -213,11 +213,11 @@ def plot_distance_over_height(df_ball):
 
 def plot_shot_analysis(df_ball, metrics):
     """Create interactive basketball shot analysis visualization with two 2D trajectory plots:
-    Ball Path (Rear View) shows mirrored Y vs Z (lateral deviation, centered on release_y),
     Ball Path (Side View) shows mirrored X vs Z (horizontal movement, no midline adjustment),
+    Ball Path (Rear View) shows mirrored Y vs Z (lateral deviation, centered on release_y),
     from lift_idx to release_idx, including set_idx.
-    Both plots have a fixed Y-axis range of 3-11 ft. Rear View X-axis is -2 to 2 ft (fixed),
-    Side View X-axis is 4 ft wide (dynamic range)."""
+    Both plots have a fixed Y-axis range of 3-11 ft. Side View X-axis is 4 ft wide (dynamic range),
+    Rear View X-axis is -2 to 2 ft (fixed)."""
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
     import numpy as np
@@ -256,7 +256,7 @@ def plot_shot_analysis(df_ball, metrics):
     # Create figure with two subplots side by side
     fig = make_subplots(
         rows=1, cols=2,
-        subplot_titles=("Ball Path (Rear View)", "Ball Path (Side View)"),  # Swapped titles
+        subplot_titles=("Ball Path (Side View)", "Ball Path (Rear View)"),  # Corrected titles
         horizontal_spacing=0.1
     )
 
@@ -288,9 +288,6 @@ def plot_shot_analysis(df_ball, metrics):
     logger.debug(f"Side View - traj_x_mirrored min/max: {np.min(traj_x_mirrored) if len(traj_x_mirrored) > 0 else 'N/A'}/{np.max(traj_x_mirrored) if len(traj_x_mirrored) > 0 else 'N/A'}")
     logger.debug(f"release_y: {release_y}")
 
-    # Rear View X-range: Fixed -2 to 2 ft
-    y_range = [-2, 2]
-
     # Side View X-range: 4 ft wide, centered dynamically
     if len(traj_x_mirrored) > 0:
         x_min, x_max = np.nanmin(traj_x_mirrored), np.nanmax(traj_x_mirrored)
@@ -302,56 +299,13 @@ def plot_shot_analysis(df_ball, metrics):
     else:
         x_range = [-2, 2]
 
+    # Rear View X-range: Fixed -2 to 2 ft
+    y_range = [-2, 2]
+
     # Fixed Z-range for both views
     z_range = [3, 11]
 
-    # Plot Rear View (mirrored Y vs Z, centered on release_y) - Left plot, col=1
-    if len(traj_y_relative) > 0 and len(traj_z) > 0:
-        fig.add_trace(
-            go.Scatter(
-                x=traj_y_relative,
-                y=traj_z,
-                mode='lines',
-                name='Trajectory',
-                line=dict(color=COLOR_PALETTE['trajectory'], width=4),
-                showlegend=True
-            ),
-            row=1, col=1
-        )
-        for phase in ['lift', 'set', 'release']:
-            idx = locals()[f"{phase}_idx"]
-            if trajectory_start <= idx <= trajectory_end:
-                y_val = -((df_ball.at[idx, 'Basketball_Y'] * INCHES_TO_FEET) - release_y)  # Mirror and center on release_y
-                z_val = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
-                logger.debug(f"Rear View {phase} - x: {y_val}, y: {z_val}")
-                fig.add_trace(
-                    go.Scatter(
-                        x=[y_val],
-                        y=[z_val],
-                        mode='markers',
-                        marker=dict(
-                            color=COLOR_PALETTE[phase],
-                            **MARKER_STYLES[phase]
-                        ),
-                        name=f'{phase.capitalize()}',
-                        showlegend=True
-                    ),
-                    row=1, col=1
-                )
-    else:
-        logger.warning("Rear View data empty. Adding placeholder.")
-        fig.add_trace(
-            go.Scatter(
-                x=[0], y=[3],
-                mode='text',
-                text=["No Data"],
-                textposition="middle center",
-                showlegend=False
-            ),
-            row=1, col=1
-        )
-
-    # Plot Side View (mirrored X vs Z, no centering) - Right plot, col=2
+    # Plot Side View (mirrored X vs Z, no centering) - Left plot, col=1
     if len(traj_x_mirrored) > 0 and len(traj_z) > 0:
         fig.add_trace(
             go.Scatter(
@@ -360,9 +314,9 @@ def plot_shot_analysis(df_ball, metrics):
                 mode='lines',
                 name='Trajectory',
                 line=dict(color=COLOR_PALETTE['trajectory'], width=4),
-                showlegend=False
+                showlegend=True
             ),
-            row=1, col=2
+            row=1, col=1
         )
         for phase in ['lift', 'set', 'release']:
             idx = locals()[f"{phase}_idx"]
@@ -380,12 +334,58 @@ def plot_shot_analysis(df_ball, metrics):
                             **MARKER_STYLES[phase]
                         ),
                         name=f'{phase.capitalize()}',
+                        showlegend=True
+                    ),
+                    row=1, col=1
+                )
+    else:
+        logger.warning("Side View data empty. Adding placeholder.")
+        fig.add_trace(
+            go.Scatter(
+                x=[0], y=[3],
+                mode='text',
+                text=["No Data"],
+                textposition="middle center",
+                showlegend=False
+            ),
+            row=1, col=1
+        )
+
+    # Plot Rear View (mirrored Y vs Z, centered on release_y) - Right plot, col=2
+    if len(traj_y_relative) > 0 and len(traj_z) > 0:
+        fig.add_trace(
+            go.Scatter(
+                x=traj_y_relative,
+                y=traj_z,
+                mode='lines',
+                name='Trajectory',
+                line=dict(color=COLOR_PALETTE['trajectory'], width=4),
+                showlegend=False
+            ),
+            row=1, col=2
+        )
+        for phase in ['lift', 'set', 'release']:
+            idx = locals()[f"{phase}_idx"]
+            if trajectory_start <= idx <= trajectory_end:
+                y_val = -((df_ball.at[idx, 'Basketball_Y'] * INCHES_TO_FEET) - release_y)  # Mirror and center on release_y
+                z_val = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
+                logger.debug(f"Rear View {phase} - x: {y_val}, y: {z_val}")
+                fig.add_trace(
+                    go.Scatter(
+                        x=[y_val],
+                        y=[z_val],
+                        mode='markers',
+                        marker=dict(
+                            color=COLOR_PALETTE[phase],
+                            **MARKER_STYLES[phase]
+                        ),
+                        name=f'{phase.capitalize()}',
                         showlegend=False
                     ),
                     row=1, col=2
                 )
     else:
-        logger.warning("Side View data empty. Adding placeholder.")
+        logger.warning("Rear View data empty. Adding placeholder.")
         fig.add_trace(
             go.Scatter(
                 x=[0], y=[3],
@@ -399,9 +399,9 @@ def plot_shot_analysis(df_ball, metrics):
 
     # Configure axes
     fig.update_xaxes(
-        title_text="Lateral Deviation from Release (ft)",
+        title_text="Horizontal Position (ft)",
         row=1, col=1,
-        range=y_range,
+        range=x_range,
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12)
@@ -409,7 +409,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_yaxes(
         title_text="Height (ft)",
         row=1, col=1,
-        range=z_range,
+        quick questionrange=z_range,
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12),
@@ -417,9 +417,9 @@ def plot_shot_analysis(df_ball, metrics):
     )
 
     fig.update_xaxes(
-        title_text="Horizontal Position (ft)",
+        title_text="Lateral Deviation from Release (ft)",
         row=1, col=2,
-        range=x_range,
+        range=y_range,
         constrain='domain',
         title_font=dict(size=14),
         tickfont=dict(size=12)
