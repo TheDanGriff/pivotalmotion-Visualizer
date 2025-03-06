@@ -345,40 +345,138 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
 def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
     import streamlit as st
     import pandas as pd
+    from streamlit.components.v1 import components
 
     st.header("Biomechanics Analysis")
     release_idx = metrics.get('release_idx', 0)
 
-    st.subheader("Joint Flexion/Extension")
+    # Get player averages (assuming you have a function to fetch these for biomechanical KPIs)
+    player_name = st.session_state.get('username', 'Unknown')  # Adjust based on your session state
+    shot_type = st.session_state.get('shot_type', 'Unknown')  # Adjust if stored elsewhere
+    player_averages = get_player_kpi_averages(player_name, shot_type) or {}
+
+    # Compute KPIs from joint flexion analysis
     fig, kpis = plot_joint_flexion_analysis(df_pose, df_ball, metrics)
+
+    # Define KPI ranges for metallic color scaling
+    kpi_ranges = {
+        'Kinematic Chain Score': {'min': 0, 'max': 100},
+        'Elbow Max Flexion': {'min': 0, 'max': 180},
+        'Shoulder Max Flexion': {'min': 0, 'max': 180},
+        'Wrist Max Flexion': {'min': 0, 'max': 180},
+        'Hip Max Flexion': {'min': 0, 'max': 180},
+        'Knee Max Flexion': {'min': 0, 'max': 180},
+        'Ankle Max Flexion': {'min': 0, 'max': 180},
+        'Stability Ratio': {'min': 0, 'max': 2},
+        'COM Speed': {'min': 0, 'max': 10}  # Adjust ranges as needed
+    }
+
+    # --- KPI Cards Section ---
+    st.subheader("Biomechanical KPIs")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        animated_flip_kpi_card(
+            "Kinematic Chain Score",
+            kpis.get('kinematic_chain_score', 0),
+            "/100",
+            player_average=player_averages.get('Kinematic Chain Score'),
+            min_value=kpi_ranges['Kinematic Chain Score']['min'],
+            max_value=kpi_ranges['Kinematic Chain Score']['max']
+        )
+    with col2:
+        animated_flip_kpi_card(
+            "Elbow Max Flexion",
+            kpis.get('elbow', {}).get('max_flexion', 0),
+            "°",
+            player_average=player_averages.get('Elbow Max Flexion'),
+            min_value=kpi_ranges['Elbow Max Flexion']['min'],
+            max_value=kpi_ranges['Elbow Max Flexion']['max']
+        )
+    with col3:
+        animated_flip_kpi_card(
+            "Shoulder Max Flexion",
+            kpis.get('shoulder', {}).get('max_flexion', 0),
+            "°",
+            player_average=player_averages.get('Shoulder Max Flexion'),
+            min_value=kpi_ranges['Shoulder Max Flexion']['min'],
+            max_value=kpi_ranges['Shoulder Max Flexion']['max']
+        )
+    with col4:
+        animated_flip_kpi_card(
+            "Knee Max Flexion",
+            kpis.get('knee', {}).get('max_flexion', 0),
+            "°",
+            player_average=player_averages.get('Knee Max Flexion'),
+            min_value=kpi_ranges['Knee Max Flexion']['min'],
+            max_value=kpi_ranges['Knee Max Flexion']['max']
+        )
+
+    col5, col6, col7, col8 = st.columns(4)
+    with col5:
+        animated_flip_kpi_card(
+            "Wrist Max Flexion",
+            kpis.get('wrist', {}).get('max_flexion', 0),
+            "°",
+            player_average=player_averages.get('Wrist Max Flexion'),
+            min_value=kpi_ranges['Wrist Max Flexion']['min'],
+            max_value=kpi_ranges['Wrist Max Flexion']['max']
+        )
+    with col6:
+        animated_flip_kpi_card(
+            "Hip Max Flexion",
+            kpis.get('hip', {}).get('max_flexion', 0),
+            "°",
+            player_average=player_averages.get('Hip Max Flexion'),
+            min_value=kpi_ranges['Hip Max Flexion']['min'],
+            max_value=kpi_ranges['Hip Max Flexion']['max']
+        )
+    with col7:
+        animated_flip_kpi_card(
+            "Ankle Max Flexion",
+            kpis.get('ankle', {}).get('max_flexion', 0),
+            "°",
+            player_average=player_averages.get('Ankle Max Flexion'),
+            min_value=kpi_ranges['Ankle Max Flexion']['min'],
+            max_value=kpi_ranges['Ankle Max Flexion']['max']
+        )
+    with col8:
+        animated_flip_kpi_card(
+            "Stability Ratio",
+            kpis.get('stability_ratio', 0),
+            "",
+            player_average=player_averages.get('Stability Ratio'),
+            min_value=kpi_ranges['Stability Ratio']['min'],
+            max_value=kpi_ranges['Stability Ratio']['max']
+        )
+
+    # --- Joint Flexion/Extension Visuals ---
+    st.subheader("Joint Flexion/Extension")
     st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("Joint Flexion/Extension KPIs")
-    col1, col2, col3 = st.columns(3)
-    joint_keys = ['elbow', 'shoulder', 'wrist', 'hip', 'knee', 'ankle']  # Explicitly list joints
-    for i, joint in enumerate([j for j in kpis.keys() if j in joint_keys]):
-        col = [col1, col2, col3][i % 3]
-        with col:
-            # Safely access KPIs with fallback to 'N/A'
-            max_flexion = kpis[joint].get('max_flexion', float('nan'))
-            min_flexion = kpis[joint].get('min_flexion', float('nan'))
-            at_lift = kpis[joint].get('at_lift', float('nan'))
-            at_set = kpis[joint].get('at_set', float('nan'))
-            at_release = kpis[joint].get('at_release', float('nan'))
-            range_val = kpis[joint].get('range', float('nan'))
-            rate_change = kpis[joint].get('rate_change', float('nan'))
+    # --- Body Alignment Visuals ---
+    if not df_pose.empty and release_idx < len(df_pose):
+        frame_data = df_pose.iloc[release_idx]  # Use release frame for alignment visuals
 
-            st.metric(f"{joint.capitalize()} Max Flexion", f"{max_flexion:.1f}°" if not pd.isna(max_flexion) else "N/A")
-            st.metric(f"{joint.capitalize()} Min Flexion", f"{min_flexion:.1f}°" if not pd.isna(min_flexion) else "N/A")
-            st.metric(f"{joint.capitalize()} at Lift", f"{at_lift:.1f}°" if not pd.isna(at_lift) else "N/A")
-            st.metric(f"{joint.capitalize()} at Set", f"{at_set:.1f}°" if not pd.isna(at_set) else "N/A")
-            st.metric(f"{joint.capitalize()} at Release", f"{at_release:.1f}°" if not pd.isna(at_release) else "N/A")
-            st.metric(f"{joint.capitalize()} Range", f"{range_val:.1f}°" if not pd.isna(range_val) else "N/A")
-            st.metric(f"{joint.capitalize()} Max Rate", f"{rate_change:.1f}°/s" if not pd.isna(rate_change) else "N/A")
-    
-    st.subheader("Kinematic Chain Score")
-    kinematic_score = kpis.get('kinematic_chain_score', float('nan'))
-    st.metric("Kinematic Chain Score", f"{kinematic_score:.1f}/100" if not pd.isna(kinematic_score) else "N/A")
+        st.subheader("Body Alignment Visuals")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.write("Body Alignment (Feet, Hips, Shoulders)")
+            body_fig = create_body_alignment_visual(frame_data, hoop_x=501.0, hoop_y=0.0)
+            st.plotly_chart(body_fig, use_container_width=True)
+
+        with col2:
+            st.write("Foot Alignment")
+            foot_fig = create_foot_alignment_visual(
+                frame_data,
+                shot_distance=metrics.get('shot_distance', 0) / 12,  # Convert inches to feet
+                flip=False,  # Adjust based on your data or add logic to determine flip
+                hoop_x=41.75,  # Default hoop position in feet
+                hoop_y=0.0
+            )
+            st.plotly_chart(foot_fig, use_container_width=True)
+    else:
+        st.warning("Insufficient pose data or invalid release index for alignment visuals.")
 
 def show_spin_analysis_page(df_spin):
     if not df_spin.empty:
