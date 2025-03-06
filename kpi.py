@@ -530,7 +530,7 @@ def get_metallic_color(value, player_average, min_value=None, max_value=None):
         b = int(203 * (1 + norm_value) + 169 * -norm_value)
     return f"rgb({r}, {g}, {b})"
 
-def animated_flip_kpi_card(label, value, unit, player_average, min_value=None, max_value=None, extra_html=""):
+def animated_flip_kpi_card(label, value, unit, player_average, min_value=None, max_value=None, description="", calculation_info=""):
     if pd.isna(player_average) or player_average is None:
         arrow = ""
         color = "#D3D3D3"
@@ -538,6 +538,7 @@ def animated_flip_kpi_card(label, value, unit, player_average, min_value=None, m
         color = get_metallic_color(value, player_average, min_value, max_value)
         arrow = "↑" if value > player_average else "↓" if value < player_average else "="
 
+    # HTML for the card with tooltip and back-side description
     html_code = f"""
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400&display=swap');
@@ -584,11 +585,35 @@ def animated_flip_kpi_card(label, value, unit, player_average, min_value=None, m
         color: #fff;
         transform: rotateY(180deg);
         padding: 15px;
-        font-size: 16px;
+        font-size: 14px;
       }}
       .kpi-value {{
         font-size: 36px;
         margin: 10px 0;
+      }}
+      .tooltip {{
+        position: relative;
+        display: inline-block;
+      }}
+      .tooltip .tooltiptext {{
+        visibility: hidden;
+        width: 200px;
+        background-color: #555;
+        color: #fff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 5px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -100px;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }}
+      .tooltip:hover .tooltiptext {{
+        visibility: visible;
+        opacity: 1;
       }}
     </style>
     <script>
@@ -604,12 +629,12 @@ def animated_flip_kpi_card(label, value, unit, player_average, min_value=None, m
     <div id="{label.replace(' ', '_')}" class="flip-card" onclick="toggleFlip('{label.replace(' ', '_')}')">
       <div class="flip-card-inner">
         <div class="flip-card-front">
-          <h3>{label.upper()}</h3>
+          <h3>{label.upper()} <span class="tooltip">ℹ<span class="tooltiptext">{calculation_info}</span></span></h3>
           <div class="kpi-value">{value:.1f} {unit} {arrow}</div>
         </div>
         <div class="flip-card-back">
           <p><strong>Player Average:</strong> {player_average if player_average is not None else "N/A"} {unit}</p>
-          {extra_html}
+          <p>{description}</p>
         </div>
       </div>
     </div>

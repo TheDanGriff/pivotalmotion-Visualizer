@@ -350,27 +350,22 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
     st.header("Biomechanics Analysis")
     release_idx = metrics.get('release_idx', 0)
 
-    # Get player averages
     player_name = st.session_state.get('username', 'Unknown')
     shot_type = st.session_state.get('shot_type', 'Unknown')
     player_averages = get_player_kpi_averages(player_name, shot_type) or {}
 
-    # Compute KPIs from joint flexion analysis
     fig, kpis = plot_joint_flexion_analysis(df_pose, df_ball, metrics)
 
-    # Define KPI ranges for metallic color scaling
     kpi_ranges = {
         'Kinematic Chain Score': {'min': 0, 'max': 100},
         'Stability Ratio': {'min': 0, 'max': 2},
         'Max Knee Flexion': {'min': 0, 'max': 180},
         'Max Elbow Flexion': {'min': 0, 'max': 180},
-        'Asymmetry Score': {'min': 0, 'max': 180},  # Max difference possible
-        'COM Speed': {'min': 0, 'max': 10},
-        'COM Direction': {'min': -180, 'max': 180},
-        'COM Force': {'min': 0, 'max': 500}
+        'Asymmetry Score': {'min': 0, 'max': 180},
+        'Shoulder Rotation': {'min': 0, 'max': 180},
+        'COM Acceleration': {'min': -50, 'max': 50}  # Adjusted range for acceleration
     }
 
-    # --- KPI Cards Section ---
     st.subheader("Biomechanical KPIs")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -380,7 +375,9 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
             "/100",
             player_average=player_averages.get('Kinematic Chain Score'),
             min_value=kpi_ranges['Kinematic Chain Score']['min'],
-            max_value=kpi_ranges['Kinematic Chain Score']['max']
+            max_value=kpi_ranges['Kinematic Chain Score']['max'],
+            description="Good range: 70-100. Higher indicates better energy transfer.",
+            calculation_info="Sum of timing (40%), range (30%), and release angle (30%) scores."
         )
     with col2:
         animated_flip_kpi_card(
@@ -389,28 +386,34 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
             "",
             player_average=player_averages.get('Stability Ratio'),
             min_value=kpi_ranges['Stability Ratio']['min'],
-            max_value=kpi_ranges['Stability Ratio']['max']
+            max_value=kpi_ranges['Stability Ratio']['max'],
+            description="Good range: 1.5-2. Wider feet relative to hips is better.",
+            calculation_info="Average feet width divided by average hip width."
         )
     with col3:
         animated_flip_kpi_card(
             "Max Knee Flexion",
-            kpis.get('right_knee', {}).get('max_flexion', 0),  # Updated to 'right_knee'
+            kpis.get('right_knee', {}).get('max_flexion', 0),
             "°",
             player_average=player_averages.get('Max Knee Flexion'),
             min_value=kpi_ranges['Max Knee Flexion']['min'],
-            max_value=kpi_ranges['Max Knee Flexion']['max']
+            max_value=kpi_ranges['Max Knee Flexion']['max'],
+            description="Good range: 60-90°. Higher aids power generation.",
+            calculation_info="Maximum right knee angle during the shot."
         )
     with col4:
         animated_flip_kpi_card(
             "Max Elbow Flexion",
-            kpis.get('right_elbow', {}).get('max_flexion', 0),  # Updated to 'right_elbow'
+            kpis.get('right_elbow', {}).get('max_flexion', 0),
             "°",
             player_average=player_averages.get('Max Elbow Flexion'),
             min_value=kpi_ranges['Max Elbow Flexion']['min'],
-            max_value=kpi_ranges['Max Elbow Flexion']['max']
+            max_value=kpi_ranges['Max Elbow Flexion']['max'],
+            description="Good range: 90-120°. Higher aids shot control.",
+            calculation_info="Maximum right elbow angle during the shot."
         )
 
-    col5, col6, col7, col8 = st.columns(4)
+    col5, col6, col7, _ = st.columns(4)  # Reduced to 3 columns since we have 7 KPIs
     with col5:
         animated_flip_kpi_card(
             "Asymmetry Score",
@@ -419,42 +422,35 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
             player_average=player_averages.get('Asymmetry Score'),
             min_value=kpi_ranges['Asymmetry Score']['min'],
             max_value=kpi_ranges['Asymmetry Score']['max'],
-            extra_html="<p>Lower is better (more symmetric)</p>"
+            description="Good range: 0-20°. Lower indicates better symmetry.",
+            calculation_info="Average difference between left and right knee/elbow angles at release."
         )
     with col6:
         animated_flip_kpi_card(
-            "COM Speed",
-            kpis.get('com', {}).get('speed', 0),
-            "ft/s",
-            player_average=player_averages.get('COM Speed'),
-            min_value=kpi_ranges['COM Speed']['min'],
-            max_value=kpi_ranges['COM Speed']['max']
+            "Shoulder Rotation",
+            kpis.get('shoulder_rotation', 0),
+            "°",
+            player_average=player_averages.get('Shoulder Rotation'),
+            min_value=kpi_ranges['Shoulder Rotation']['min'],
+            max_value=kpi_ranges['Shoulder Rotation']['max'],
+            description="Good range: 30-60°. Higher aids shot power.",
+            calculation_info="Absolute difference in right shoulder angle from lift to release."
         )
     with col7:
         animated_flip_kpi_card(
-            "COM Direction",
-            kpis.get('com', {}).get('direction', 0),
-            "°",
-            player_average=player_averages.get('COM Direction'),
-            min_value=kpi_ranges['COM Direction']['min'],
-            max_value=kpi_ranges['COM Direction']['max']
-        )
-    with col8:
-        animated_flip_kpi_card(
-            "COM Force",
-            kpis.get('com', {}).get('force', 0),
-            "N",
-            player_average=player_averages.get('COM Force'),
-            min_value=kpi_ranges['COM Force']['min'],
-            max_value=kpi_ranges['COM Force']['max'],
-            extra_html=f"<p>Direction: {kpis.get('com', {}).get('force_direction', 0):.1f}°</p>"
+            "COM Acceleration",
+            kpis.get('com_acceleration', 0),
+            "ft/s²",
+            player_average=player_averages.get('COM Acceleration'),
+            min_value=kpi_ranges['COM Acceleration']['min'],
+            max_value=kpi_ranges['COM Acceleration']['max'],
+            description="Positive values indicate upward/forward motion. Good range: 10-30 ft/s².",
+            calculation_info="Mean acceleration of centroid from lift to release."
         )
 
-    # --- Joint Flexion/Extension Visuals ---
     st.subheader("Joint Flexion/Extension")
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- Body Alignment Visuals ---
     if not df_pose.empty and release_idx < len(df_pose):
         frame_data = df_pose.iloc[release_idx]
         st.subheader("Body Alignment Visuals")

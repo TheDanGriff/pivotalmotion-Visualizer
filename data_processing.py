@@ -2189,7 +2189,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         }
 
         # Force estimation before shot (from lift to set)
-        mass = 70  # Assume 70 kg (~154 lbs) player mass; adjust as needed
+        mass = 97  # Assume 70 kg (~154 lbs) player mass; adjust as needed
         com_speed_pre = com_speed.iloc[lift_idx - start_idx:set_idx - start_idx]
         if len(com_speed_pre) > 1:
             accel = com_speed_pre.diff().iloc[1:] / (1 / fps)  # Acceleration in ft/s^2
@@ -2221,5 +2221,25 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     else:
         kpis['asymmetry_score'] = np.nan
 
+    # Shoulder Rotation (right shoulder, from lift to release)
+    if not pose_segment['right_shoulder_angle'].isna().all():
+        shoulder_lift = pose_segment['right_shoulder_angle'].iloc[lift_idx - start_idx] if 0 <= lift_idx - start_idx < len(pose_segment) else np.nan
+        shoulder_release = pose_segment['right_shoulder_angle'].iloc[release_idx - start_idx] if 0 <= release_idx - start_idx < len(pose_segment) else np.nan
+        kpis['shoulder_rotation'] = abs(shoulder_release - shoulder_lift) if not pd.isna(shoulder_lift) and not pd.isna(shoulder_release) else np.nan
+
+    # COM Acceleration (from lift to release)
+    if all(col in pose_segment for col in ['CENTROID_X', 'CENTROID_Y', 'CENTROID_Z']):
+        com_x = pose_segment['CENTROID_X']
+        com_y = pose_segment['CENTROID_Y']
+        com_z = pose_segment['CENTROID_Z']
+        com_speed = np.sqrt((com_x.diff()**2 + com_y.diff()**2 + com_z.diff()**2)) * fps * INCHES_TO_FEET
+        com_accel = com_speed.diff() / pose_segment['time'].diff()  # Acceleration in ft/s^2
+        kpis['com_acceleration'] = com_accel.iloc[lift_idx - start_idx:release_idx - start_idx].mean() if not com_accel.isna().all() else np.nan
+    else:
+        kpis['com_acceleration'] = np.nan
+
+
+
     logger.debug(f"KPIs computed: {kpis}")
     return fig, kpis
+
