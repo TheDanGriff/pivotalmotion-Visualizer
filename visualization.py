@@ -256,8 +256,8 @@ def plot_shot_analysis(df_ball, metrics):
     fig = make_subplots(
         rows=2, cols=2,
         subplot_titles=(
-            "Ball Trajectory (Side View)",
-            "Ball Trajectory (Lateral View)",
+            "Ball Path (Side View)",
+            "Ball Path (Rear View)",
             "Release Curvature Analysis",
             "Lateral Curvature Analysis"
         ),
