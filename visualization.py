@@ -401,7 +401,7 @@ def plot_shot_analysis(df_ball, metrics):
         height=600,  # Increased height for larger graphs
         width=1200,  # Increased width to fill more of the Streamlit screen
         title_text="Ball Path Analysis (Lift to Release)",
-        title_x=0.5,  # Center the main title
+        title_x=0.4,  # Center the main title
         title_font=dict(size=20),
         margin=dict(t=120, b=100, l=80, r=80),  # Increased top margin for subplot title spacing
         legend=dict(
