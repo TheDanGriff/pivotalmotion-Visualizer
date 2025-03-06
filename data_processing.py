@@ -2074,6 +2074,34 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     # Calculate KPIs
     kpis = {}
 
+    # Define joints and their angles
+    joints = ['elbow', 'shoulder', 'wrist', 'hip', 'knee', 'ankle']
+
+    for joint in joints:
+        angles = pose_segment[f'{joint}_angle']
+        if angles.isna().all():
+            kpis[joint] = {
+                'max_flexion': np.nan,
+                'min_flexion': np.nan,
+                'at_lift': np.nan,
+                'at_set': np.nan,
+                'at_release': np.nan,
+                'range': np.nan,
+                'rate_change': np.nan
+            }
+        else:
+            rate = angles.diff() / pose_segment['time'].diff()  # Rate of change in degrees/sec
+            kpis[joint] = {
+                'max_flexion': angles.max(),
+                'min_flexion': angles.min(),
+                'at_lift': angles.iloc[lift_idx - start_idx],
+                'at_set': angles.iloc[set_idx - start_idx],
+                'at_release': angles.iloc[release_idx - start_idx],
+                'range': angles.max() - angles.min(),
+                'rate_change': rate.max() if not rate.isna().all() else np.nan
+            }
+
+
     # 1. Kinematic Chain Score
     def calculate_kinematic_chain_score(pose_segment, lift_idx, set_idx, release_idx, start_idx, end_idx, fps):
         sequence_order = ['ankle', 'knee', 'hip', 'shoulder', 'elbow', 'wrist']
@@ -2164,4 +2192,10 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
 
     logger.debug(f"KPIs computed: {kpis}")
 
+    # Kinematic Chain Score (keep as a separate top-level key)
+    kpis['kinematic_chain_score'] = calculate_kinematic_chain_score(
+        pose_segment, lift_idx, set_idx, release_idx, start_idx, end_idx, fps
+    )
+
+    logger.debug(f"KPIs computed: {kpis}")
     return fig, kpis
