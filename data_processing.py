@@ -1003,7 +1003,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         candidate_set = ball_df.iloc[release_window_start:metrics['release_idx']]
         # For a shot moving left-to-right, the release point will have a high X value.
         # So we choose the candidate with the minimum Basketball_X_ft.
-        set_idx_candidate = candidate_set['Basketball_X_ft'].idxmin()
+        set_idx_candidate = candidate_set['Basketball_X_ft'].idxmax()
         metrics['set_idx'] = set_idx_candidate
 
         # -- Lift point: Look back 30 frames from the set point and choose the frame with the largest X,
