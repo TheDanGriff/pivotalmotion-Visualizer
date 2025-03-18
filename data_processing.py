@@ -1002,7 +1002,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         #    -- Set point: work backwards 50 frames from release and pick the frame with the minimum X value.
         release_window_start = max(0, metrics['release_idx'] - 50)
         candidate_set = ball_df.iloc[release_window_start:metrics['release_idx']]
-        metrics['set_idx'] = candidate_set['Basketball_X_ft'].idxmin()
+        metrics['set_idx'] = candidate_set['Basketball_X_ft'].idxmax()
 
         #    -- Lift point: set the lift point to be 5 frames before the set point.
         metrics['lift_idx'] = max(0, metrics['set_idx'] - 5)
