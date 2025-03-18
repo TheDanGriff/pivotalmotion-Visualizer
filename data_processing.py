@@ -999,7 +999,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
 
         # 8. Recalculate set and lift points using the remapped X coordinate ("Basketball_X_ft").
         # -- Set point: Look back 50 frames from release and choose the frame with the smallest (i.e. furthest back) X.
-        release_window_start = max(0, metrics['release_idx'] - 55)
+        release_window_start = max(0, metrics['release_idx'] - 58)
         candidate_set = ball_df.iloc[release_window_start:metrics['release_idx']]
         # For a shot moving left-to-right, the release point will have a high X value.
         # So we choose the candidate with the minimum Basketball_X_ft.
