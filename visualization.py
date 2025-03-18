@@ -214,15 +214,14 @@ def plot_distance_over_height(df_ball):
 def plot_shot_analysis(df_ball, metrics):
     """
     Create interactive basketball shot analysis visualization with two 2D trajectory plots:
-
-    - Left Plot (Side View): Uses raw Basketball_Y data (in feet) versus Basketball_Z.
-      Its horizontal (Y) axis is dynamically set to a 4-ft range centered on the shot’s Y values.
-
-    - Right Plot (Rear View): Uses Basketball_X data (in feet) that is midline-adjusted by the
-      release X value (so that the release point is at 0) versus Basketball_Z.
-      Its horizontal (X) axis is fixed to [-2, 2] ft.
-
-    Both plots have a fixed vertical (Z) range of 3–11 ft.
+    
+    - Left Plot (Side View): Uses the remapped Basketball_X_ft (in feet) versus Basketball_Z (converted to feet).
+      Its horizontal axis is centered on the release X value and fixed to a 4‑ft width.
+      
+    - Right Plot (Rear View): Uses the remapped Basketball_Y_ft (in feet) versus Basketball_Z (converted to feet).
+      Its horizontal axis is fixed to [-2, 2] ft (with the release point at 0).
+      
+    Both plots have a fixed vertical (Z) axis of 3–11 ft.
     """
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
@@ -232,197 +231,145 @@ def plot_shot_analysis(df_ball, metrics):
     import logging
 
     logger = logging.getLogger(__name__)
+    # Since we now have remapped columns, we assume that:
+    #   df_ball has "Basketball_X_ft" and "Basketball_Y_ft" (in feet)
+    #   Z is still in inches and needs conversion.
     INCHES_TO_FEET = 1 / 12
 
-    # Define colors and marker styles.
-    COLOR_PALETTE = {
-        'trajectory': 'rgba(31, 119, 180, 1)',
-        'lift': 'rgba(147, 112, 219, 1)',
-        'set': 'rgba(255, 182, 193, 1)',
-        'release': 'rgba(255, 102, 102, 1)',
-    }
-    MARKER_STYLES = {
-        'lift': dict(symbol='circle', size=12, line=dict(width=2, color='white')),
-        'set': dict(symbol='diamond', size=12, line=dict(width=2, color='white')),
-        'release': dict(symbol='x', size=12, line=dict(width=2, color='white')),
-    }
-
-    def clamp_index(idx, max_idx):
-        return max(0, min(int(idx), max_idx))
-
-    max_idx = len(df_ball) - 1
-    lift_idx = clamp_index(metrics.get('lift_idx', 0), max_idx)
-    set_idx = clamp_index(metrics.get('set_idx', lift_idx), max_idx)
-    release_idx = clamp_index(metrics.get('release_idx', set_idx + 1), max_idx)
-    trajectory_indices = sorted([lift_idx, set_idx, release_idx])
-    trajectory_start = trajectory_indices[0]
-    trajectory_end = trajectory_indices[-1]
-    set_idx = trajectory_indices[1]
-
-    # Create a figure with two subplots.
-    fig = make_subplots(
-        rows=1, cols=2,
-        subplot_titles=("Ball Path (Side View)", "Ball Path (Rear View)"),
-        horizontal_spacing=0.1
-    )
-
+    # We'll use a helper to smooth the data.
     def get_slice(data, start, end):
         if isinstance(data, (pd.Series, np.ndarray, list)) and len(data) > 0:
             seg = data[start:end].to_numpy() if hasattr(data, 'to_numpy') else np.array(data[start:end])
             if len(seg) > 3:
-                window_length = min(11, len(seg) - 1)
-                if window_length % 2 == 0:
-                    window_length += 1
-                seg = savgol_filter(seg, window_length=window_length, polyorder=2)
-            return seg * INCHES_TO_FEET
+                win_length = min(11, len(seg) - 1)
+                if win_length % 2 == 0:
+                    win_length += 1
+                seg = savgol_filter(seg, window_length=win_length, polyorder=2)
+            return seg  # Already in feet (if from _ft) or raw if not
         return np.array([])
 
-    # Get smoothed trajectory data (all in feet).
-    traj_x = get_slice(df_ball['Basketball_X'], trajectory_start, trajectory_end + 1)
-    traj_y = get_slice(df_ball['Basketball_Y'], trajectory_start, trajectory_end + 1)
-    traj_z = get_slice(df_ball['Basketball_Z'], trajectory_start, trajectory_end + 1)
+    # Determine key indices.
+    def clamp_index(idx, max_idx):
+        return max(0, min(int(idx), max_idx))
+    max_idx = len(df_ball) - 1
+    lift_idx = clamp_index(metrics.get('lift_idx', 0), max_idx)
+    set_idx = clamp_index(metrics.get('set_idx', lift_idx), max_idx)
+    release_idx = clamp_index(metrics.get('release_idx', set_idx + 1), max_idx)
+    
+    # We assume that the DataFrame has been remapped.
+    # For side view, use Basketball_X_ft; for rear view, use Basketball_Y_ft.
+    # Convert Z to feet (since it is still in inches).
+    traj_x = get_slice(df_ball['Basketball_X_ft'], lift_idx, release_idx + 1)  # in feet
+    traj_y = get_slice(df_ball['Basketball_Y_ft'], lift_idx, release_idx + 1)  # in feet
+    traj_z = get_slice(df_ball['Basketball_Z'], lift_idx, release_idx + 1) * INCHES_TO_FEET  # convert Z
 
-    # --- Left Plot: Use raw Y data (Side View) ---
-    # (No midline adjustment here; the horizontal axis is computed dynamically.)
-    left_data = traj_y
-    if len(left_data) > 0:
-        center_left = (np.nanmin(left_data) + np.nanmax(left_data)) / 2
-        left_range = [center_left - 2, center_left + 2]
-    else:
-        left_range = [-2, 2]
+    # For the side view, we plot X vs Z.
+    # Center the horizontal axis around the release X coordinate.
+    release_x = df_ball.at[release_idx, 'Basketball_X_ft']
+    side_range = [release_x - 2, release_x + 2]
 
-    # --- Right Plot: Use X data with midline adjustment (Rear View) ---
-    release_x = df_ball.at[release_idx, 'Basketball_X'] * INCHES_TO_FEET
-    # Adjust X so that the release point is at 0; here we also mirror the data.
-    right_data = -(traj_x - release_x)
-    right_range = [-2, 2]
+    # For the rear view, we plot Y vs Z.
+    # Since remapping set release Y to 0, we use a fixed range.
+    release_y = df_ball.at[release_idx, 'Basketball_Y_ft']  # should be ~0
+    rear_range = [-2, 2]
 
-    logger.debug(f"Left Plot (Y) min/max: {np.nanmin(left_data) if len(left_data)>0 else 'N/A'}/"
-                 f"{np.nanmax(left_data) if len(left_data)>0 else 'N/A'}")
-    logger.debug(f"Right Plot (X, midline-adjusted) min/max: {np.nanmin(right_data) if len(right_data)>0 else 'N/A'}/"
-                 f"{np.nanmax(right_data) if len(right_data)>0 else 'N/A'}")
-    logger.debug(f"release_x: {release_x}")
+    # Build the two subplots.
+    fig = make_subplots(
+        rows=1, cols=2,
+        subplot_titles=("Side View (X vs. Z)", "Rear View (Y vs. Z)"),
+        horizontal_spacing=0.1
+    )
 
-    # --- Plotting ---
-    # Left Plot (Side View): Plot raw Y vs Z.
-    if len(left_data) > 0 and len(traj_z) > 0:
+    # --- Left Plot: Side View ---
+    # Plot the trajectory: X (in feet) versus Z (in feet)
+    if len(traj_x) > 0 and len(traj_z) > 0:
         fig.add_trace(
             go.Scatter(
-                x=left_data,
+                x=traj_x,
                 y=traj_z,
                 mode='lines',
                 name='Trajectory',
-                line=dict(color=COLOR_PALETTE['trajectory'], width=4),
-                showlegend=True
+                line=dict(color='rgba(31, 119, 180, 1)', width=4)
             ),
             row=1, col=1
         )
-        # Markers for key phases using Basketball_Y values.
+        # Add markers for key phases using Basketball_X_ft.
         for phase in ['lift', 'set', 'release']:
-            idx = locals()[f"{phase}_idx"]
-            if trajectory_start <= idx <= trajectory_end:
-                marker_y = df_ball.at[idx, 'Basketball_Y'] * INCHES_TO_FEET
-                marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
-                fig.add_trace(
-                    go.Scatter(
-                        x=[marker_y],
-                        y=[marker_z],
-                        mode='markers',
-                        marker=dict(color=COLOR_PALETTE[phase], **MARKER_STYLES[phase]),
-                        name=f'{phase.capitalize()}',
-                        showlegend=True
-                    ),
-                    row=1, col=1
-                )
-    else:
-        fig.add_trace(
-            go.Scatter(
-                x=[0], y=[3],
-                mode='text', text=["No Data"],
-                textposition="middle center",
-                showlegend=False
-            ),
-            row=1, col=1
-        )
-
-    # Right Plot (Rear View): Plot midline-adjusted X vs Z.
-    if len(right_data) > 0 and len(traj_z) > 0:
-        fig.add_trace(
-            go.Scatter(
-                x=right_data,
-                y=traj_z,
-                mode='lines',
-                name='Trajectory',
-                line=dict(color=COLOR_PALETTE['trajectory'], width=4),
-                showlegend=False
-            ),
-            row=1, col=2
-        )
-        # Markers for key phases using Basketball_X with midline adjustment.
-        for phase in ['lift', 'set', 'release']:
-            idx = locals()[f"{phase}_idx"]
-            if trajectory_start <= idx <= trajectory_end:
-                marker_x = -((df_ball.at[idx, 'Basketball_X'] * INCHES_TO_FEET) - release_x)
+            idx = locals()[f"{phase}_idx"] if f"{phase}_idx" in locals() else None
+            if idx is not None and lift_idx <= idx <= release_idx:
+                marker_x = df_ball.at[idx, 'Basketball_X_ft']
                 marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
                 fig.add_trace(
                     go.Scatter(
                         x=[marker_x],
                         y=[marker_z],
                         mode='markers',
-                        marker=dict(color=COLOR_PALETTE[phase], **MARKER_STYLES[phase]),
-                        name=f'{phase.capitalize()}',
-                        showlegend=False
+                        marker=dict(color={'lift':'rgba(147, 112, 219, 1)',
+                                           'set':'rgba(255, 182, 193, 1)',
+                                           'release':'rgba(255, 102, 102, 1)'}[phase],
+                                    symbol={'lift':'circle', 'set':'diamond', 'release':'x'},
+                                    size=12),
+                        name=f'{phase.capitalize()}'
+                    ),
+                    row=1, col=1
+                )
+    else:
+        fig.add_trace(
+            go.Scatter(x=[0], y=[3], mode='text', text=["No Data"]),
+            row=1, col=1
+        )
+
+    # --- Right Plot: Rear View ---
+    # Plot the trajectory: Y (in feet) versus Z (in feet)
+    if len(traj_y) > 0 and len(traj_z) > 0:
+        fig.add_trace(
+            go.Scatter(
+                x=traj_y,
+                y=traj_z,
+                mode='lines',
+                name='Trajectory',
+                line=dict(color='rgba(31, 119, 180, 1)', width=4)
+            ),
+            row=1, col=2
+        )
+        # Add markers for key phases using Basketball_Y_ft.
+        for phase in ['lift', 'set', 'release']:
+            idx = locals()[f"{phase}_idx"] if f"{phase}_idx" in locals() else None
+            if idx is not None and lift_idx <= idx <= release_idx:
+                marker_y = df_ball.at[idx, 'Basketball_Y_ft']
+                marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
+                fig.add_trace(
+                    go.Scatter(
+                        x=[marker_y],
+                        y=[marker_z],
+                        mode='markers',
+                        marker=dict(color={'lift':'rgba(147, 112, 219, 1)',
+                                           'set':'rgba(255, 182, 193, 1)',
+                                           'release':'rgba(255, 102, 102, 1)'}[phase],
+                                    symbol={'lift':'circle', 'set':'diamond', 'release':'x'},
+                                    size=12),
+                        name=f'{phase.capitalize()}'
                     ),
                     row=1, col=2
                 )
     else:
         fig.add_trace(
-            go.Scatter(
-                x=[0], y=[3],
-                mode='text', text=["No Data"],
-                textposition="middle center",
-                showlegend=False
-            ),
+            go.Scatter(x=[0], y=[3], mode='text', text=["No Data"]),
             row=1, col=2
         )
 
     # --- Axes Configuration ---
-    # Left Plot (Side View): x-axis from raw Y data (dynamic range).
-    fig.update_xaxes(
-        title_text="Horizontal Position (ft)",
-        row=1, col=1,
-        range=left_range,
-        constrain='domain',
-        title_font=dict(size=14),
-        tickfont=dict(size=12)
-    )
-    fig.update_yaxes(
-        title_text="Height (ft)",
-        row=1, col=1,
-        range=[3, 11],
-        constrain='domain',
-        title_font=dict(size=14),
-        tickfont=dict(size=12),
-        title_standoff=20
-    )
-    # Right Plot (Rear View): x-axis fixed to [-2, 2] ft.
-    fig.update_xaxes(
-        title_text="Lateral Deviation from Release (ft)",
-        row=1, col=2,
-        range=right_range,
-        constrain='domain',
-        title_font=dict(size=14),
-        tickfont=dict(size=12)
-    )
-    fig.update_yaxes(
-        title_text="Height (ft)",
-        row=1, col=2,
-        range=[3, 11],
-        constrain='domain',
-        title_font=dict(size=14),
-        tickfont=dict(size=12),
-        title_standoff=20
-    )
+    # Left Plot (Side View): set horizontal (X) axis to side_range and vertical (Z) axis to [3,11].
+    fig.update_xaxes(title_text="Horizontal Position (ft)", row=1, col=1, range=side_range,
+                     title_font=dict(size=14), tickfont=dict(size=12))
+    fig.update_yaxes(title_text="Height (ft)", row=1, col=1, range=[3, 11],
+                     title_font=dict(size=14), tickfont=dict(size=12), title_standoff=20)
+
+    # Right Plot (Rear View): set horizontal (Y) axis fixed to [-2,2] and vertical (Z) to [3,11].
+    fig.update_xaxes(title_text="Lateral Position (ft)", row=1, col=2, range=rear_range,
+                     title_font=dict(size=14), tickfont=dict(size=12))
+    fig.update_yaxes(title_text="Height (ft)", row=1, col=2, range=[3, 11],
+                     title_font=dict(size=14), tickfont=dict(size=12), title_standoff=20)
 
     # --- Overall Layout ---
     fig.update_layout(
@@ -432,14 +379,7 @@ def plot_shot_analysis(df_ball, metrics):
         title_x=0.38,
         title_font=dict(size=20),
         margin=dict(t=120, b=100, l=80, r=80),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=-0.25,
-            xanchor="center",
-            x=0.5,
-            font=dict(size=12)
-        ),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5, font=dict(size=12)),
         plot_bgcolor='rgba(255, 255, 255, 1)',
         paper_bgcolor='rgba(255, 255, 255, 1)',
         showlegend=True
@@ -452,6 +392,7 @@ def plot_shot_analysis(df_ball, metrics):
         annotation.y = 1.05
 
     return fig
+
 
 
 
