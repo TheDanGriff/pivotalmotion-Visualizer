@@ -966,12 +966,12 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['release_idx'] = ball_df['velocity_magnitude'].iloc[apex_window_start:metrics['apex_idx']].idxmax()
 
         # UPDATED window sizes: use 50 frames before release to get the set point.
-        release_window_start = max(0, metrics['release_idx'] - 50)
+        release_window_start = max(0, metrics['release_idx'] - 40)
         # *** Use the remapped X column later; for now use raw to define window.
         metrics['set_idx'] = ball_df.iloc[release_window_start:metrics['release_idx']]['Basketball_X'].idxmin()
 
         # Then, work backwards from the set point using a 30‐frame window for the lift.
-        set_window_start = max(0, metrics['set_idx'] - 30)
+        set_window_start = max(0, metrics['set_idx'] - 20)
         metrics['lift_idx'] = ball_df.iloc[set_window_start:metrics['set_idx']]['Basketball_X'].idxmax()
 
         metrics['rim_impact_idx'] = (basketball_z <= 120).idxmax()  # 10 ft = 120 inches
