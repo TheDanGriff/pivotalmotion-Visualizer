@@ -1000,13 +1000,13 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
 
         # 7. Recalculate set and lift points using remapped X coordinate ("Basketball_X_ft").
         #    -- Set point: work backwards 50 frames from release.
-        release_window_start = max(0, metrics['release_idx'] - 50)
+        release_window_start = max(0, metrics['release_idx'] - 30)
         candidate_set = ball_df.iloc[release_window_start:metrics['release_idx']]
         # We choose the candidate with the maximum remapped X (farthest horizontally)
         metrics['set_idx'] = candidate_set['Basketball_X_ft'].idxmax()
 
         #    -- Lift point: work backwards 30 frames from the set point.
-        set_window_start = max(0, metrics['set_idx'] - 30)
+        set_window_start = max(0, metrics['set_idx'] - 20)
         candidate_lift = ball_df.iloc[set_window_start:metrics['set_idx']]
         # Initially, pick the frame with the maximum remapped X.
         lift_idx_candidate = candidate_lift['Basketball_X_ft'].idxmax()
