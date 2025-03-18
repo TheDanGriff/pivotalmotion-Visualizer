@@ -1002,26 +1002,30 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         #    -- Set point: work backwards 50 frames from release.
         release_window_start = max(0, metrics['release_idx'] - 50)
         candidate_set = ball_df.iloc[release_window_start:metrics['release_idx']]
-        # Initially, pick the frame with the maximum Basketball_X_ft.
+        # We choose the candidate with the maximum remapped X (farthest horizontally)
         metrics['set_idx'] = candidate_set['Basketball_X_ft'].idxmax()
 
-        # If the candidate set point's vertical (Z) value is below 3 ft, re-find the set point
-        # in the window from the current lift point to the release point.
-        if ball_df.at[metrics['set_idx'], 'Basketball_Z'] * INCHES_TO_FEET < 3:
-            candidate_set = ball_df.iloc[metrics['lift_idx']:metrics['release_idx']]
-            if not candidate_set.empty:
-                metrics['set_idx'] = candidate_set['Basketball_X_ft'].idxmax()
-                logger.info("Set index recalculated based on 3ft vertical threshold.")
-
-        # For the lift point: work backwards from the set point over 30 frames,
-        # selecting the frame with the maximum Basketball_X_ft.
+        #    -- Lift point: work backwards 30 frames from the set point.
         set_window_start = max(0, metrics['set_idx'] - 30)
         candidate_lift = ball_df.iloc[set_window_start:metrics['set_idx']]
-        metrics['lift_idx'] = candidate_lift['Basketball_X_ft'].idxmax()
+        # Initially, pick the frame with the maximum remapped X.
+        lift_idx_candidate = candidate_lift['Basketball_X_ft'].idxmax()
+        # Check the vertical height at the candidate lift point (convert Z from inches to feet)
+        lift_height = ball_df.at[lift_idx_candidate, 'Basketball_Z'] * INCHES_TO_FEET
+        if lift_height < 2.5:
+            # Find the last frame in candidate_lift where height is at least 2.5 ft.
+            valid_candidates = candidate_lift[candidate_lift['Basketball_Z'] * INCHES_TO_FEET >= 2.5]
+            if not valid_candidates.empty:
+                lift_idx_candidate = valid_candidates.index[-1]
+            else:
+                # If none meet the threshold, default to the last candidate in the window.
+                lift_idx_candidate = candidate_lift.index[-1]
+        metrics['lift_idx'] = lift_idx_candidate
 
         # Enforce a minimum separation: set point must be at least 10 frames after the lift point.
         if (metrics['set_idx'] - metrics['lift_idx']) < 10:
             metrics['lift_idx'] = max(0, metrics['set_idx'] - 10)
+
 
         # 8. Compute additional KPIs.
         metrics['release_height'] = release_point['Basketball_Z'] * INCHES_TO_FEET

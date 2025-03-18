@@ -215,13 +215,13 @@ def plot_shot_analysis(df_ball, metrics):
     """
     Create interactive basketball shot analysis visualization with two 2D trajectory plots:
     
-    - Left Plot (Side View): Uses the remapped Basketball_X_ft (in feet) versus Basketball_Z (converted to feet).
-      Its horizontal axis is centered on the release X value and fixed to a 4‑ft width.
+    - Left Plot (Side View): Uses the remapped Basketball_X_ft (in feet) versus Basketball_Z (in feet).
+      The horizontal axis is centered on the release point and fixed to a 4‑ft width.
       
-    - Right Plot (Rear View): Uses the remapped Basketball_Y_ft (in feet) versus Basketball_Z (converted to feet).
-      Its horizontal axis is fixed to [-2, 2] ft (with the release point at 0).
+    - Right Plot (Rear View): Uses the remapped Basketball_Y_ft (in feet) versus Basketball_Z (in feet).
+      The horizontal axis is fixed to [-2, 2] ft (with the release point at 0).
       
-    Both plots have a fixed vertical (Z) axis of 3–11 ft.
+    Both plots have a fixed vertical (Z) axis from 2.5 to 11 ft.
     """
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
@@ -233,7 +233,7 @@ def plot_shot_analysis(df_ball, metrics):
     logger = logging.getLogger(__name__)
     INCHES_TO_FEET = 1 / 12
 
-    # Helper: Smooth a slice (data assumed to be already in feet)
+    # Helper to smooth slices.
     def get_slice(data, start, end):
         if isinstance(data, (pd.Series, np.ndarray, list)) and len(data) > 0:
             seg = data[start:end].to_numpy() if hasattr(data, 'to_numpy') else np.array(data[start:end])
@@ -242,53 +242,46 @@ def plot_shot_analysis(df_ball, metrics):
                 if win_length % 2 == 0:
                     win_length += 1
                 seg = savgol_filter(seg, window_length=win_length, polyorder=2)
-            return seg
+            return seg  # Assumes data already in feet.
         return np.array([])
 
-    # Determine key indices (using the remapped data)
     def clamp_index(idx, max_idx):
         return max(0, min(int(idx), max_idx))
+
     max_idx = len(df_ball) - 1
     lift_idx = clamp_index(metrics.get('lift_idx', 0), max_idx)
     set_idx = clamp_index(metrics.get('set_idx', lift_idx), max_idx)
     release_idx = clamp_index(metrics.get('release_idx', set_idx + 1), max_idx)
 
-    # --- NEW: Adjust lift_idx if the detected lift point's height is below 3 ft.
-    # (We assume the vertical (Z) coordinate is given by Basketball_Z (in inches) converted to feet.)
-    if df_ball.at[lift_idx, 'Basketball_Z'] * INCHES_TO_FEET < 3:
-        valid = df_ball.loc[lift_idx:release_idx]
-        valid_idx = valid[valid['Basketball_Z'] * INCHES_TO_FEET >= 3].index
-        if not valid_idx.empty:
-            old_lift = lift_idx
-            lift_idx = valid_idx[0]
-            logger.info(f"Lift index adjusted from {old_lift} to {lift_idx} (vertical threshold met).")
-        else:
-            logger.info("No lift frame with height >= 3 ft found; using original lift_idx.")
+    # For the visual, determine a starting index: if the ball's height at the lift point is below 2.5 ft,
+    # then set the start index to the first frame where the height reaches 2.5 ft.
+    ball_z_ft = df_ball['Basketball_Z'] * INCHES_TO_FEET
+    visual_start_idx = lift_idx
+    if ball_z_ft.iloc[lift_idx] < 2.5:
+        valid_indices = ball_z_ft[ball_z_ft >= 2.5].index
+        if len(valid_indices) > 0:
+            visual_start_idx = valid_indices[0]
 
-    # For side view, use remapped Basketball_X_ft and for rear view, use remapped Basketball_Y_ft.
-    traj_x = get_slice(df_ball['Basketball_X_ft'], lift_idx, release_idx + 1)
-    traj_y = get_slice(df_ball['Basketball_Y_ft'], lift_idx, release_idx + 1)
-    # Convert Basketball_Z (still in inches) to feet.
-    traj_z = get_slice(df_ball['Basketball_Z'], lift_idx, release_idx + 1) * INCHES_TO_FEET
+    # Use remapped coordinates.
+    traj_x = get_slice(df_ball['Basketball_X_ft'], visual_start_idx, release_idx + 1)
+    traj_y = get_slice(df_ball['Basketball_Y_ft'], visual_start_idx, release_idx + 1)
+    traj_z = get_slice(df_ball['Basketball_Z'], visual_start_idx, release_idx + 1) * INCHES_TO_FEET
 
-    # For the side view:
-    # Center the horizontal (X) axis around the release X coordinate.
+    # For side view: horizontal axis centered on the release X.
     release_x = df_ball.at[release_idx, 'Basketball_X_ft']
     side_range = [release_x - 2, release_x + 2]
 
-    # For the rear view:
-    # Use the remapped Y coordinate; the release point should be near 0 so fix range to [-2, 2].
+    # For rear view: use remapped Y; release point should be near 0.
     release_y = df_ball.at[release_idx, 'Basketball_Y_ft']
     rear_range = [-2, 2]
 
-    # Create a figure with two subplots.
     fig = make_subplots(
         rows=1, cols=2,
         subplot_titles=("Side View (X vs. Z)", "Rear View (Y vs. Z)"),
         horizontal_spacing=0.1
     )
 
-    # --- Left Plot (Side View): Plot Basketball_X_ft vs. Basketball_Z ---
+    # --- Left Plot (Side View): Plot X vs. Z.
     if len(traj_x) > 0 and len(traj_z) > 0:
         fig.add_trace(
             go.Scatter(
@@ -300,10 +293,9 @@ def plot_shot_analysis(df_ball, metrics):
             ),
             row=1, col=1
         )
-        # Mark phases (lift, set, release)
-        for phase, idx in (('lift', lift_idx), ('set', set_idx), ('release', release_idx)):
-            # Only add if the index is in our visual window.
-            if lift_idx <= idx <= release_idx:
+        # Mark the phases.
+        for phase, idx in zip(['lift', 'set', 'release'], [lift_idx, set_idx, release_idx]):
+            if visual_start_idx <= idx <= release_idx:
                 marker_x = df_ball.at[idx, 'Basketball_X_ft']
                 marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
                 phase_color = {'lift': 'rgba(147, 112, 219, 1)',
@@ -321,12 +313,9 @@ def plot_shot_analysis(df_ball, metrics):
                     row=1, col=1
                 )
     else:
-        fig.add_trace(
-            go.Scatter(x=[0], y=[3], mode='text', text=["No Data"]),
-            row=1, col=1
-        )
+        fig.add_trace(go.Scatter(x=[0], y=[2.5], mode='text', text=["No Data"]), row=1, col=1)
 
-    # --- Right Plot (Rear View): Plot Basketball_Y_ft vs. Basketball_Z ---
+    # --- Right Plot (Rear View): Plot Y vs. Z.
     if len(traj_y) > 0 and len(traj_z) > 0:
         fig.add_trace(
             go.Scatter(
@@ -338,8 +327,8 @@ def plot_shot_analysis(df_ball, metrics):
             ),
             row=1, col=2
         )
-        for phase, idx in (('lift', lift_idx), ('set', set_idx), ('release', release_idx)):
-            if lift_idx <= idx <= release_idx:
+        for phase, idx in zip(['lift', 'set', 'release'], [lift_idx, set_idx, release_idx]):
+            if visual_start_idx <= idx <= release_idx:
                 marker_y = df_ball.at[idx, 'Basketball_Y_ft']
                 marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
                 phase_color = {'lift': 'rgba(147, 112, 219, 1)',
@@ -357,22 +346,18 @@ def plot_shot_analysis(df_ball, metrics):
                     row=1, col=2
                 )
     else:
-        fig.add_trace(
-            go.Scatter(x=[0], y=[3], mode='text', text=["No Data"]),
-            row=1, col=2
-        )
+        fig.add_trace(go.Scatter(x=[0], y=[2.5], mode='text', text=["No Data"]), row=1, col=2)
 
     # --- Axes Configuration ---
-    # For side view: x-axis is horizontal position; set range as determined.
     fig.update_xaxes(title_text="Horizontal Position (ft)", row=1, col=1,
                      range=side_range, title_font=dict(size=14), tickfont=dict(size=12))
-    # Vertical axis (Z, height) for both plots fixed to [3, 11] ft.
+    # Use vertical axis range from 2.5 to 11 ft.
     fig.update_yaxes(title_text="Height (ft)", row=1, col=1,
-                     range=[3, 11], title_font=dict(size=14), tickfont=dict(size=12), title_standoff=20)
+                     range=[2.5, 11], title_font=dict(size=14), tickfont=dict(size=12), title_standoff=20)
     fig.update_xaxes(title_text="Lateral Position (ft)", row=1, col=2,
                      range=rear_range, title_font=dict(size=14), tickfont=dict(size=12))
     fig.update_yaxes(title_text="Height (ft)", row=1, col=2,
-                     range=[3, 11], title_font=dict(size=14), tickfont=dict(size=12), title_standoff=20)
+                     range=[2.5, 11], title_font=dict(size=14), tickfont=dict(size=12), title_standoff=20)
 
     # --- Overall Layout ---
     fig.update_layout(
@@ -394,6 +379,7 @@ def plot_shot_analysis(df_ball, metrics):
         annotation.y = 1.05
 
     return fig
+
 
 
 
