@@ -1010,7 +1010,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         # We now use "Basketball_X_ft" (in feet) for a more accurate alignment.
         release_window_start = max(0, metrics['release_idx'] - 50)
         metrics['set_idx'] = ball_df.iloc[release_window_start:metrics['release_idx']]['Basketball_X_ft'].idxmin()
-        set_window_start = max(0, metrics['set_idx'] - 20)
+        set_window_start = max(0, metrics['set_idx'] - 30)
         metrics['lift_idx'] = ball_df.iloc[set_window_start:metrics['set_idx']]['Basketball_X_ft'].idxmax()
 
         # 7. Compute additional KPIs.
