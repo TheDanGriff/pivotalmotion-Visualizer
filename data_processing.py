@@ -1008,7 +1008,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         # -- Lift point: work backwards 30 frames from the set point and pick the frame with the largest X.
         set_window_start = max(0, metrics['set_idx'] - 30)
         candidate_lift = ball_df.iloc[set_window_start:metrics['set_idx']]
-        lift_idx_candidate = candidate_lift['Basketball_X_ft'].idxmin()
+        lift_idx_candidate = candidate_lift['Basketball_X_ft'].idxmax()
         # If the difference from the set point is less than 0.5 foot, use the last frame in that window.
         if (ball_df.at[metrics['set_idx'], 'Basketball_X_ft'] - ball_df.at[lift_idx_candidate, 'Basketball_X_ft']) < 0.5:
             lift_idx_candidate = candidate_lift.index[-1]
