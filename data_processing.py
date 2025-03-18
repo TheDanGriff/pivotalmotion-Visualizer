@@ -960,14 +960,22 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             .fillna(method='ffill')
         )
 
-        # 4. Identify key shot indices using raw (inches) data.
+        # 4. Identify key shot indices.
         metrics['apex_idx'] = basketball_z.idxmax()
         apex_window_start = max(0, metrics['apex_idx'] - 75)
         metrics['release_idx'] = ball_df['velocity_magnitude'].iloc[apex_window_start:metrics['apex_idx']].idxmax()
 
-        # For now, we won’t calculate set and lift using raw data;
-        # we will recalc them after remapping (using Basketball_X_ft).
-        
+        # UPDATED window sizes: use 50 frames before release to get the set point.
+        release_window_start = max(0, metrics['release_idx'] - 40)
+        # *** Use the remapped X column later; for now use raw to define window.
+        metrics['set_idx'] = ball_df.iloc[release_window_start:metrics['release_idx']]['Basketball_X'].idxmin()
+
+        # Then, work backwards from the set point using a 30‐frame window for the lift.
+        set_window_start = max(0, metrics['set_idx'] - 20)
+        metrics['lift_idx'] = ball_df.iloc[set_window_start:metrics['set_idx']]['Basketball_X'].idxmax()
+
+        metrics['rim_impact_idx'] = (basketball_z <= 120).idxmax()  # 10 ft = 120 inches
+
         # 5. Determine hoop position based on release point.
         release_point = ball_df.loc[metrics['release_idx']]
         player_x = release_point['Basketball_X']
@@ -976,11 +984,10 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['hoop_x'] = hoop_x
         metrics['hoop_y'] = hoop_y
 
-        # 6. Remap shot coordinates so that the release point's Y becomes 0.
-        # This function converts ball coordinates to feet (creating Basketball_X_ft and Basketball_Y_ft)
-        # and rotates all points about the hoop.
+        # 6. --- New Step: Remap shot coordinates so that the release point's Y becomes 0.
+        # This function converts ball coordinates to feet (adding new columns) and rotates them about the hoop.
         ball_df, pose_df, theta_used = remap_shot_coordinates(ball_df, pose_df, hoop_x, hoop_y, metrics['release_idx'], INCHES_TO_FEET)
-        # Update release point from remapped data.
+        # Update the release point from the remapped data:
         release_point = ball_df.loc[metrics['release_idx']]
         hoop_x_ft = hoop_x * INCHES_TO_FEET
         hoop_y_ft = hoop_y * INCHES_TO_FEET  # should be 0
@@ -999,13 +1006,12 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['original_shot_distance'] = original_shot_distance
         metrics['flip'] = flip
 
-        # --- NEW: Recalculate the set and lift indices using the remapped X coordinate.
-        # We keep the lift point as determined from a backward window (30 frames before release)
-        lift_window_start = max(0, metrics['release_idx'] - 30)
-        metrics['lift_idx'] = ball_df.iloc[lift_window_start:metrics['release_idx']]['Basketball_X_ft'].idxmax()
-        # Now, update the set point to be the frame within 10 frames AFTER the lift point that has the minimum X.
-        window_end = min(metrics['lift_idx'] + 10, len(ball_df))
-        metrics['set_idx'] = ball_df.iloc[metrics['lift_idx']:window_end]['Basketball_X_ft'].idxmin()
+        # --- NEW: Now re-calculate the set and lift points using the remapped X coordinate.
+        # We now use "Basketball_X_ft" (in feet) for a more accurate alignment.
+        release_window_start = max(0, metrics['release_idx'] - 50)
+        metrics['set_idx'] = ball_df.iloc[release_window_start:metrics['release_idx']]['Basketball_X_ft'].idxmin()
+        set_window_start = max(0, metrics['set_idx'] - 20)
+        metrics['lift_idx'] = ball_df.iloc[set_window_start:metrics['set_idx']]['Basketball_X_ft'].idxmax()
 
         # 7. Compute additional KPIs.
         metrics['release_height'] = release_point['Basketball_Z'] * INCHES_TO_FEET
@@ -1109,7 +1115,6 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['release_velocity'] = 0.0  # Fallback
 
     return metrics, pose_df, ball_df
-
 
 
 
