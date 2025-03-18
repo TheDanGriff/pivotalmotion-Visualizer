@@ -600,6 +600,102 @@ def fetch_user_completed_data_file_jobs(user_email):
         return []
 # In data_processing.py, update the column names used in calculations:
 
+def adjust_shot_coordinates(ball_df, pose_df=None):
+    """
+    Check if the ball's X coordinate is negative. If so, convert all X values to their absolute values 
+    and flip all Y values (multiply by -1) so that all shots are mapped to the same half of the court.
+    Optionally applies the same transformation to the pose_df if provided.
+    """
+    # Use the first non-NaN X value to decide
+    first_x = ball_df['Basketball_X'].dropna().iloc[0]
+    if first_x < 0:
+        ball_df['Basketball_X'] = ball_df['Basketball_X'].abs()
+        ball_df['Basketball_Y'] = -ball_df['Basketball_Y']
+        logger.info("Ball coordinates adjusted: X values made positive and Y values flipped.")
+        if pose_df is not None:
+            # Apply similar transformation to all pose columns ending in _X and _Y.
+            pose_df = pose_df.copy()
+            for col in pose_df.columns:
+                if col.endswith('_X'):
+                    pose_df[col] = pose_df[col].abs()
+                elif col.endswith('_Y'):
+                    pose_df[col] = -pose_df[col]
+            logger.info("Pose coordinates adjusted similarly (X absolute, Y flipped).")
+    return ball_df, pose_df
+
+
+
+
+
+def remap_shot_coordinates(ball_df, pose_df, hoop_x, hoop_y, release_idx, INCHES_TO_FEET=1/12):
+    """
+    Remap all ball (and optionally pose) coordinates from inches to feet so that the shot's
+    release point has a Y coordinate of 0 while preserving the distance from the hoop.
+    
+    The transformation rotates all points about the hoop (converted to feet).
+    
+    Parameters:
+      ball_df: DataFrame with ball tracking data (expects 'Basketball_X' and 'Basketball_Y' in inches).
+      pose_df: DataFrame with pose data (can be None). All columns ending in _X and _Y are assumed to be in inches.
+      hoop_x, hoop_y: Coordinates of the hoop in inches.
+      release_idx: The index of the release frame in ball_df.
+      INCHES_TO_FEET: Conversion factor from inches to feet.
+      
+    Returns:
+      ball_df_new: A copy of ball_df with new columns 'Basketball_X_ft' and 'Basketball_Y_ft' holding the
+                   remapped coordinates (in feet).
+      pose_df_new: A copy of pose_df with all _X and _Y columns converted and rotated (or None if pose_df is None).
+      theta: The rotation angle (in radians) used in the transformation.
+    """
+    # Work on a copy so that original data is preserved.
+    ball_df_new = ball_df.copy()
+    # Convert ball coordinates from inches to feet.
+    ball_df_new['Basketball_X_ft'] = ball_df_new['Basketball_X'] * INCHES_TO_FEET
+    ball_df_new['Basketball_Y_ft'] = ball_df_new['Basketball_Y'] * INCHES_TO_FEET
+
+    # Hoop position in feet.
+    H = np.array([hoop_x * INCHES_TO_FEET, hoop_y * INCHES_TO_FEET])
+    # Get the release point in feet.
+    R = np.array([ball_df_new.loc[release_idx, 'Basketball_X_ft'],
+                  ball_df_new.loc[release_idx, 'Basketball_Y_ft']])
+    # Compute the vector from hoop to release.
+    V = R - H
+    # Compute the angle theta (in radians) that V makes with the horizontal.
+    theta = np.arctan2(V[1], V[0])
+    # Build the rotation matrix that rotates by -theta.
+    c, s = np.cos(-theta), np.sin(-theta)
+    rot_matrix = np.array([[c, -s],
+                           [s,  c]])
+    
+    # Rotate every ball coordinate (in feet) about the hoop.
+    def rotate_point(P):
+        return rot_matrix.dot(P - H) + H
+    
+    ball_coords = ball_df_new[['Basketball_X_ft', 'Basketball_Y_ft']].to_numpy()
+    rotated = np.apply_along_axis(rotate_point, 1, ball_coords)
+    ball_df_new['Basketball_X_ft'] = rotated[:, 0]
+    ball_df_new['Basketball_Y_ft'] = rotated[:, 1]
+    
+    # For pose data, apply a similar transformation if provided.
+    pose_df_new = None
+    if pose_df is not None:
+        pose_df_new = pose_df.copy()
+        # Convert all columns ending in _X and _Y from inches to feet.
+        for col in pose_df_new.columns:
+            if col.endswith('_X') or col.endswith('_Y'):
+                pose_df_new[col] = pose_df_new[col] * INCHES_TO_FEET
+        # For each coordinate pair (assumes _X and _Y come in pairs), apply the rotation.
+        for col in list(pose_df_new.columns):
+            if col.endswith('_X'):
+                base = col[:-2]
+                col_x, col_y = f"{base}_X", f"{base}_Y"
+                if col_y in pose_df_new.columns:
+                    pts = pose_df_new[[col_x, col_y]].to_numpy()
+                    rotated_pts = np.apply_along_axis(rotate_point, 1, pts)
+                    pose_df_new[col_x] = rotated_pts[:, 0]
+                    pose_df_new[col_y] = rotated_pts[:, 1]
+    return ball_df_new, pose_df_new, theta
+
 def calculate_foot_angles(df):
     """Calculate foot angles using both old and new column names."""
     try:
@@ -785,7 +881,26 @@ def compute_joint_angles(df):
                 ), axis=1)
     return df
 
-
+# New helper function #3: Save adjusted raw data to a file.
+def save_adjusted_data(df, user_email, job_id, segment_id, file_format='csv'):
+    """
+    Save the adjusted raw data (df) to a new file.
+    The file is saved under "processed/{user_email}/{job_id}/{segment_id}_adjusted.{file_format}".
+    """
+    output_filename = f"{segment_id}_adjusted.{file_format}"
+    try:
+        if file_format.lower() == 'csv':
+            df.to_csv(output_filename, index=False)
+        elif file_format.lower() in ['xlsx', 'xls']:
+            df.to_excel(output_filename, index=False)
+        else:
+            logger.error(f"Unsupported file format for saving: {file_format}")
+            return None
+        logger.info(f"Adjusted raw data saved to {output_filename}")
+        return output_filename
+    except Exception as e:
+        logger.error(f"Error saving adjusted data: {e}")
+        return None
 
 def calculate_shot_metrics(pose_df, ball_df, fps=60):
     """
@@ -816,11 +931,14 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             logger.error(f"Missing columns in ball_df: {missing_ball}.")
             return metrics, pose_df, ball_df
 
-        # 2. Compute additional pose angles
+        # --- New Step 1: Adjust coordinates if shot comes from the negative side.
+        ball_df, pose_df = adjust_shot_coordinates(ball_df, pose_df)
+
+        # 2. Compute additional pose angles.
         pose_df = calculate_foot_angles(pose_df)
         pose_df = calculate_rotation_angles(pose_df)
 
-        # 3. Compute velocities in inches/second
+        # 3. Compute velocities in inches/second.
         basketball_x = ball_df['Basketball_X']
         basketball_y = ball_df['Basketball_Y']
         basketball_z = ball_df['Basketball_Z']
@@ -828,13 +946,11 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         ball_df['velocity_x'] = basketball_x.diff() * fps
         ball_df['velocity_y'] = basketball_y.diff() * fps
         ball_df['velocity_z'] = basketball_z.diff() * fps
-
         ball_df['velocity_magnitude'] = np.sqrt(
             ball_df['velocity_x']**2 +
             ball_df['velocity_y']**2 +
             ball_df['velocity_z']**2
         )
-
         ball_df['velocity_magnitude'] = ball_df['velocity_magnitude'].replace(0, np.nan)
         ball_df['velocity_magnitude'] = (
             ball_df['velocity_magnitude']
@@ -843,27 +959,37 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             .fillna(method='ffill')
         )
 
-        # 4. Identify key shot indices
+        # 4. Identify key shot indices.
         metrics['apex_idx'] = basketball_z.idxmax()
         apex_window_start = max(0, metrics['apex_idx'] - 75)
         metrics['release_idx'] = ball_df['velocity_magnitude'].iloc[apex_window_start:metrics['apex_idx']].idxmax()
 
-        release_window_start = max(0, metrics['release_idx'] - 20)
+        # UPDATED window sizes: 50 frames for set, 30 for lift.
+        release_window_start = max(0, metrics['release_idx'] - 50)
         metrics['set_idx'] = ball_df.iloc[release_window_start:metrics['release_idx']]['Basketball_X'].idxmin()
 
-        set_window_start = max(0, metrics['set_idx'] - 15)
+        set_window_start = max(0, metrics['set_idx'] - 30)
         metrics['lift_idx'] = ball_df.iloc[set_window_start:metrics['set_idx']]['Basketball_X'].idxmax()
 
         metrics['rim_impact_idx'] = (basketball_z <= 120).idxmax()  # 10 ft = 120 inches
 
-        # 5. Compute KPIs (convert to feet where applicable)
+        # 5. Determine hoop position based on release point.
         release_point = ball_df.loc[metrics['release_idx']]
         player_x = release_point['Basketball_X']
         hoop_x = 501.0 if player_x >= 0 else -501.0
         hoop_y = 0.0
+        metrics['hoop_x'] = hoop_x
+        metrics['hoop_y'] = hoop_y
 
-        dx = (hoop_x - release_point['Basketball_X']) * INCHES_TO_FEET
-        dy = (hoop_y - release_point['Basketball_Y']) * INCHES_TO_FEET
+        # 6. --- New Step: Remap shot coordinates so that the release point's Y becomes 0.
+        # This function converts ball coordinates to feet (adding new columns) and rotates them about the hoop.
+        ball_df, pose_df, theta_used = remap_shot_coordinates(ball_df, pose_df, hoop_x, hoop_y, metrics['release_idx'], INCHES_TO_FEET)
+        # Update the release point from the remapped data:
+        release_point = ball_df.loc[metrics['release_idx']]
+        hoop_x_ft = hoop_x * INCHES_TO_FEET
+        hoop_y_ft = hoop_y * INCHES_TO_FEET  # should be 0
+        dx = hoop_x_ft - release_point['Basketball_X_ft']
+        dy = hoop_y_ft - release_point['Basketball_Y_ft']
         original_shot_distance = np.sqrt(dx**2 + dy**2)
 
         if original_shot_distance > 47.0:
@@ -876,20 +1002,19 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['shot_distance'] = shot_distance
         metrics['original_shot_distance'] = original_shot_distance
         metrics['flip'] = flip
-        metrics['hoop_x'] = hoop_x
-        metrics['hoop_y'] = hoop_y
 
+        # 7. Compute additional KPIs.
         metrics['release_height'] = release_point['Basketball_Z'] * INCHES_TO_FEET
         metrics['release_time'] = (metrics['release_idx'] - metrics['lift_idx']) / fps
         metrics['apex_height'] = basketball_z.max() * INCHES_TO_FEET
 
-        # 6. Compute Release Angle
-        post_release = ball_df.loc[metrics['release_idx']:metrics['release_idx'] + 3]
+        # 8. Compute Release Angle using remapped (ft) coordinates.
+        post_release = ball_df.loc[metrics['release_idx']:metrics['release_idx']+3]
         dz = post_release['Basketball_Z'].diff().iloc[1:].mean() * INCHES_TO_FEET
-        dxy = np.sqrt(post_release['Basketball_X'].diff()**2 + post_release['Basketball_Y'].diff()**2).iloc[1:].mean() * INCHES_TO_FEET
+        dxy = np.sqrt(post_release['Basketball_X_ft'].diff()**2 + post_release['Basketball_Y_ft'].diff()**2).iloc[1:].mean()
         metrics['release_angle'] = np.degrees(np.arctan2(dz, dxy))
 
-        # 7. Compute Release Velocity
+        # 9. Compute Release Velocity.
         if pd.isna(metrics['release_idx']) or metrics['release_idx'] >= len(ball_df):
             logger.error(f"Invalid release_idx: {metrics['release_idx']}, ball_df length: {len(ball_df)}")
             metrics['release_velocity'] = 0.0
@@ -903,19 +1028,19 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             release_velocity = np.sqrt(rv_x**2 + rv_y**2 + rv_z**2) * INCHES_TO_FEET
             metrics['release_velocity'] = 0.0 if pd.isna(release_velocity) or release_velocity < 0 else release_velocity
 
-        # 8. Curvature computations (convert from 1/inches to 1/feet)
+        # 10. Curvature computations.
         metrics['curvature_side'] = savgol_filter(np.gradient(np.gradient(basketball_x)), 11, 3) * 12
         metrics['curvature_lateral'] = savgol_filter(np.gradient(np.gradient(basketball_y)), 11, 3) * 12
         metrics['release_curvature'] = metrics['curvature_side'][metrics['release_idx']] * 12
 
-        # 9. Classify release angle
+        # 11. Classify release angle.
         metrics['release_class'] = classify_release_angle(
             metrics.get('release_angle', 0),
             metrics.get('shot_distance', 0),
             metrics.get('release_height', 0)
         )
 
-        # 10. Lateral deviation (using provided function)
+        # 12. Lateral deviation.
         lateral_dev = calculate_lateral_deviation(
             ball_df,
             metrics['release_idx'],
@@ -923,64 +1048,64 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             hoop_y=metrics['hoop_y']
         )
         if lateral_dev:
-            metrics['lateral_deviation'] = lateral_dev[0]  # Already in feet, preserve full precision
+            metrics['lateral_deviation'] = lateral_dev[0]
             metrics['lateral_final_x'] = lateral_dev[1]
             metrics['lateral_actual_y'] = lateral_dev[2]
             metrics['lateral_expected_y'] = lateral_dev[3]
         else:
-            metrics['lateral_deviation'] = 0.0  # Only set to 0.0 if calculation fails
+            metrics['lateral_deviation'] = 0.0
 
-        # 11. Additional Pose Computations (update this section)
-            pose_df = compute_joint_angles(pose_df)  # Already calculates some angles
-            pose_df = calculate_centroid(pose_df)
-            pose_df = calculate_stability(pose_df)
-            pose_df = calculate_guide_hand_release(pose_df)
+        # 13. Additional Pose Computations.
+        pose_df = compute_joint_angles(pose_df)
+        pose_df = calculate_centroid(pose_df)
+        pose_df = calculate_stability(pose_df)
+        pose_df = calculate_guide_hand_release(pose_df)
 
-            # Add new joint angle calculations for consistency with visuals
-            def calculate_angle(df, a_x, a_y, a_z, b_x, b_y, b_z, c_x, c_y, c_z):
-                ab = np.sqrt((df[a_x] - df[b_x])**2 + (df[a_y] - df[b_y])**2 + (df[a_z] - df[b_z])**2)
-                bc = np.sqrt((df[c_x] - df[b_x])**2 + (df[c_y] - df[b_y])**2 + (df[c_z] - df[b_z])**2)
-                ac = np.sqrt((df[a_x] - df[c_x])**2 + (df[a_y] - df[c_y])**2 + (df[a_z] - df[c_z])**2)
-                cos_angle = (ab**2 + bc**2 - ac**2) / (2 * ab * bc)
-                cos_angle = np.clip(cos_angle, -1, 1)
-                return np.degrees(np.arccos(cos_angle))
+        def calculate_angle(df, a_x, a_y, a_z, b_x, b_y, b_z, c_x, c_y, c_z):
+            ab = np.sqrt((df[a_x] - df[b_x])**2 + (df[a_y] - df[b_y])**2 + (df[a_z] - df[b_z])**2)
+            bc = np.sqrt((df[c_x] - df[b_x])**2 + (df[c_y] - df[b_y])**2 + (df[c_z] - df[b_z])**2)
+            ac = np.sqrt((df[a_x] - df[c_x])**2 + (df[a_y] - df[c_y])**2 + (df[a_z] - df[c_z])**2)
+            cos_angle = (ab**2 + bc**2 - ac**2) / (2 * ab * bc)
+            cos_angle = np.clip(cos_angle, -1, 1)
+            return np.degrees(np.arccos(cos_angle))
 
-            pose_df['elbow_angle'] = calculate_angle(
-                pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
-                'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
-                'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z'
-            )
-            pose_df['shoulder_angle'] = calculate_angle(
-                pose_df, 'MIDHIP_X', 'MIDHIP_Y', 'MIDHIP_Z',
-                'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
-                'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z'
-            )
-            pose_df['wrist_angle'] = calculate_angle(
-                pose_df, 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
-                'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z',
-                'RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z'
-            )
-            pose_df['hip_angle'] = calculate_angle(
-                pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
-                'RHIP_X', 'RHIP_Y', 'RHIP_Z',
-                'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z'
-            )
-            pose_df['knee_angle'] = calculate_angle(
-                pose_df, 'RHIP_X', 'RHIP_Y', 'RHIP_Z',
-                'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
-                'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z'
-            )
-            pose_df['ankle_angle'] = calculate_angle(
-                pose_df, 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
-                'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z',
-                'RBIGTOE_X', 'RBIGTOE_Y', 'RBIGTOE_Z'
-            )
+        pose_df['elbow_angle'] = calculate_angle(
+            pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
+            'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
+            'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z'
+        )
+        pose_df['shoulder_angle'] = calculate_angle(
+            pose_df, 'MIDHIP_X', 'MIDHIP_Y', 'MIDHIP_Z',
+            'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
+            'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z'
+        )
+        pose_df['wrist_angle'] = calculate_angle(
+            pose_df, 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
+            'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z',
+            'RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z'
+        )
+        pose_df['hip_angle'] = calculate_angle(
+            pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
+            'RHIP_X', 'RHIP_Y', 'RHIP_Z',
+            'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z'
+        )
+        pose_df['knee_angle'] = calculate_angle(
+            pose_df, 'RHIP_X', 'RHIP_Y', 'RHIP_Z',
+            'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
+            'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z'
+        )
+        pose_df['ankle_angle'] = calculate_angle(
+            pose_df, 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
+            'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z',
+            'RBIGTOE_X', 'RBIGTOE_Y', 'RBIGTOE_Z'
+        )
 
     except Exception as e:
         logger.error(f"Error calculating shot metrics: {str(e)}")
         metrics['release_velocity'] = 0.0  # Fallback
 
     return metrics, pose_df, ball_df
+
 
 def calculate_lateral_deviation(df, release_index, hoop_x=501.0, hoop_y=0.0):
     """
