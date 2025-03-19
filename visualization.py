@@ -252,7 +252,7 @@ def plot_shot_analysis(df_ball, metrics):
     max_idx = len(df_ball) - 1
     release_idx = clamp_index(metrics.get('release_idx', 0), max_idx)
     # Always start the visual 60 frames before release (if available)
-    start_idx = max(0, release_idx - 60)
+    start_idx = max(0, release_idx - 50)
     # We keep set and lift indices from metrics; they will be marked if they lie within the window.
     set_idx = clamp_index(metrics.get('set_idx', release_idx), max_idx)
     lift_idx = clamp_index(metrics.get('lift_idx', start_idx), max_idx)
@@ -384,20 +384,6 @@ def plot_shot_analysis(df_ball, metrics):
         annotation.y = 1.05
 
     return fig
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def plot_foot_alignment(df):
