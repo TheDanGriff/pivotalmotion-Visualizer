@@ -252,21 +252,21 @@ def plot_shot_analysis(df_ball, metrics):
     max_idx = len(df_ball) - 1
     release_idx = clamp_index(metrics.get('release_idx', 0), max_idx)
     # Always start the visual 60 frames before release (if available)
-    start_idx = max(0, release_idx - 32)
-    # We keep set and lift indices from metrics; they will be marked if they lie within the window.
+    start_idx = max(0, release_idx - 60)
+    # Keep set and lift indices from metrics.
     set_idx = clamp_index(metrics.get('set_idx', release_idx), max_idx)
     lift_idx = clamp_index(metrics.get('lift_idx', start_idx), max_idx)
 
-    # For the side view, we use the remapped X coordinate (in feet) and for the rear view the remapped Y.
+    # For the side view, use the remapped X coordinate; for the rear view, use the remapped Y.
     traj_x = get_slice(df_ball['Basketball_X_ft'], start_idx, release_idx + 1)
     traj_y = get_slice(df_ball['Basketball_Y_ft'], start_idx, release_idx + 1)
     traj_z = get_slice(df_ball['Basketball_Z'], start_idx, release_idx + 1) * INCHES_TO_FEET
 
-    # For the side view, we want a 4‑ft wide axis centered on the release X value.
+    # For the side view, center the horizontal axis on the release X value (4‑ft wide).
     release_x = df_ball.at[release_idx, 'Basketball_X_ft']
     side_range = [release_x - 2, release_x + 2]
 
-    # For the rear view, we assume the remapped Y is near zero at release.
+    # For the rear view, assume the remapped Y is near zero at release.
     release_y = df_ball.at[release_idx, 'Basketball_Y_ft']
     rear_range = [-2, 2]
 
@@ -289,11 +289,16 @@ def plot_shot_analysis(df_ball, metrics):
             ),
             row=1, col=1
         )
-        # Mark computed lift, set, and release points if they fall within the plotted window.
+        # Mark the computed lift, set, and release points if they lie within the visual window.
         for phase, idx in [('lift', lift_idx), ('set', set_idx), ('release', release_idx)]:
             if start_idx <= idx <= release_idx:
                 marker_x = df_ball.at[idx, 'Basketball_X_ft']
-                marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
+                # For lift point, force the vertical coordinate to be at least the lower threshold (2.5 ft)
+                marker_z_raw = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
+                if phase == 'lift':
+                    marker_z = max(marker_z_raw, 2.5)
+                else:
+                    marker_z = marker_z_raw
                 phase_color = {'lift': 'rgba(147, 112, 219, 1)',
                                'set': 'rgba(255, 182, 193, 1)',
                                'release': 'rgba(255, 102, 102, 1)'}[phase]
@@ -331,7 +336,11 @@ def plot_shot_analysis(df_ball, metrics):
         for phase, idx in [('lift', lift_idx), ('set', set_idx), ('release', release_idx)]:
             if start_idx <= idx <= release_idx:
                 marker_y = df_ball.at[idx, 'Basketball_Y_ft']
-                marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
+                marker_z_raw = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
+                if phase == 'lift':
+                    marker_z = max(marker_z_raw, 2.5)
+                else:
+                    marker_z = marker_z_raw
                 phase_color = {'lift': 'rgba(147, 112, 219, 1)',
                                'set': 'rgba(255, 182, 193, 1)',
                                'release': 'rgba(255, 102, 102, 1)'}[phase]
@@ -368,7 +377,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_layout(
         height=800,
         width=1400,
-        title_text="Ball Path Analysis (32 Frames Before Release)",
+        title_text="Ball Path Analysis (60 Frames Before Release)",
         title_x=0.38,
         title_font=dict(size=20),
         margin=dict(t=120, b=100, l=80, r=80),
@@ -384,6 +393,7 @@ def plot_shot_analysis(df_ball, metrics):
         annotation.y = 1.05
 
     return fig
+
 
 
 def plot_foot_alignment(df):
