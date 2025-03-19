@@ -398,7 +398,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_layout(
         height=800,
         width=1400,
-        title_text="Ball Path Analysis (32 Frames Before Release)",
+        title_text="Ball Path Analysis",
         title_x=0.38,
         title_font=dict(size=20),
         margin=dict(t=120, b=100, l=80, r=80),
