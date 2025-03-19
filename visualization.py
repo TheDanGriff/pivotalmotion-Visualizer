@@ -216,14 +216,14 @@ def plot_shot_analysis(df_ball, metrics):
     Create interactive basketball shot analysis visualization with two 2D trajectory plots:
 
     - Side View: Uses the remapped Basketball_X_ft (in feet) versus Basketball_Z (in feet).
-      The x-axis shows the actual court position (in feet) limited to a 4‑ft window centered on the release point.
+      The x-axis is a 4-ft window centered on release point [-2, 2].
       Tick labels are reversed so that the highest numbers appear on the left.
       The projected ball path after release is drawn in red (dotted).
 
     - Rear View: Uses the remapped Basketball_Y_ft (in feet) versus Basketball_Z (in feet).
       Its horizontal axis is fixed to [-2, 2] ft (with the release point at 0).
 
-    Both plots have a fixed vertical (Z) axis from 2 to 11 ft and show the last 32 frames prior to release.
+    Both plots have a fixed 4-ft vertical (Z) axis range and show the last 32 frames prior to release.
     The lift point marker is forced to be the very first frame in that window.
     """
     from plotly.subplots import make_subplots
@@ -267,7 +267,7 @@ def plot_shot_analysis(df_ball, metrics):
     # Vertical axis: Basketball_Z (converted to feet).
     traj_z = get_slice(df_ball['Basketball_Z'], start_idx, release_idx + 1) * INCHES_TO_FEET
 
-    # Define the side view x-axis as a 4‑ft window centered on the release point.
+    # Define the side view x-axis as a 4-ft window centered on the release point.
     release_x = df_ball.at[release_idx, 'Basketball_X_ft']
     side_range = [release_x - 2, release_x + 2]
 
@@ -285,6 +285,10 @@ def plot_shot_analysis(df_ball, metrics):
     traj_y = get_slice(df_ball['Basketball_Y_ft'], start_idx, release_idx + 1)
     # Use the same vertical axis (traj_z) as above.
     rear_range = [-2, 2]  # Fixed horizontal range for rear view.
+
+    # Determine vertical range (4 ft) centered around the release height
+    release_z = df_ball.at[release_idx, 'Basketball_Z'] * INCHES_TO_FEET
+    z_range = [release_z - 2, release_z + 2]
 
     # Create subplots.
     fig = make_subplots(
@@ -343,7 +347,7 @@ def plot_shot_analysis(df_ball, metrics):
             )
     else:
         fig.add_trace(
-            go.Scatter(x=[0], y=[2.0], mode='text', text=["No Data"]),
+            go.Scatter(x=[0], y=[release_z], mode='text', text=["No Data"]),
             row=1, col=1
         )
 
@@ -391,7 +395,7 @@ def plot_shot_analysis(df_ball, metrics):
             )
     else:
         fig.add_trace(
-            go.Scatter(x=[0], y=[2.0], mode='text', text=["No Data"]),
+            go.Scatter(x=[0], y=[release_z], mode='text', text=["No Data"]),
             row=1, col=2
         )
 
@@ -400,7 +404,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_xaxes(
         title_text="Horizontal Position (ft)",
         row=1, col=1,
-        range=side_range,
+        range=side_range,  # 4-ft range centered on release
         tickmode='array',
         tickvals=tickvals,
         ticktext=ticktext,
@@ -414,7 +418,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_yaxes(
         title_text="Height (ft)",
         row=1, col=1,
-        range=[2, 11],
+        range=z_range,  # 4-ft range centered on release height
         dtick=1,
         showgrid=True,
         gridwidth=1,
@@ -439,7 +443,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_yaxes(
         title_text="Height (ft)",
         row=1, col=2,
-        range=[2, 11],
+        range=z_range,  # Same 4-ft range as side view
         dtick=1,
         showgrid=True,
         gridwidth=1,
@@ -462,7 +466,7 @@ def plot_shot_analysis(df_ball, metrics):
         paper_bgcolor='rgba(255, 255, 255, 1)',
         showlegend=True
     )
-    # Ensure equal aspect ratio for both subplots.
+    # Ensure 1:1 aspect ratio for both subplots
     for col in [1, 2]:
         fig.update_xaxes(row=1, col=col, scaleanchor=f"y{col}", scaleratio=1)
     for annotation in fig.layout.annotations:
