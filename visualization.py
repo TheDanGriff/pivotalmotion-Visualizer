@@ -396,31 +396,64 @@ def plot_shot_analysis(df_ball, metrics):
             row=1, col=2
         )
 
+# ... (code above remains unchanged)
+
     # --- Axes Configuration ---
-    # Side View: Use the actual remapped x-values, but limit the range to the 4‑ft window.
-    fig.update_xaxes(title_text="Horizontal Position (ft)", row=1, col=1,
-                     range=side_range,
-                     tickmode='array',
-                     tickvals=tickvals,
-                     ticktext=ticktext,
-                     title_font=dict(size=14),
-                     tickfont=dict(size=12))
-    # For both views, set the vertical axis (height) from 2.5 to 11 ft.
-    fig.update_yaxes(title_text="Height (ft)", row=1, col=1,
-                     range=[2.5, 11],
-                     title_font=dict(size=14),
-                     tickfont=dict(size=12),
-                     title_standoff=20)
-    # Rear View:
-    fig.update_xaxes(title_text="Lateral Position (ft)", row=1, col=2,
-                     range=rear_range,
-                     title_font=dict(size=14),
-                     tickfont=dict(size=12))
-    fig.update_yaxes(title_text="Height (ft)", row=1, col=2,
-                     range=[2.5, 11],
-                     title_font=dict(size=14),
-                     tickfont=dict(size=12),
-                     title_standoff=20)
+    # SIDE VIEW: Use the actual remapped x-values but limit to the 4‑ft window.
+    # We set tickmode to 'array' (as before) with our custom tickvals and ticktext,
+    # and then add dtick and grid settings.
+    fig.update_xaxes(
+        title_text="Horizontal Position (ft)",
+        row=1, col=1,
+        range=side_range,
+        tickmode='array',
+        tickvals=tickvals,
+        ticktext=ticktext,
+        dtick=1,
+        showgrid=True,
+        gridwidth=1,
+        gridcolor='lightgrey',
+        title_font=dict(size=14),
+        tickfont=dict(size=12)
+    )
+    # For both plots, set the vertical (Z) axis from 2 to 11 ft with 1‑ft increments.
+    fig.update_yaxes(
+        title_text="Height (ft)",
+        row=1, col=1,
+        range=[2, 11],
+        dtick=1,
+        showgrid=True,
+        gridwidth=1,
+        gridcolor='lightgrey',
+        title_font=dict(size=14),
+        tickfont=dict(size=12),
+        title_standoff=20
+    )
+    # Rear View: For the x-axis (lateral position) we use linear ticks.
+    fig.update_xaxes(
+        title_text="Lateral Position (ft)",
+        row=1, col=2,
+        range=rear_range,
+        tickmode='linear',
+        dtick=1,
+        showgrid=True,
+        gridwidth=1,
+        gridcolor='lightgrey',
+        title_font=dict(size=14),
+        tickfont=dict(size=12)
+    )
+    fig.update_yaxes(
+        title_text="Height (ft)",
+        row=1, col=2,
+        range=[2, 11],
+        dtick=1,
+        showgrid=True,
+        gridwidth=1,
+        gridcolor='lightgrey',
+        title_font=dict(size=14),
+        tickfont=dict(size=12),
+        title_standoff=20
+    )
 
     # --- Overall Layout ---
     fig.update_layout(
@@ -442,6 +475,7 @@ def plot_shot_analysis(df_ball, metrics):
         annotation.y = 1.05
 
     return fig
+
 
 
 
