@@ -353,11 +353,11 @@ def plot_shot_analysis(df_ball, metrics):
                      range=side_range, title_font=dict(size=14), tickfont=dict(size=12))
     # Use vertical axis range from 2.5 to 11 ft.
     fig.update_yaxes(title_text="Height (ft)", row=1, col=1,
-                     range=[2.5, 11], title_font=dict(size=14), tickfont=dict(size=12), title_standoff=20)
+                 range=[2.5, 11], title_font=dict(size=14), tickfont=dict(size=12), title_standoff=20)
     fig.update_xaxes(title_text="Lateral Position (ft)", row=1, col=2,
                      range=rear_range, title_font=dict(size=14), tickfont=dict(size=12))
     fig.update_yaxes(title_text="Height (ft)", row=1, col=2,
-                     range=[2.5, 11], title_font=dict(size=14), tickfont=dict(size=12), title_standoff=20)
+                    range=[2.5, 11], title_font=dict(size=14), tickfont=dict(size=12), title_standoff=20)
 
     # --- Overall Layout ---
     fig.update_layout(
