@@ -998,21 +998,23 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['original_shot_distance'] = original_shot_distance
         metrics['flip'] = flip
 
-        # 7. Recalculate set and lift points using remapped X coordinate ("Basketball_X_ft").
-        #    -- Set point: work backwards 50 frames from the release point and pick the frame with the maximum horizontal (X) position.
-        release_window_start = max(0, metrics['release_idx'] - 50)
+        # 7. Recalculate set and lift points using remapped horizontal positions ("Basketball_X_ft").
+        # Set point: work backwards from the release point over the last 30 frames
+        # and pick the frame with the maximum horizontal position.
+        release_window_start = max(0, metrics['release_idx'] - 30)
         candidate_set = ball_df.iloc[release_window_start:metrics['release_idx']]
         metrics['set_idx'] = candidate_set['Basketball_X_ft'].idxmax()
 
-        #    -- Lift point: work backwards 30 frames from the set point and pick the frame with the minimum horizontal (X) position.
+        # Lift point: work backwards from the set point over the previous 30 frames
+        # and pick the frame with the maximum horizontal position.
         set_window_start = max(0, metrics['set_idx'] - 30)
         candidate_lift = ball_df.iloc[set_window_start:metrics['set_idx']]
-        metrics['lift_idx'] = candidate_lift['Basketball_X_ft'].idxmin()
+        metrics['lift_idx'] = candidate_lift['Basketball_X_ft'].idxmax()
 
-        # Enforce a minimum separation between lift and set (e.g. at least 10 frames)
+        # Enforce a minimum separation: if the set point is fewer than 10 frames after the lift point,
+        # force the lift point to be 10 frames before the set point.
         if (metrics['set_idx'] - metrics['lift_idx']) < 10:
             metrics['lift_idx'] = max(0, metrics['set_idx'] - 10)
-
 
 
         # 8. Compute additional KPIs.
