@@ -222,11 +222,10 @@ def plot_shot_analysis(df_ball, metrics):
       Its horizontal axis is fixed to [-2, 2] ft (with the release point at 0).
       
     Both plots have a fixed vertical (Z) axis from 2.5 to 11 ft.
-    The plot always shows the last 32 frames prior to the release.
-    
-    If the ball’s vertical position at the start of the window (i.e. the candidate lift point) is below 2.5 ft,
-    we force the lift marker to be displayed at 2.5 ft and then re-compute the set point as the frame with the
-    maximum horizontal (X or Y) position after that.
+    The plot always shows frames before release. We compute a dynamic starting frame:
+      - Use the default of 32 frames before release,
+      - But if the ball’s Z (in feet) goes below 2.5 earlier than that (and within 60 frames), use that frame.
+    The lift marker is then set at this start frame.
     """
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
@@ -238,7 +237,7 @@ def plot_shot_analysis(df_ball, metrics):
     logger = logging.getLogger(__name__)
     INCHES_TO_FEET = 1 / 12
 
-    # Helper: smooth a slice of data using Savitzky–Golay filter.
+    # Helper to smooth a slice.
     def get_slice(data, start, end):
         if isinstance(data, (pd.Series, np.ndarray, list)) and len(data) > 0:
             seg = data[start:end].to_numpy() if hasattr(data, 'to_numpy') else np.array(data[start:end])
@@ -247,49 +246,48 @@ def plot_shot_analysis(df_ball, metrics):
                 if win_length % 2 == 0:
                     win_length += 1
                 seg = savgol_filter(seg, window_length=win_length, polyorder=2)
-            return seg  # Assumes data already in feet if using *_ft columns
+            return seg  # Assumes data already in feet if using *_ft columns.
         return np.array([])
 
-    # Determine key indices.
     def clamp_index(idx, max_idx):
         return max(0, min(int(idx), max_idx))
     max_idx = len(df_ball) - 1
     release_idx = clamp_index(metrics.get('release_idx', 0), max_idx)
-    
-    # Visual window: always show the last 32 frames prior to release.
-    visual_window = 32
-    start_idx = max(0, release_idx - visual_window)
-    
-    # --- Adjust the lift point marker ---
-    # Candidate lift marker comes from the first frame in the window.
-    candidate_lift_z = df_ball.at[start_idx, 'Basketball_Z'] * INCHES_TO_FEET
-    if candidate_lift_z < 2.5:
-        # If the candidate is below 2.5 ft, force the marker to be at 2.5 ft.
-        lift_marker_z = 2.5
-        # And re-compute the set point using only frames from start_idx onward.
-        candidate_set_window = df_ball.iloc[start_idx:release_idx+1]
-        if not candidate_set_window.empty:
-            # For side view, use the remapped horizontal coordinate.
-            set_idx = candidate_set_window['Basketball_X_ft'].idxmax()
+
+    # Determine new starting index for the visual.
+    # Default: 32 frames before release.
+    default_window = 32
+    max_window = 60
+    candidate_start = max(0, release_idx - default_window)
+    # Get vertical positions (converted to feet) for all frames up to release.
+    z_ft = df_ball['Basketball_Z'] * INCHES_TO_FEET
+    # Find the index of the minimum Z value (i.e. the lowest point) among frames 0 to release_idx.
+    lowest_idx = z_ft.loc[:release_idx].idxmin()
+    if z_ft.loc[lowest_idx] < 2.5:
+        # If the lowest point occurs within max_window frames, use it;
+        # otherwise, use the frame 60 frames before release.
+        if (release_idx - lowest_idx) <= max_window:
+            start_idx = lowest_idx
         else:
-            set_idx = release_idx
-        # And set the "lift index" for plotting to the window start.
-        lift_idx = start_idx
+            start_idx = release_idx - max_window
     else:
-        # Otherwise, use the computed metrics.
-        lift_idx = start_idx  # (we force the visual to start at start_idx)
-        lift_marker_z = df_ball.at[lift_idx, 'Basketball_Z'] * INCHES_TO_FEET
-        set_idx = clamp_index(metrics.get('set_idx', release_idx), max_idx)
-    
-    # For the side view, use the remapped X coordinate (in feet); for rear view, use remapped Y.
+        start_idx = candidate_start
+
+    # For our visual, we force the lift marker to be at start_idx.
+    lift_idx = start_idx
+    # Keep the set point from metrics (clamped)
+    set_idx = clamp_index(metrics.get('set_idx', release_idx), max_idx)
+
+    # For the side view, we use the remapped X coordinate.
     traj_x = get_slice(df_ball['Basketball_X_ft'], start_idx, release_idx + 1)
+    # For the rear view, use the remapped Y coordinate.
     traj_y = get_slice(df_ball['Basketball_Y_ft'], start_idx, release_idx + 1)
+    # Convert Basketball_Z (in inches) to feet.
     traj_z = get_slice(df_ball['Basketball_Z'], start_idx, release_idx + 1) * INCHES_TO_FEET
 
-    # Side view horizontal axis centered on release.
+    # Define horizontal axis ranges:
     release_x = df_ball.at[release_idx, 'Basketball_X_ft']
     side_range = [release_x - 2, release_x + 2]
-    # Rear view: assume release Y is near 0.
     release_y = df_ball.at[release_idx, 'Basketball_Y_ft']
     rear_range = [-2, 2]
 
@@ -312,15 +310,11 @@ def plot_shot_analysis(df_ball, metrics):
             ),
             row=1, col=1
         )
-        # Mark phases if within window.
-        # For the lift marker, we use our adjusted value.
+        # Mark the phase points (lift, set, release).
         for phase, idx in [('lift', lift_idx), ('set', set_idx), ('release', release_idx)]:
             if start_idx <= idx <= release_idx:
-                if phase == 'lift':
-                    marker_z = lift_marker_z
-                else:
-                    marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
                 marker_x = df_ball.at[idx, 'Basketball_X_ft']
+                marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
                 phase_color = {'lift': 'rgba(147, 112, 219, 1)',
                                'set': 'rgba(255, 182, 193, 1)',
                                'release': 'rgba(255, 102, 102, 1)'}[phase]
@@ -357,11 +351,8 @@ def plot_shot_analysis(df_ball, metrics):
         )
         for phase, idx in [('lift', lift_idx), ('set', set_idx), ('release', release_idx)]:
             if start_idx <= idx <= release_idx:
-                if phase == 'lift':
-                    marker_z = lift_marker_z
-                else:
-                    marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
                 marker_y = df_ball.at[idx, 'Basketball_Y_ft']
+                marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
                 phase_color = {'lift': 'rgba(147, 112, 219, 1)',
                                'set': 'rgba(255, 182, 193, 1)',
                                'release': 'rgba(255, 102, 102, 1)'}[phase]
@@ -398,7 +389,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_layout(
         height=800,
         width=1400,
-        title_text="Ball Path Analysis",
+        title_text="Ball Path Analysis (Frames Before Release)",
         title_x=0.38,
         title_font=dict(size=20),
         margin=dict(t=120, b=100, l=80, r=80),
@@ -414,6 +405,7 @@ def plot_shot_analysis(df_ball, metrics):
         annotation.y = 1.05
 
     return fig
+
 
 
 
