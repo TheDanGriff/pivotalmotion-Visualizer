@@ -223,8 +223,8 @@ def plot_shot_analysis(df_ball, metrics):
     - Rear View: Uses the remapped Basketball_Y_ft (in feet) versus Basketball_Z (in feet).
       Its horizontal axis is fixed to [-2, 2] ft (with the release point at 0).
 
-    Both plots have a fixed vertical (Z) axis from 2 to 11 ft and show the last 32 frames prior to release.
-    The lift point marker is forced to be the very first frame in that window.
+    Both plots have a fixed vertical (Z) axis from 2 to 11 ft (9 ft tall) and show the last 32 frames prior to release.
+    The plot area is a 4:9 width-to-height rectangle to match physical proportions.
     """
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
@@ -286,11 +286,11 @@ def plot_shot_analysis(df_ball, metrics):
     # Use the same vertical axis (traj_z) as above.
     rear_range = [-2, 2]  # Fixed horizontal range for rear view.
 
-    # Create subplots.
+    # Create subplots with custom grid to control aspect ratio.
     fig = make_subplots(
         rows=1, cols=2,
         subplot_titles=("Side View (X vs. Z)", "Rear View (Y vs. Z)"),
-        horizontal_spacing=0.1
+        horizontal_spacing=0.15
     )
 
     # --- SIDE VIEW PLOT ---
@@ -414,7 +414,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_yaxes(
         title_text="Height (ft)",
         row=1, col=1,
-        range=[2, 11],  # Fixed 2-11 ft
+        range=[2, 11],  # Fixed 2-11 ft (9 ft)
         dtick=1,
         showgrid=True,
         gridwidth=1,
@@ -427,7 +427,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_xaxes(
         title_text="Lateral Position (ft)",
         row=1, col=2,
-        range=rear_range,  # Fixed to [-2, 2]
+        range=rear_range,  # Fixed to [-2, 2] (4 ft)
         tickmode='linear',
         dtick=1,
         showgrid=True,
@@ -439,7 +439,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_yaxes(
         title_text="Height (ft)",
         row=1, col=2,
-        range=[2, 11],  # Fixed 2-11 ft
+        range=[2, 11],  # Fixed 2-11 ft (9 ft)
         dtick=1,
         showgrid=True,
         gridwidth=1,
@@ -450,20 +450,33 @@ def plot_shot_analysis(df_ball, metrics):
     )
 
     # --- OVERALL LAYOUT ---
+    # Set figure dimensions to enforce 4:9 ratio (width:height)
+    # Each subplot should be roughly 4:9, so total width accounts for two subplots + spacing
+    subplot_width = 400  # pixels for 4 ft
+    subplot_height = 900  # pixels for 9 ft
+    total_width = subplot_width * 2 + 100  # Two subplots + spacing
+
     fig.update_layout(
-        height=800,
-        width=1400,
+        height=subplot_height + 200,  # Extra space for title and legend
+        width=total_width,
         title_text="Ball Path Analysis",
         title_x=0.38,
         title_font=dict(size=20),
         margin=dict(t=120, b=100, l=80, r=80),
-        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5, font=dict(size=12)),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(size=12)),
         plot_bgcolor='rgba(255, 255, 255, 1)',
         paper_bgcolor='rgba(255, 255, 255, 1)',
         showlegend=True
     )
-    # Remove 1:1 aspect ratio constraint to allow equal scaling with different ranges
-    # Equal scaling is maintained by Plotly's default behavior when ranges are set
+
+    # Ensure each subplot maintains the 4:9 ratio
+    fig.update_layout(
+        autosize=False,
+        grid={'rows': 1, 'columns': 2, 'pattern': "independent"}
+    )
+    for col in [1, 2]:
+        fig.update_xaxes(row=1, col=col, constrain='domain')
+        fig.update_yaxes(row=1, col=col, constrain='domain')
 
     for annotation in fig.layout.annotations:
         annotation.y = 1.05
