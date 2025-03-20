@@ -254,11 +254,12 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         'Release Velocity': {'value': metrics.get('release_velocity', 0), 'min': 0, 'max': 30},  # feet/s
         'Release Time': {'value': metrics.get('release_time', 0), 'min': 0, 'max': 1},      # seconds
         'Apex Height': {'value': metrics.get('apex_height', 0), 'min': 0, 'max': 20},       # feet (adjusted max for realism)
-        'Release Curvature': {'value': metrics.get('release_curvature', 0), 'min': 0, 'max': 0.5},  # 1/ft
+        'Release Curvature (Side)': {'value': metrics.get('release_curvature_side', 0), 'min': 0, 'max': 0.5},  # 1/ft
+        'Release Curvature (Rear)': {'value': metrics.get('release_curvature_rear', 0), 'min': 0, 'max': 0.5},  # 1/ft
         'Lateral Deviation': {'value': metrics.get('lateral_deviation', 0), 'min': -0.5, 'max': 0.5}  # feet
     }
 
-    # KPI Grid (two rows of four columns)
+    # KPI Grid (two rows of four columns, plus a third row for the extra KPI)
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         animated_flip_kpi_card(
@@ -332,14 +333,14 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         )
     with col7:
         animated_flip_kpi_card(
-            "Release Curvature",
-            kpis['Release Curvature']['value'],
+            "Release Curvature (Side)",
+            kpis['Release Curvature (Side)']['value'],
             "1/ft",
-            player_average=player_averages.get('Release Curvature') if player_averages else None,
-            min_value=kpis['Release Curvature']['min'],
-            max_value=kpis['Release Curvature']['max'],
-            description="Good range: 0.05-0.15 1/ft. Moderate curvature optimizes arc.",
-            calculation_info="Second derivative of ball's X-position at release, scaled to 1/ft."
+            player_average=player_averages.get('Release Curvature (Side)') if player_averages else None,
+            min_value=kpis['Release Curvature (Side)']['min'],
+            max_value=kpis['Release Curvature (Side)']['max'],
+            description="Good range: 0.05-0.15 1/ft. Moderate curvature in the side view optimizes the shot arc.",
+            calculation_info="Terminal curvature from Bezier fit in the XZ plane (side view)."
         )
     with col8:
         animated_flip_kpi_card(
@@ -351,6 +352,20 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             max_value=kpis['Lateral Deviation']['max'],
             description="Good range: -0.1 to 0.1 ft. Closer to 0 indicates better aim.",
             calculation_info="Perpendicular distance from shot line to ball at hoop height, in feet."
+        )
+
+    # Third row for the additional KPI
+    col9 = st.columns(1)[0]  # Single column
+    with col9:
+        animated_flip_kpi_card(
+            "Release Curvature (Rear)",
+            kpis['Release Curvature (Rear)']['value'],
+            "1/ft",
+            player_average=player_averages.get('Release Curvature (Rear)') if player_averages else None,
+            min_value=kpis['Release Curvature (Rear)']['min'],
+            max_value=kpis['Release Curvature (Rear)']['max'],
+            description="Good range: 0.05-0.15 1/ft. Moderate curvature in the rear view ensures straight trajectory.",
+            calculation_info="Terminal curvature from Bezier fit in the YZ plane (rear view)."
         )
 
     # Shot Location Visualization (Fixed Size, Proper Scale)
