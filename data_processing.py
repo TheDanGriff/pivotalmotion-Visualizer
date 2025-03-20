@@ -1450,7 +1450,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     t_fine = np.linspace(0, 1, num_interp)
     t_percent = ((t_fine - lift_t) / (release_t - lift_t)) * 100  # Normalize lift-to-release as 0-100%
 
-    # Normalized Acceleration (for top/bottom panel)
+    # Normalized Acceleration
     t_raw, norm_acc, acc_raw = compute_normalized_acceleration_from_raw(df_ball, start_idx, end_idx, fps)
     if len(norm_acc) > 3:
         window_length = min(11, len(norm_acc) - 1)
@@ -1461,7 +1461,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     w = (weighting_exponent + 1) * (t_fine ** weighting_exponent)
     weighted_acc = np.abs(norm_acc_interp) * w
 
-    # Velocity (shared across all panels)
+    # Velocity
     velocity_segment = df_ball['velocity_magnitude'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
     if len(velocity_segment) > 3:
         window_length = min(11, len(velocity_segment) - 1)
@@ -1470,7 +1470,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         velocity_segment = savgol_filter(velocity_segment, window_length=window_length, polyorder=2)
     velocity_interp = np.interp(t_fine, t_raw, velocity_segment)
 
-    # Side View Curvature (XZ plane, left panel)
+    # Side View Curvature (XZ plane)
     seg_x = df_ball['Basketball_X'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
     seg_z = df_ball['Basketball_Z'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
     if len(seg_x) > 3:
@@ -1488,7 +1488,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         side_curve = savgol_filter(side_curve, window_length=window_length, polyorder=2)
     weighted_side = np.abs(side_curve) * w
 
-    # Rear View Curvature (YZ plane, right panel)
+    # Rear View Curvature (YZ plane)
     seg_y = df_ball['Basketball_Y'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
     if len(seg_y) > 3:
         window_length = min(11, len(seg_y) - 1)
@@ -1528,11 +1528,12 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     dummy_release = go.Scatter(x=[None], y=[None], mode='lines', line=dict(color=COLOR_PALETTE['release'], dash=DASH_STYLES['release'], width=2), name=f"Release (index: {release_idx})")
     dummy_velocity = go.Scatter(x=[None], y=[None], mode='lines', line=dict(color=COLOR_PALETTE['velocity'], width=2), name="Velocity (ft/s)")
 
-    # Three subplots: Acceleration (top), Side Curvature (bottom left), Rear Curvature (bottom right)
+    # Create subplots
     fig = make_subplots(
         rows=2, cols=2,
         subplot_titles=("Normalized Ball Acceleration", "Side View Curvature (XZ)", "Rear View Curvature (YZ)"),
-        specs=[[{"colspan": 2}, None], [{"secondary_y": True}, {"secondary_y": True}]],
+        specs=[[{"colspan": 2, "secondary_y": True}, None],  # Row 1: Acceleration with secondary Y-axis
+               [{"secondary_y": True}, {"secondary_y": True}]],  # Row 2: Side and Rear with secondary Y-axes
         horizontal_spacing=0.15,
         vertical_spacing=0.2
     )
@@ -1598,7 +1599,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
 
     # Update layout
     fig.update_layout(
-        height=700,  # Increased height for three subplots
+        height=700,
         width=800,
         title_text="Ball Curvature and Acceleration Analysis",
         title_x=0.4,
