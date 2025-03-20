@@ -1342,6 +1342,15 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     t_fine = np.linspace(0, 1, num_interp)
     t_percent = np.linspace(-25, 125, num_interp)  # -25% to 125% relative to lift-to-release
 
+    # Adjust phase positions: Lift at 0%, Release at 100%
+    lift_position = 0  # Lift at 0%
+    release_position = 100  # Release at 100%
+    set_position = ((set_idx - lift_idx) / lift_to_release_frames * 100) if lift_to_release_frames > 0 else 50  # Set relative to lift-to-release
+    pre_lift_fraction = extra_frames / total_frames * 150  # Convert pre-lift frames to percentage of total range
+    lift_t = -25 + pre_lift_fraction  # Adjust lift position to 0%
+    set_t = lift_t + set_position  # Scale set position
+    release_t = lift_t + release_position  # Release at 100%
+
     # Velocity
     velocity_segment = df_ball['velocity_magnitude'].iloc[start_idx:end_idx].to_numpy() * INCHES_TO_FEET
     if len(velocity_segment) > 31:
@@ -1365,9 +1374,9 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     side_curve = bezier_curvature(P_side, t_fine, scale=curvature_scale / 12)
     
     # Remove outliers: Cap at 3x median curvature (excluding first 1%)
-    median_curvature = np.median(side_curve[int(num_interp * 0.01):])  # Exclude first 1%
-    cap_value = min(3 * median_curvature, 0.5)  # Cap at 3x median or 0.5 1/ft
-    side_curve = np.clip(side_curve, 0, cap_value)  # Apply cap before smoothing
+    median_curvature = np.median(side_curve[int(num_interp * 0.01):])
+    cap_value = min(3 * median_curvature, 0.5)
+    side_curve = np.clip(side_curve, 0, cap_value)
     if len(side_curve) > 3:
         window_length = min(11, len(side_curve) - 1)
         if window_length % 2 == 0:
@@ -1387,9 +1396,9 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     rear_curve = bezier_curvature(P_rear, t_fine, scale=curvature_scale / 12)
     
     # Remove outliers: Cap at 3x median curvature (excluding first 1%)
-    median_curvature = np.median(rear_curve[int(num_interp * 0.01):])  # Exclude first 1%
-    cap_value = min(3 * median_curvature, 0.5)  # Cap at 3x median or 0.5 1/ft
-    rear_curve = np.clip(rear_curve, 0, cap_value)  # Apply cap before smoothing
+    median_curvature = np.median(rear_curve[int(num_interp * 0.01):])
+    cap_value = min(3 * median_curvature, 0.5)
+    rear_curve = np.clip(rear_curve, 0, cap_value)
     if len(rear_curve) > 3:
         window_length = min(11, len(rear_curve) - 1)
         if window_length % 2 == 0:
@@ -1437,7 +1446,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         go.Scatter(x=t_percent, y=velocity_interp, mode='lines', name='Velocity (ft/s)', line=dict(color=COLOR_PALETTE['velocity'], width=2), showlegend=False),
         row=1, col=1, secondary_y=True
     )
-    for phase, phase_t in zip(['lift', 'set', 'release'], [-25, ((set_idx - lift_idx) / lift_to_release_frames * 100) if lift_to_release_frames > 0 else 50, 100]):
+    for phase, phase_t in zip(['lift', 'set', 'release'], [lift_t, set_t, release_t]):
         fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]), row=1, col=1)
 
     # Rear View
@@ -1453,11 +1462,11 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         go.Scatter(x=t_percent, y=velocity_interp, mode='lines', name='Velocity (ft/s)', line=dict(color=COLOR_PALETTE['velocity'], width=2), showlegend=False),
         row=1, col=2, secondary_y=True
     )
-    for phase, phase_t in zip(['lift', 'set', 'release'], [-25, ((set_idx - lift_idx) / lift_to_release_frames * 100) if lift_to_release_frames > 0 else 50, 100]):
+    for phase, phase_t in zip(['lift', 'set', 'release'], [lift_t, set_t, release_t]):
         fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]), row=1, col=2)
 
     # Adjust Y-axis scales
-    max_weighted = max(np.max(weighted_side), np.max(weighted_rear), 0.1)  # Ensure minimum scale
+    max_weighted = max(np.max(weighted_side), np.max(weighted_rear), 0.1)
     max_curvature = max(np.max(side_curve), np.max(rear_curve), 0.1)
     fig.update_yaxes(
         title_text="Curvature (1/ft)", row=1, col=1, secondary_y=False, range=[0, max_curvature * 1.2]
