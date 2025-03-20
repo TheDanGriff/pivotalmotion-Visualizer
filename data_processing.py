@@ -1376,29 +1376,36 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     from scipy.signal import savgol_filter
     from plotly.subplots import make_subplots
 
-    # Extract indices from metrics
     lift_idx = int(metrics.get('lift_idx', 0))
     set_idx = int(metrics.get('set_idx', lift_idx + 1))
     release_idx = int(metrics.get('release_idx', set_idx + 1))
 
-    # Core range: lift to release
     lift_to_release_frames = release_idx - lift_idx
     if lift_to_release_frames <= 0:
         raise ValueError("Invalid indices: release_idx must be greater than lift_idx.")
 
-    # Extend range: 25% before lift and 25% after release
     extra_frames = int(lift_to_release_frames * 0.25)
     max_idx = len(df_ball) - 1
     start_idx = max(0, lift_idx - extra_frames)
     end_idx = min(max_idx, release_idx + extra_frames)
     total_frames_extended = end_idx - start_idx
 
-    # Time parameters
     lift_t = (lift_idx - start_idx) / total_frames_extended
     set_t = (set_idx - lift_idx) / lift_to_release_frames
     release_t = (release_idx - start_idx) / total_frames_extended
     t_fine = np.linspace(0, 1, num_interp)
-    t_percent = ((t_fine - lift_t) / (release_t - lift_t)) * 100  # Normalize lift-to-release as 0-100%
+    t_percent = ((t_fine - lift_t) / (release_t - lift_t)) * 100
+
+    # Normalized Acceleration with heavy smoothing
+    t_raw, norm_acc, acc_raw = compute_normalized_acceleration_from_raw(df_ball, start_idx, end_idx, fps)
+    if len(norm_acc) > 31:  # Increased window length
+        window_length = min(31, len(norm_acc) - 1)
+        if window_length % 2 == 0:
+            window_length += 1
+        norm_acc = savgol_filter(norm_acc, window_length=window_length, polyorder=2)
+    norm_acc_interp = np.interp(t_fine, t_raw, norm_acc)
+    w = (weighting_exponent + 1) * (t_fine ** weighting_exponent)
+    weighted_acc = np.abs(norm_acc_interp) * w
 
     # Velocity
     velocity_segment = df_ball['velocity_magnitude'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
@@ -1407,7 +1414,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         if window_length % 2 == 0:
             window_length += 1
         velocity_segment = savgol_filter(velocity_segment, window_length=window_length, polyorder=2)
-    velocity_interp = np.interp(t_fine, np.linspace(0, 1, len(velocity_segment)), velocity_segment)
+    velocity_interp = np.interp(t_fine, t_raw, velocity_segment)
 
     # Side View Curvature (XZ plane)
     seg_x = df_ball['Basketball_X'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
@@ -1425,7 +1432,6 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         if window_length % 2 == 0:
             window_length += 1
         side_curve = savgol_filter(side_curve, window_length=window_length, polyorder=2)
-    w = (weighting_exponent + 1) * (t_fine ** weighting_exponent)
     weighted_side = np.abs(side_curve) * w
 
     # Rear View Curvature (YZ plane)
@@ -1449,8 +1455,10 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         'lift': 'rgba(147, 112, 219, 1)',
         'set': 'rgba(255, 182, 193, 1)',
         'release': 'rgba(255, 102, 102, 1)',
+        'acceleration': 'rgba(0, 0, 0, 1)',
         'curvature': 'rgba(0, 0, 0, 1)',
         'velocity': 'rgba(107, 174, 214, 1)',
+        'weighted_acc': 'rgba(255, 102, 102, 0.3)',
         'weighted_side': 'rgba(31, 119, 180, 0.3)',
         'weighted_rear': 'rgba(31, 119, 180, 0.3)'
     }
@@ -1517,7 +1525,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     # Update layout
     fig.update_layout(
         height=500,
-        width=1000,  # Adjusted for two subplots
+        width=1000,
         title_text="Ball Curvature Analysis",
         title_x=0.5,
         title_font=dict(size=20),
@@ -1528,13 +1536,14 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         showlegend=True
     )
 
-    # Add dummy traces to legend
     fig.add_trace(dummy_lift)
     fig.add_trace(dummy_set)
     fig.add_trace(dummy_release)
     fig.add_trace(dummy_velocity)
 
     return fig
+
+
 def calculate_lateral_deviation(df, release_index, hoop_x=501.0, hoop_y=0.0):
     """
     Calculate lateral deviation of the ball from the intended shot line to the hoop, in feet.
