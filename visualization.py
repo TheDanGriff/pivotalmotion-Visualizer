@@ -212,12 +212,6 @@ def plot_distance_over_height(df_ball):
 
 
 def plot_shot_analysis(df_ball, metrics):
-    """
-    Create interactive basketball shot analysis visualization with two 2D trajectory plots:
-    - Side View: Basketball_X_ft vs Basketball_Z_ft, 4 ft span (±2 ft from release), 2-11 ft height.
-    - Rear View: Basketball_Y_ft vs Basketball_Z_ft, 4 ft span (-2 to 2 ft), 2-11 ft height.
-    Both show last 32 frames prior to release, with markers and projected path, 1:1 grid boxes.
-    """
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
     import numpy as np
@@ -228,7 +222,6 @@ def plot_shot_analysis(df_ball, metrics):
     logger = logging.getLogger(__name__)
     INCHES_TO_FEET = 1 / 12
 
-    # Helper function to smooth and clip a slice of data
     def get_slice(df, column, start, end, clip_min=None, clip_max=None):
         if column in df.columns and len(df) > 0:
             seg = df[column].iloc[start:end].to_numpy()
@@ -242,52 +235,34 @@ def plot_shot_analysis(df_ball, metrics):
             return seg
         return np.array([])
 
-    # Clamp index helper
     def clamp_index(idx, max_idx):
         return max(0, min(int(idx), max_idx))
 
     max_idx = len(df_ball) - 1
     release_idx = clamp_index(metrics.get('release_idx', 0), max_idx)
-    start_idx = max(0, release_idx - 32)  # Last 32 frames prior to release
-    lift_idx = start_idx  # Force lift to first frame
+    start_idx = max(0, release_idx - 32)
+    lift_idx = clamp_index(metrics.get('lift_idx', start_idx), max_idx)
     set_idx = clamp_index(metrics.get('set_idx', release_idx), max_idx)
-
-    # Debug to verify data
-    logger.debug(f"Indices: Release={release_idx}, Set={set_idx}, Lift={lift_idx}, Start={start_idx}, Max={max_idx}")
-    logger.debug(f"Sample Basketball_X_ft: {df_ball['Basketball_X_ft'].iloc[start_idx:start_idx+5].tolist()}")
 
     # --- SIDE VIEW ---
     traj_x = get_slice(df_ball, 'Basketball_X_ft', start_idx, release_idx + 1)
     traj_z = get_slice(df_ball, 'Basketball_Z_ft', start_idx, release_idx + 1, clip_min=2, clip_max=11)
-    traj_v = get_slice(df_ball, 'velocity_magnitude', start_idx, release_idx + 1)  # Already in ft/s
+    traj_v = get_slice(df_ball, 'velocity_magnitude', start_idx, release_idx + 1)
     release_x = df_ball.at[release_idx, 'Basketball_X_ft']
-
-    # Ensure X-axis is positive
-    if release_x < 0:
-        logger.warning(f"Release_x is negative ({release_x}), flipping to positive")
-        traj_x = -traj_x
-        release_x = abs(release_x)
-
-    # Define 4 ft range centered around release_x
-    side_range = [release_x - 2, release_x + 2]  # ±2 ft from release
+    side_range = [release_x - 2, release_x + 2]
     if len(traj_x) > 0 and len(traj_z) > 0 and len(traj_v) > 0:
-        # Ensure all arrays are the same length
         min_len = min(len(traj_x), len(traj_z), len(traj_v))
         traj_x = traj_x[:min_len]
         traj_z = traj_z[:min_len]
         traj_v = traj_v[:min_len]
-        # Clip to range
         mask = (traj_x >= side_range[0]) & (traj_x <= side_range[1]) & (traj_z >= 2) & (traj_z <= 11)
         traj_x = traj_x[mask]
         traj_z = traj_z[mask]
         traj_v = traj_v[mask]
 
-    # Projected trajectory
     post_release_end = min(max_idx, release_idx + 20)
     proj_x = get_slice(df_ball, 'Basketball_X_ft', release_idx, post_release_end + 1)
     proj_z = get_slice(df_ball, 'Basketball_Z_ft', release_idx, post_release_end + 1, clip_min=2, clip_max=11)
-    if release_x < 0:
-        proj_x = -proj_x
     if len(proj_x) > 0 and len(proj_z) > 0:
         min_len = min(len(proj_x), len(proj_z))
         proj_x = proj_x[:min_len]
@@ -296,15 +271,15 @@ def plot_shot_analysis(df_ball, metrics):
         proj_x = proj_x[proj_mask]
         proj_z = proj_z[proj_mask]
 
-    tickvals_x = np.linspace(side_range[0], side_range[1], 5)  # 4 ft, 1 ft per tick
+    tickvals_x = np.linspace(side_range[0], side_range[1], 5)
     ticktext_x = [f"{val:.1f}" for val in tickvals_x]
-    tickvals_y = np.arange(2, 12, 1)  # 2 to 11 ft, 1 ft per tick
+    tickvals_y = np.arange(2, 12, 1)
 
     # --- REAR VIEW ---
     traj_y = get_slice(df_ball, 'Basketball_Y_ft', start_idx, release_idx + 1)
-    traj_z_rear = traj_z  # Reuse traj_z if lengths match
+    traj_z_rear = traj_z
     traj_v_rear = traj_v
-    rear_range = [-2, 2]  # Fixed 4 ft span
+    rear_range = [-2, 2]
     if len(traj_y) > 0 and len(traj_z_rear) > 0 and len(traj_v_rear) > 0:
         min_len = min(len(traj_y), len(traj_z_rear), len(traj_v_rear))
         traj_y = traj_y[:min_len]
@@ -366,8 +341,6 @@ def plot_shot_analysis(df_ball, metrics):
             idx = info['idx']
             if start_idx <= idx <= release_idx:
                 marker_x = df_ball.at[idx, 'Basketball_X_ft']
-                if marker_x < 0:
-                    marker_x = -marker_x
                 marker_z = df_ball.at[idx, 'Basketball_Z_ft']
                 if side_range[0] <= marker_x <= side_range[1] and 2 <= marker_z <= 11:
                     fig.add_trace(
