@@ -1478,7 +1478,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         height=500,
         width=1000,
         title_text="Ball Curvature Analysis",
-        title_x=0.3,
+        title_x=0.38,
         title_font=dict(size=20),
         margin=dict(t=100, b=100, l=40, r=40),
         legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=12)),
