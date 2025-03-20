@@ -1336,7 +1336,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     total_frames = end_idx - start_idx
 
     if total_frames <= 0:
-        raise ValueError("Invalid indices: end_idx must be a greater than start_idx.")
+        raise ValueError("Invalid indices: end_idx must be greater than start_idx.")
 
     # Time parameterization
     t_fine = np.linspace(0, 1, num_interp)
@@ -1363,10 +1363,14 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         seg_z = savgol_filter(seg_z, window_length=window_length, polyorder=2)
     P_side, _ = fit_bezier_curve(seg_x, seg_z, n=bezier_order)
     side_curve = bezier_curvature(P_side, t_fine, scale=curvature_scale / 12)
-    side_curve_clipped = np.clip(side_curve, 0, 5)
-    side_outliers = np.where(side_curve > 5, side_curve, np.nan)
-    if len(side_curve) > 3:
-        window_length = min(11, len(side_curve) - 1)
+    
+    # Remove outliers: Cap at 3x the median curvature (excluding first 1% if spike)
+    median_curvature = np.median(side_curve[int(num_interp * 0.01):])  # Exclude first 1%
+    cap_value = min(3 * median_curvature, 5)  # Cap at 3x median or 5 1/ft
+    side_outliers = np.where(side_curve > cap_value, side_curve, np.nan)
+    side_curve_clipped = np.clip(side_curve, 0, cap_value)
+    if len(side_curve_clipped) > 3:
+        window_length = min(11, len(side_curve_clipped) - 1)
         if window_length % 2 == 0:
             window_length += 1
         side_curve_clipped = savgol_filter(side_curve_clipped, window_length=window_length, polyorder=2)
@@ -1382,10 +1386,14 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         seg_y = savgol_filter(seg_y, window_length=window_length, polyorder=2)
     P_rear, _ = fit_bezier_curve(seg_y, seg_z, n=bezier_order)
     rear_curve = bezier_curvature(P_rear, t_fine, scale=curvature_scale / 12)
-    rear_curve_clipped = np.clip(rear_curve, 0, 5)
-    rear_outliers = np.where(rear_curve > 5, rear_curve, np.nan)
-    if len(rear_curve) > 3:
-        window_length = min(11, len(rear_curve) - 1)
+    
+    # Remove outliers: Cap at 3x the median curvature (excluding first 1% if spike)
+    median_curvature = np.median(rear_curve[int(num_interp * 0.01):])  # Exclude first 1%
+    cap_value = min(3 * median_curvature, 5)  # Cap at 3x median or 5 1/ft
+    rear_outliers = np.where(rear_curve > cap_value, rear_curve, np.nan)
+    rear_curve_clipped = np.clip(rear_curve, 0, cap_value)
+    if len(rear_curve_clipped) > 3:
+        window_length = min(11, len(rear_curve_clipped) - 1)
         if window_length % 2 == 0:
             window_length += 1
         rear_curve_clipped = savgol_filter(rear_curve_clipped, window_length=window_length, polyorder=2)
@@ -1429,7 +1437,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         row=1, col=1, secondary_y=False
     )
     fig.add_trace(
-        go.Scatter(x=t_percent, y=side_outliers, mode='markers', name='Side Outliers (>5 1/ft)', marker=dict(color=COLOR_PALETTE['outlier'], size=6)),
+        go.Scatter(x=t_percent, y=side_outliers, mode='markers', name='Side Outliers', marker=dict(color=COLOR_PALETTE['outlier'], size=6)),
         row=1, col=1, secondary_y=False
     )
     fig.add_trace(
@@ -1449,7 +1457,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         row=1, col=2, secondary_y=False
     )
     fig.add_trace(
-        go.Scatter(x=t_percent, y=rear_outliers, mode='markers', name='Rear Outliers (>5 1/ft)', marker=dict(color=COLOR_PALETTE['outlier'], size=6)),
+        go.Scatter(x=t_percent, y=rear_outliers, mode='markers', name='Rear Outliers', marker=dict(color=COLOR_PALETTE['outlier'], size=6)),
         row=1, col=2, secondary_y=False
     )
     fig.add_trace(
