@@ -947,20 +947,20 @@ def bernstein_poly(k, n, tau):
 def evaluate_bezier(P, tau, derivative=0):
     """Evaluate Bezier curve or its derivatives at tau."""
     n = len(P) - 1
-    if derivative == 0:
+    if derivative == 0:  # Curve itself
         return sum(P[k] * bernstein_poly(k, n, tau) for k in range(n + 1))
-    elif derivative == 1 and n >= 1:
+    elif derivative == 1 and n >= 1:  # First derivative
         return n * sum((P[k + 1] - P[k]) * bernstein_poly(k, n - 1, tau) for k in range(n))
-    elif derivative == 2 and n >= 2:
+    elif derivative == 2 and n >= 2:  # Second derivative
         return n * (n - 1) * sum((P[k + 2] - 2 * P[k + 1] + P[k]) * bernstein_poly(k, n - 2, tau) for k in range(n - 1))
     else:
-        return np.zeros(2)
+        return np.zeros(2)  # Return zero vector for invalid cases
 
 def compute_curvature(P, tau):
     """Compute curvature at tau for a 2D Bezier curve."""
     try:
-        B1 = evaluate_bezier(P, tau, 1)  # First derivative
-        B2 = evaluate_bezier(P, tau, 2)  # Second derivative
+        B1 = evaluate_bezier(P, tau, derivative=1)  # First derivative
+        B2 = evaluate_bezier(P, tau, derivative=2)  # Second derivative
         x1, z1 = B1
         x2, z2 = B2
         denom = (x1**2 + z1**2)**1.5
@@ -1024,7 +1024,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         pose_df = calculate_foot_angles(pose_df)
         pose_df = calculate_rotation_angles(pose_df)
 
-        # 4. Compute velocities in inches/second
+        # 4. Compute velocities in inches/second (Fix deprecation warning)
         basketball_x = ball_df['Basketball_X']
         basketball_y = ball_df['Basketball_Y']
         basketball_z = ball_df['Basketball_Z']
@@ -1038,12 +1038,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             ball_df['velocity_z']**2
         )
         ball_df['velocity_magnitude'] = ball_df['velocity_magnitude'].replace(0, np.nan)
-        ball_df['velocity_magnitude'] = (
-            ball_df['velocity_magnitude']
-            .interpolate(method='linear')
-            .fillna(method='bfill')
-            .fillna(method='ffill')
-        )
+        ball_df['velocity_magnitude'] = ball_df['velocity_magnitude'].interpolate(method='linear').bfill().ffill()
 
         # 5. Identify key shot indices
         metrics['apex_idx'] = basketball_z.idxmax()
@@ -1191,7 +1186,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         pose_df = calculate_stability(pose_df)
         pose_df = calculate_guide_hand_release(pose_df)
 
-        # 18. Recompute joint angles
+        # 18. Recompute joint angles (Fix fragmented DataFrame warning)
         def calculate_angle(df, a_x, a_y, a_z, b_x, b_y, b_z, c_x, c_y, c_z):
             ab = np.sqrt((df[a_x] - df[b_x])**2 + (df[a_y] - df[b_y])**2 + (df[a_z] - df[b_z])**2)
             bc = np.sqrt((df[c_x] - df[b_x])**2 + (df[c_y] - df[b_y])**2 + (df[c_z] - df[b_z])**2)
@@ -1200,36 +1195,40 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             cos_angle = np.clip(cos_angle, -1, 1)
             return np.degrees(np.arccos(cos_angle))
 
-        pose_df['elbow_angle'] = calculate_angle(
-            pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
-            'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
-            'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z'
-        )
-        pose_df['shoulder_angle'] = calculate_angle(
-            pose_df, 'MIDHIP_X', 'MIDHIP_Y', 'MIDHIP_Z',
-            'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
-            'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z'
-        )
-        pose_df['wrist_angle'] = calculate_angle(
-            pose_df, 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
-            'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z',
-            'RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z'
-        )
-        pose_df['hip_angle'] = calculate_angle(
-            pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
-            'RHIP_X', 'RHIP_Y', 'RHIP_Z',
-            'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z'
-        )
-        pose_df['knee_angle'] = calculate_angle(
-            pose_df, 'RHIP_X', 'RHIP_Y', 'RHIP_Z',
-            'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
-            'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z'
-        )
-        pose_df['ankle_angle'] = calculate_angle(
-            pose_df, 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
-            'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z',
-            'RBIGTOE_X', 'RBIGTOE_Y', 'RBIGTOE_Z'
-        )
+        # Compute all angles at once and concatenate
+        angles = {
+            'elbow_angle': calculate_angle(
+                pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
+                'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
+                'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z'
+            ),
+            'shoulder_angle': calculate_angle(
+                pose_df, 'MIDHIP_X', 'MIDHIP_Y', 'MIDHIP_Z',
+                'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
+                'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z'
+            ),
+            'wrist_angle': calculate_angle(
+                pose_df, 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
+                'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z',
+                'RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z'
+            ),
+            'hip_angle': calculate_angle(
+                pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
+                'RHIP_X', 'RHIP_Y', 'RHIP_Z',
+                'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z'
+            ),
+            'knee_angle': calculate_angle(
+                pose_df, 'RHIP_X', 'RHIP_Y', 'RHIP_Z',
+                'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
+                'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z'
+            ),
+            'ankle_angle': calculate_angle(
+                pose_df, 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
+                'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z',
+                'RBIGTOE_X', 'RBIGTOE_Y', 'RBIGTOE_Z'
+            )
+        }
+        pose_df = pd.concat([pose_df, pd.DataFrame(angles, index=pose_df.index)], axis=1)
 
     except Exception as e:
         logger.error(f"Error calculating shot metrics: {str(e)}")
