@@ -901,6 +901,89 @@ def save_adjusted_data(df, user_email, job_id, segment_id, file_format='csv'):
     except Exception as e:
         logger.error(f"Error saving adjusted data: {e}")
         return None
+#---------------------------------#
+
+import numpy as np
+import pandas as pd
+from scipy.special import comb
+from scipy.integrate import trapz
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Bezier and Curvature Helper Functions
+def compute_tau(points):
+    """Compute parameter tau using chordal parameterization."""
+    diffs = np.diff(points, axis=0)
+    distances = np.linalg.norm(diffs, axis=1)
+    cumulative = np.cumsum(distances)
+    total = cumulative[-1] if cumulative[-1] != 0 else 1e-10  # Avoid division by zero
+    tau = np.r_[0, cumulative / total]
+    return tau
+
+def bezier_design_matrix(tau, n):
+    """Create design matrix A for Bezier curve fitting."""
+    m = len(tau)
+    A = np.zeros((m, n + 1))
+    for k in range(n + 1):
+        A[:, k] = comb(n, k) * (1 - tau)**(n - k) * tau**k
+    return A
+
+def fit_bezier(points, n=10):
+    """Fit an nth-order Bezier curve to points."""
+    try:
+        tau = compute_tau(points)
+        A = bezier_design_matrix(tau, n)
+        P = np.linalg.lstsq(A, points, rcond=None)[0]
+        return P
+    except Exception as e:
+        logger.error(f"Error fitting Bezier curve: {str(e)}")
+        return None
+
+def bernstein_poly(k, n, tau):
+    """Compute Bernstein polynomial."""
+    return comb(n, k) * (1 - tau)**(n - k) * tau**k
+
+def evaluate_bezier(P, tau, derivative=0):
+    """Evaluate Bezier curve or its derivatives at tau."""
+    n = len(P) - 1
+    if derivative == 0:
+        return sum(P[k] * bernstein_poly(k, n, tau) for k in range(n + 1))
+    elif derivative == 1 and n >= 1:
+        return n * sum((P[k + 1] - P[k]) * bernstein_poly(k, n - 1, tau) for k in range(n))
+    elif derivative == 2 and n >= 2:
+        return n * (n - 1) * sum((P[k + 2] - 2 * P[k + 1] + P[k]) * bernstein_poly(k, n - 2, tau) for k in range(n - 1))
+    else:
+        return np.zeros(2)
+
+def compute_curvature(P, tau):
+    """Compute curvature at tau for a 2D Bezier curve."""
+    try:
+        B1 = evaluate_bezier(P, tau, 1)  # First derivative
+        B2 = evaluate_bezier(P, tau, 2)  # Second derivative
+        x1, z1 = B1
+        x2, z2 = B2
+        denom = (x1**2 + z1**2)**1.5
+        if denom == 0:
+            return 0
+        return abs(x1 * z2 - z1 * x2) / denom
+    except Exception as e:
+        logger.error(f"Error computing curvature: {str(e)}")
+        return 0
+
+def compute_terminal_curvature(P, tau_max, N=50):
+    """Compute terminal curvature σ with cubic weighting."""
+    try:
+        z = np.linspace(0, 1, N)
+        tau_z = tau_max + z * (1 - tau_max)
+        kappa_z = np.array([compute_curvature(P, tau) for tau in tau_z])
+        w_z = 4 * z**3  # Cubic weighting function
+        sigma = trapz(w_z * kappa_z, z)
+        return sigma
+    except Exception as e:
+        logger.error(f"Error computing terminal curvature: {str(e)}")
+        return 0
+
 def calculate_shot_metrics(pose_df, ball_df, fps=60):
     """
     Calculate basketball shot metrics entirely in FEET.
@@ -964,10 +1047,8 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['release_idx'] = ball_df['velocity_magnitude'].iloc[apex_window_start:metrics['apex_idx']].idxmax()
 
         # Initially compute set and lift indices using raw data.
-        # -- Set point: work backwards over ~40-50 frames (using raw X) to find the frame where the X position is minimal.
         release_window_start = max(0, metrics['release_idx'] - 40)
         metrics['set_idx'] = ball_df.iloc[release_window_start:metrics['release_idx']]['Basketball_X'].idxmin()
-        # -- Lift point (preliminary): work backwards over ~25 frames from the set point using raw data.
         set_window_start = max(0, metrics['set_idx'] - 25)
         metrics['lift_idx'] = ball_df.iloc[set_window_start:metrics['set_idx']]['Basketball_X'].idxmax()
         metrics['rim_impact_idx'] = (basketball_z <= 120).idxmax()  # 10 ft = 120 inches
@@ -980,12 +1061,11 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['hoop_x'] = hoop_x
         metrics['hoop_y'] = hoop_y
 
-        # 6. Remap shot coordinates: convert ball coordinates to feet and rotate about the hoop so that the release point’s Y becomes 0.
+        # 6. Remap shot coordinates: convert ball coordinates to feet and rotate about the hoop.
         ball_df, pose_df, theta_used = remap_shot_coordinates(ball_df, pose_df, hoop_x, hoop_y, metrics['release_idx'], INCHES_TO_FEET)
-        # Update release point from remapped data.
         release_point = ball_df.loc[metrics['release_idx']]
         hoop_x_ft = hoop_x * INCHES_TO_FEET
-        hoop_y_ft = hoop_y * INCHES_TO_FEET  # should be 0
+        hoop_y_ft = hoop_y * INCHES_TO_FEET
         dx = hoop_x_ft - release_point['Basketball_X_ft']
         dy = hoop_y_ft - release_point['Basketball_Y_ft']
         original_shot_distance = np.sqrt(dx**2 + dy**2)
@@ -999,32 +1079,22 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['original_shot_distance'] = original_shot_distance
         metrics['flip'] = flip
 
-        # 7. Recalculate set and lift points using remapped X coordinates ("Basketball_X_ft").
-        # -- For the set point: we want the frame with the maximum horizontal (X) position within 30 frames before release.
+        # 7. Recalculate set and lift points using remapped X coordinates.
         candidate_set_window = ball_df.iloc[max(0, metrics['release_idx'] - 30):metrics['release_idx']]
         if not candidate_set_window.empty:
             metrics['set_idx'] = candidate_set_window['Basketball_X_ft'].idxmax()
         else:
             metrics['set_idx'] = metrics['release_idx']
-        
-        # -- For the lift point: work backwards from the set point over 30 frames.
-        # Instead of simply taking idxmax, now compute the frame where the horizontal movement rate (dx)
-        # stops decreasing (i.e. becomes near zero or changes sign) and vertical movement (dz) becomes positive.
+
         candidate_lift_window = ball_df.iloc[max(0, metrics['set_idx'] - 30):metrics['set_idx']].copy()
-        # Compute horizontal difference (dx) and vertical difference (dz) in feet.
         candidate_lift_window['dx'] = candidate_lift_window['Basketball_X_ft'].diff()
         candidate_lift_window['dz'] = candidate_lift_window['Basketball_Z'].diff() * INCHES_TO_FEET
         lift_idx_candidate = None
-        # Loop through candidate frames (starting from the beginning of this window)
         for i in range(1, len(candidate_lift_window)-1):
-            # If the previous horizontal change is strongly negative (e.g. less than -0.15)
-            # and the current horizontal change is near zero (>= -0.15) and the vertical difference is positive,
-            # then mark this frame as the lift point.
             if candidate_lift_window['dx'].iloc[i-1] < -0.15 and candidate_lift_window['dx'].iloc[i] >= -0.15 and candidate_lift_window['dz'].iloc[i] > 0:
                 lift_idx_candidate = candidate_lift_window.index[i]
                 break
         if lift_idx_candidate is None:
-            # Fallback: choose the frame where the horizontal change (dx) is maximum (i.e. least negative).
             lift_idx_candidate = candidate_lift_window['dx'].idxmax()
         metrics['lift_idx'] = lift_idx_candidate
 
@@ -1053,10 +1123,22 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             release_velocity = np.sqrt(rvx**2 + rvy**2 + rvz**2) * INCHES_TO_FEET
             metrics['release_velocity'] = 0.0 if pd.isna(release_velocity) or release_velocity < 0 else release_velocity
 
-        # 11. Curvature computations.
-        metrics['curvature_side'] = savgol_filter(np.gradient(np.gradient(basketball_x)), 11, 3) * 12
-        metrics['curvature_lateral'] = savgol_filter(np.gradient(np.gradient(basketball_y)), 11, 3) * 12
-        metrics['release_curvature'] = metrics['curvature_side'][metrics['release_idx']] * 12
+        # 11. Compute Release Curvature using Bezier curves
+        ball_df['Basketball_Z_ft'] = ball_df['Basketball_Z'] * INCHES_TO_FEET
+        points = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_X_ft', 'Basketball_Z_ft']].dropna().values
+        if len(points) > 11:  # Ensure enough points for 10th-order fit
+            P = fit_bezier(points, n=10)
+            if P is not None:
+                tau_grid = np.linspace(0, 1, 100)
+                kappa_grid = np.array([compute_curvature(P, tau) for tau in tau_grid])
+                tau_max = tau_grid[np.argmax(kappa_grid)]
+                sigma = compute_terminal_curvature(P, tau_max)
+                metrics['release_curvature'] = sigma
+            else:
+                metrics['release_curvature'] = 0.0
+        else:
+            logger.warning(f"Insufficient points ({len(points)}) for Bezier fit between lift_idx {metrics['lift_idx']} and release_idx {metrics['release_idx']}")
+            metrics['release_curvature'] = 0.0
 
         # 12. Classify release angle.
         metrics['release_class'] = classify_release_angle(
@@ -1086,7 +1168,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         pose_df = calculate_stability(pose_df)
         pose_df = calculate_guide_hand_release(pose_df)
 
-        # Recompute a few joint angles for consistency.
+        # Recompute joint angles for consistency.
         def calculate_angle(df, a_x, a_y, a_z, b_x, b_y, b_z, c_x, c_y, c_z):
             ab = np.sqrt((df[a_x] - df[b_x])**2 + (df[a_y] - df[b_y])**2 + (df[a_z] - df[b_z])**2)
             bc = np.sqrt((df[c_x] - df[b_x])**2 + (df[c_y] - df[b_y])**2 + (df[c_z] - df[b_z])**2)
@@ -1131,11 +1213,6 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['release_velocity'] = 0.0  # Fallback
 
     return metrics, pose_df, ball_df
-
-
-
-
-
 
 
 
