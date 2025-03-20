@@ -242,7 +242,14 @@ def plot_shot_analysis(df_ball, metrics):
     release_idx = clamp_index(metrics.get('release_idx', 0), max_idx)
     start_idx = max(0, release_idx - 32)
     lift_idx = clamp_index(metrics.get('lift_idx', start_idx), max_idx)
-    set_idx = clamp_index(metrics.get('set_idx', release_idx), max_idx)
+    
+    # Redefine set_idx as minimum X position within visualized range
+    candidate_set_window = df_ball.iloc[lift_idx:release_idx + 1]
+    if not candidate_set_window.empty:
+        set_idx = candidate_set_window['Basketball_X_ft'].idxmin()  # Minimum horizontal position
+    else:
+        set_idx = release_idx  # Fallback to release_idx if empty
+    logger.debug(f"Set_idx redefined as minimum X position: {set_idx}")
 
     # --- SIDE VIEW ---
     traj_x = get_slice(df_ball, 'Basketball_X_ft', lift_idx, release_idx + 1)
@@ -250,10 +257,10 @@ def plot_shot_analysis(df_ball, metrics):
     traj_v = get_slice(df_ball, 'velocity_magnitude', lift_idx, release_idx + 1)
     release_x = df_ball.at[release_idx, 'Basketball_X_ft']
 
-    # Force positive X-axis by flipping if negative
+    # Ensure positive X-axis
     if np.any(traj_x < 0):
         logger.debug(f"Negative X values detected in traj_x (e.g., {traj_x[:5]}), flipping to positive")
-        traj_x = -traj_x  # Flip to positive
+        traj_x = -traj_x
         release_x = -release_x if release_x < 0 else release_x
 
     side_range = [release_x - 2, release_x + 2]
