@@ -1400,17 +1400,6 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     t_fine = np.linspace(0, 1, num_interp)
     t_percent = ((t_fine - lift_t) / (release_t - lift_t)) * 100  # Normalize lift-to-release as 0-100%
 
-    # Normalized Acceleration
-    t_raw, norm_acc, acc_raw = compute_normalized_acceleration_from_raw(df_ball, start_idx, end_idx, fps)
-    if len(norm_acc) > 3:
-        window_length = min(11, len(norm_acc) - 1)
-        if window_length % 2 == 0:
-            window_length += 1
-        norm_acc = savgol_filter(norm_acc, window_length=window_length, polyorder=2)
-    norm_acc_interp = np.interp(t_fine, t_raw, norm_acc)
-    w = (weighting_exponent + 1) * (t_fine ** weighting_exponent)
-    weighted_acc = np.abs(norm_acc_interp) * w
-
     # Velocity
     velocity_segment = df_ball['velocity_magnitude'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
     if len(velocity_segment) > 3:
@@ -1418,7 +1407,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         if window_length % 2 == 0:
             window_length += 1
         velocity_segment = savgol_filter(velocity_segment, window_length=window_length, polyorder=2)
-    velocity_interp = np.interp(t_fine, t_raw, velocity_segment)
+    velocity_interp = np.interp(t_fine, np.linspace(0, 1, len(velocity_segment)), velocity_segment)
 
     # Side View Curvature (XZ plane)
     seg_x = df_ball['Basketball_X'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
@@ -1436,6 +1425,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         if window_length % 2 == 0:
             window_length += 1
         side_curve = savgol_filter(side_curve, window_length=window_length, polyorder=2)
+    w = (weighting_exponent + 1) * (t_fine ** weighting_exponent)
     weighted_side = np.abs(side_curve) * w
 
     # Rear View Curvature (YZ plane)
@@ -1459,10 +1449,8 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         'lift': 'rgba(147, 112, 219, 1)',
         'set': 'rgba(255, 182, 193, 1)',
         'release': 'rgba(255, 102, 102, 1)',
-        'acceleration': 'rgba(0, 0, 0, 1)',
         'curvature': 'rgba(0, 0, 0, 1)',
         'velocity': 'rgba(107, 174, 214, 1)',
-        'weighted_acc': 'rgba(255, 102, 102, 0.3)',
         'weighted_side': 'rgba(31, 119, 180, 0.3)',
         'weighted_rear': 'rgba(31, 119, 180, 0.3)'
     }
@@ -1478,11 +1466,11 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     dummy_release = go.Scatter(x=[None], y=[None], mode='lines', line=dict(color=COLOR_PALETTE['release'], dash=DASH_STYLES['release'], width=2), name=f"Release (index: {release_idx})")
     dummy_velocity = go.Scatter(x=[None], y=[None], mode='lines', line=dict(color=COLOR_PALETTE['velocity'], width=2), name="Velocity (ft/s)")
 
-    # Create subplots: 1 row, 3 columns
+    # Create subplots: 1 row, 2 columns
     fig = make_subplots(
         rows=1, cols=2,
         subplot_titles=("Side View Curvature (XZ)", "Rear View Curvature (YZ)"),
-        specs=[[ {"secondary_y": True}, {"secondary_y": True}, {"secondary_y": True} ]],
+        specs=[[{"secondary_y": True}, {"secondary_y": True}]],  # Corrected to 2 columns
         horizontal_spacing=0.1
     )
 
@@ -1502,36 +1490,36 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     for phase, phase_t in zip(['lift', 'set', 'release'], [0, set_t * 100, 100]):
         fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]), row=1, col=1)
 
-    # Right: Rear View Curvature (Col 3)
+    # Right: Rear View Curvature (Col 2)
     fig.add_trace(
         go.Scatter(x=t_percent, y=weighted_rear, mode='none', fill='tozeroy', fillcolor=COLOR_PALETTE['weighted_rear'], name='Weighted Area (Rear)'),
-        row=1, col=3
+        row=1, col=2
     )
     fig.add_trace(
         go.Scatter(x=t_percent, y=rear_curve, mode='lines', name='Rear Curvature (1/ft)', line=dict(color=COLOR_PALETTE['curvature'], width=2)),
-        row=1, col=3, secondary_y=False
+        row=1, col=2, secondary_y=False
     )
     fig.add_trace(
         go.Scatter(x=t_percent, y=velocity_interp, mode='lines', name='Velocity (ft/s)', line=dict(color=COLOR_PALETTE['velocity'], width=2), showlegend=False),
-        row=1, col=3, secondary_y=True
+        row=1, col=2, secondary_y=True
     )
     for phase, phase_t in zip(['lift', 'set', 'release'], [0, set_t * 100, 100]):
-        fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]), row=1, col=3)
+        fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]), row=1, col=2)
 
     # Update axes
     fig.update_xaxes(title_text="% of Release", row=1, col=1)
     fig.update_yaxes(title_text="Curvature (1/ft)", row=1, col=1, secondary_y=False)
     fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=1, secondary_y=True)
-    fig.update_xaxes(title_text="% of Release", row=1, col=3)
-    fig.update_yaxes(title_text="Curvature (1/ft)", row=1, col=3, secondary_y=False)
-    fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=3, secondary_y=True)
+    fig.update_xaxes(title_text="% of Release", row=1, col=2)
+    fig.update_yaxes(title_text="Curvature (1/ft)", row=1, col=2, secondary_y=False)
+    fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=2, secondary_y=True)
 
     # Update layout
     fig.update_layout(
         height=500,
-        width=1200,  # Increased width for three subplots side-by-side
-        title_text="Ball Curvature",
-        title_x=0.3,
+        width=1000,  # Adjusted for two subplots
+        title_text="Ball Curvature Analysis",
+        title_x=0.5,
         title_font=dict(size=20),
         margin=dict(t=100, b=100, l=40, r=40),
         legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=12)),

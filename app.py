@@ -246,6 +246,9 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
     # Get player averages or use None if no data exists
     player_averages = get_player_kpi_averages(player_name, shot_type)
 
+    # Log metrics for debugging
+    logger.debug(f"Metrics before KPI rendering: {metrics}")
+
     # Define KPIs with ranges for metallic color
     kpis = {
         'Release Height': {'value': metrics.get('release_height', 0), 'min': 0, 'max': 12},  # feet
@@ -253,7 +256,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         'Release Angle': {'value': metrics.get('release_angle', 0), 'min': 0, 'max': 90},    # degrees
         'Release Velocity': {'value': metrics.get('release_velocity', 0), 'min': 0, 'max': 30},  # feet/s
         'Release Time': {'value': metrics.get('release_time', 0), 'min': 0, 'max': 1},      # seconds
-        'Apex Height': {'value': metrics.get('apex_height', 0), 'min': 0, 'max': 20},       # feet (adjusted max for realism)
+        'Apex Height': {'value': metrics.get('apex_height', 0), 'min': 0, 'max': 20},       # feet
         'Release Curvature (Side)': {'value': metrics.get('release_curvature_side', 0), 'min': 0, 'max': 0.5},  # 1/ft
         'Release Curvature (Rear)': {'value': metrics.get('release_curvature_rear', 0), 'min': 0, 'max': 0.5},  # 1/ft
         'Lateral Deviation': {'value': metrics.get('lateral_deviation', 0), 'min': -0.5, 'max': 0.5}  # feet
