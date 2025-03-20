@@ -214,17 +214,9 @@ def plot_distance_over_height(df_ball):
 def plot_shot_analysis(df_ball, metrics):
     """
     Create interactive basketball shot analysis visualization with two 2D trajectory plots:
-
-    - Side View: Uses the remapped Basketball_X_ft (in feet) versus Basketball_Z (in feet).
-      The x-axis is a 4-ft window centered on release point [-2, 2 relative to release].
-      Tick labels are reversed so that the highest numbers appear on the left.
-      The projected ball path after release is drawn in red (dotted).
-
-    - Rear View: Uses the remapped Basketball_Y_ft (in feet) versus Basketball_Z (in feet).
-      Its horizontal axis is fixed to [-2, 2] ft (with the release point at 0).
-
-    Both plots have a fixed vertical (Z) axis from 2 to 11 ft (9 ft tall) and show the last 32 frames prior to release.
-    Grid boxes are square, 1 ft x 1 ft, with 4 boxes wide and 9 boxes high.
+    - Side View: Uses Basketball_X_ft vs Basketball_Z (ft), with release at 2nd-to-last left grid line.
+    - Rear View: Uses Basketball_Y_ft vs Basketball_Z (ft), fixed [-2, 2] ft range.
+    Both include velocity (ft/s) on a secondary y-axis, showing last 32 frames prior to release.
     """
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
@@ -236,7 +228,7 @@ def plot_shot_analysis(df_ball, metrics):
     logger = logging.getLogger(__name__)
     INCHES_TO_FEET = 1 / 12
 
-    # Helper function to smooth a slice of data.
+    # Helper function to smooth a slice of data
     def get_slice(data, start, end):
         if isinstance(data, (pd.Series, np.ndarray, list)) and len(data) > 0:
             seg = data[start:end].to_numpy() if hasattr(data, 'to_numpy') else np.array(data[start:end])
@@ -248,65 +240,63 @@ def plot_shot_analysis(df_ball, metrics):
             return seg
         return np.array([])
 
-    # Clamp index helper.
+    # Clamp index helper
     def clamp_index(idx, max_idx):
         return max(0, min(int(idx), max_idx))
 
     max_idx = len(df_ball) - 1
     release_idx = clamp_index(metrics.get('release_idx', 0), max_idx)
-    # Visual window: use the last 32 frames prior to release.
-    start_idx = max(0, release_idx - 32)
-    # Force the lift point to be the very first frame in the window.
-    lift_idx = start_idx
-    # Use the set point computed in metrics.
+    start_idx = max(0, release_idx - 32)  # Last 32 frames prior to release
+    lift_idx = start_idx  # Force lift to first frame
     set_idx = clamp_index(metrics.get('set_idx', release_idx), max_idx)
 
     # --- SIDE VIEW ---
-    # Use the remapped Basketball_X_ft (in feet).
     traj_x = get_slice(df_ball['Basketball_X_ft'], start_idx, release_idx + 1)
-    # Vertical axis: Basketball_Z (converted to feet).
     traj_z = get_slice(df_ball['Basketball_Z'], start_idx, release_idx + 1) * INCHES_TO_FEET
-
-    # Define the side view x-axis as a 4-ft window centered on the release point.
     release_x = df_ball.at[release_idx, 'Basketball_X_ft']
-    side_range = [release_x - 2, release_x + 2]
+    side_range = [release_x - 1, release_x + 3]  # Shift release to -1 ft (2nd-to-last left)
 
-    # For the projected (post-release) trajectory (in red, dotted), use a window of 20 frames.
+    # Projected trajectory (20 frames post-release)
     post_release_end = min(max_idx, release_idx + 20)
     proj_x = get_slice(df_ball['Basketball_X_ft'], release_idx, post_release_end + 1)
     proj_z = get_slice(df_ball['Basketball_Z'], release_idx, post_release_end + 1) * INCHES_TO_FEET
 
-    # Define custom tick values/labels so that the largest number appears on the left.
+    # Velocity (convert to ft/s)
+    velocity = get_slice(df_ball['velocity_magnitude'], start_idx, post_release_end + 1) * INCHES_TO_FEET
+    traj_velocity = velocity[:len(traj_x)]  # Pre-release
+    proj_velocity = velocity[len(traj_x)-1:]  # Post-release (adjusted length)
+
     tickvals = np.linspace(side_range[0], side_range[1], 5)
-    ticktext = [f"{val:.1f}" for val in tickvals[::-1]]
+    ticktext = [f"{val:.1f}" for val in tickvals[::-1]]  # Reversed labels
 
     # --- REAR VIEW ---
-    # Use the remapped Basketball_Y_ft (in feet) for lateral position.
     traj_y = get_slice(df_ball['Basketball_Y_ft'], start_idx, release_idx + 1)
-    # Use the same vertical axis (traj_z) as above.
-    rear_range = [-2, 2]  # Fixed horizontal range for rear view.
+    rear_range = [-2, 2]
+    proj_y = get_slice(df_ball['Basketball_Y_ft'], release_idx, post_release_end + 1)
 
-    # Create subplots.
+    # Create subplots with secondary y-axes
     fig = make_subplots(
         rows=1, cols=2,
         subplot_titles=("Side View (X vs. Z)", "Rear View (Y vs. Z)"),
-        horizontal_spacing=0.15
+        horizontal_spacing=0.15,
+        specs=[[{"secondary_y": True}, {"secondary_y": True}]]
     )
 
     # --- SIDE VIEW PLOT ---
     if len(traj_x) > 0 and len(traj_z) > 0:
-        # Plot main trajectory (solid line).
+        # Trajectory
         fig.add_trace(
-            go.Scatter(
-                x=traj_x,
-                y=traj_z,
-                mode='lines',
-                name='Trajectory',
-                line=dict(color='rgba(31, 119, 180, 1)', width=4)
-            ),
-            row=1, col=1
+            go.Scatter(x=traj_x, y=traj_z, mode='lines', name='Trajectory',
+                       line=dict(color='rgba(31, 119, 180, 1)', width=4)),
+            row=1, col=1, secondary_y=False
         )
-        # Mark the lift, set, and release points.
+        # Velocity
+        fig.add_trace(
+            go.Scatter(x=traj_x, y=traj_velocity, mode='lines', name='Velocity (ft/s)',
+                       line=dict(color='rgba(107, 174, 214, 0.7)', width=2)),
+            row=1, col=1, secondary_y=True
+        )
+        # Markers
         phase_info = {
             'lift': {'idx': lift_idx, 'color': 'rgba(147, 112, 219, 1)', 'symbol': 'circle'},
             'set': {'idx': set_idx, 'color': 'rgba(255, 182, 193, 1)', 'symbol': 'diamond'},
@@ -317,171 +307,131 @@ def plot_shot_analysis(df_ball, metrics):
             if start_idx <= idx <= release_idx:
                 marker_x = df_ball.at[idx, 'Basketball_X_ft']
                 marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
+                marker_v = df_ball.at[idx, 'velocity_magnitude'] * INCHES_TO_FEET
                 fig.add_trace(
-                    go.Scatter(
-                        x=[marker_x],
-                        y=[marker_z],
-                        mode='markers',
-                        marker=dict(color=info['color'],
-                                    symbol=info['symbol'],
-                                    size=12),
-                        name=f'{phase.capitalize()}'
-                    ),
-                    row=1, col=1
+                    go.Scatter(x=[marker_x], y=[marker_z], mode='markers',
+                               marker=dict(color=info['color'], symbol=info['symbol'], size=12),
+                               name=f'{phase.capitalize()}'),
+                    row=1, col=1, secondary_y=False
                 )
-        # Add projected ball path (post-release) in red (dotted).
+                fig.add_trace(
+                    go.Scatter(x=[marker_x], y=[marker_v], mode='markers',
+                               marker=dict(color=info['color'], symbol=info['symbol'], size=8, opacity=0.5),
+                               showlegend=False),
+                    row=1, col=1, secondary_y=True
+                )
+        # Projected path
         if release_idx < post_release_end:
             fig.add_trace(
-                go.Scatter(
-                    x=proj_x,
-                    y=proj_z,
-                    mode='lines',
-                    name='Projected Path',
-                    line=dict(color='red', width=2, dash='dot')
-                ),
-                row=1, col=1
+                go.Scatter(x=proj_x, y=proj_z, mode='lines', name='Projected Path',
+                           line=dict(color='red', width=2, dash='dot')),
+                row=1, col=1, secondary_y=False
+            )
+            fig.add_trace(
+                go.Scatter(x=proj_x, y=proj_velocity, mode='lines', name='Projected Velocity',
+                           line=dict(color='red', width=1.5, dash='dot'), showlegend=False),
+                row=1, col=1, secondary_y=True
             )
     else:
-        fig.add_trace(
-            go.Scatter(x=[0], y=[2.0], mode='text', text=["No Data"]),
-            row=1, col=1
-        )
+        fig.add_trace(go.Scatter(x=[0], y=[2.0], mode='text', text=["No Data"]), row=1, col=1)
 
     # --- REAR VIEW PLOT ---
     if len(traj_y) > 0 and len(traj_z) > 0:
         fig.add_trace(
-            go.Scatter(
-                x=traj_y,
-                y=traj_z,
-                mode='lines',
-                name='Trajectory',
-                line=dict(color='rgba(31, 119, 180, 1)', width=4)
-            ),
-            row=1, col=2
+            go.Scatter(x=traj_y, y=traj_z, mode='lines', name='Trajectory',
+                       line=dict(color='rgba(31, 119, 180, 1)', width=4)),
+            row=1, col=2, secondary_y=False
+        )
+        fig.add_trace(
+            go.Scatter(x=traj_y, y=traj_velocity, mode='lines', name='Velocity (ft/s)',
+                       line=dict(color='rgba(107, 174, 214, 0.7)', width=2)),
+            row=1, col=2, secondary_y=True
         )
         for phase, info in phase_info.items():
             idx = info['idx']
             if start_idx <= idx <= release_idx:
                 marker_y = df_ball.at[idx, 'Basketball_Y_ft']
                 marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
+                marker_v = df_ball.at[idx, 'velocity_magnitude'] * INCHES_TO_FEET
                 fig.add_trace(
-                    go.Scatter(
-                        x=[marker_y],
-                        y=[marker_z],
-                        mode='markers',
-                        marker=dict(color=info['color'],
-                                    symbol=info['symbol'],
-                                    size=12),
-                        name=f'{phase.capitalize()}'
-                    ),
-                    row=1, col=2
+                    go.Scatter(x=[marker_y], y=[marker_z], mode='markers',
+                               marker=dict(color=info['color'], symbol=info['symbol'], size=12),
+                               name=f'{phase.capitalize()}'),
+                    row=1, col=2, secondary_y=False
                 )
-        # Add projected path for rear view in red (dotted).
+                fig.add_trace(
+                    go.Scatter(x=[marker_y], y=[marker_v], mode='markers',
+                               marker=dict(color=info['color'], symbol=info['symbol'], size=8, opacity=0.5),
+                               showlegend=False),
+                    row=1, col=2, secondary_y=True
+                )
         if release_idx < post_release_end:
-            proj_y = get_slice(df_ball['Basketball_Y_ft'], release_idx, post_release_end + 1)
             fig.add_trace(
-                go.Scatter(
-                    x=proj_y,
-                    y=proj_z,
-                    mode='lines',
-                    name='Projected Path',
-                    line=dict(color='red', width=2, dash='dot')
-                ),
-                row=1, col=2
+                go.Scatter(x=proj_y, y=proj_z, mode='lines', name='Projected Path',
+                           line=dict(color='red', width=2, dash='dot')),
+                row=1, col=2, secondary_y=False
+            )
+            fig.add_trace(
+                go.Scatter(x=proj_y, y=proj_velocity, mode='lines', name='Projected Velocity',
+                           line=dict(color='red', width=1.5, dash='dot'), showlegend=False),
+                row=1, col=2, secondary_y=True
             )
     else:
-        fig.add_trace(
-            go.Scatter(x=[0], y=[2.0], mode='text', text=["No Data"]),
-            row=1, col=2
-        )
+        fig.add_trace(go.Scatter(x=[0], y=[2.0], mode='text', text=["No Data"]), row=1, col=2)
 
     # --- AXES CONFIGURATION ---
-    # SIDE VIEW:
+    # Side View
     fig.update_xaxes(
-        title_text="Horizontal Position (ft)",
-        row=1, col=1,
-        range=side_range,  # 4-ft range centered on release
-        tickmode='array',
-        tickvals=tickvals,
-        ticktext=ticktext,
-        dtick=1,
-        showgrid=True,
-        gridwidth=1,
-        gridcolor='lightgrey',
-        title_font=dict(size=14),
-        tickfont=dict(size=12)
+        title_text="Horizontal Position (ft)", row=1, col=1,
+        range=side_range, tickmode='array', tickvals=tickvals, ticktext=ticktext,
+        dtick=1, showgrid=True, gridwidth=1, gridcolor='lightgrey',
+        title_font=dict(size=14), tickfont=dict(size=12)
     )
     fig.update_yaxes(
-        title_text="Height (ft)",
-        row=1, col=1,
-        range=[2, 11],  # Fixed 2-11 ft (9 ft)
-        dtick=1,
-        showgrid=True,
-        gridwidth=1,
-        gridcolor='lightgrey',
-        title_font=dict(size=14),
-        tickfont=dict(size=12),
-        title_standoff=20
-    )
-    # REAR VIEW:
-    fig.update_xaxes(
-        title_text="Lateral Position (ft)",
-        row=1, col=2,
-        range=rear_range,  # Fixed to [-2, 2] (4 ft)
-        tickmode='linear',
-        dtick=1,
-        showgrid=True,
-        gridwidth=1,
-        gridcolor='lightgrey',
-        title_font=dict(size=14),
-        tickfont=dict(size=12)
+        title_text="Height (ft)", row=1, col=1, secondary_y=False,
+        range=[2, 11], dtick=1, showgrid=True, gridwidth=1, gridcolor='lightgrey',
+        title_font=dict(size=14), tickfont=dict(size=12), title_standoff=20
     )
     fig.update_yaxes(
-        title_text="Height (ft)",
-        row=1, col=2,
-        range=[2, 11],  # Fixed 2-11 ft (9 ft)
-        dtick=1,
-        showgrid=True,
-        gridwidth=1,
-        gridcolor='lightgrey',
-        title_font=dict(size=14),
-        tickfont=dict(size=12),
-        title_standoff=20
+        title_text="Velocity (ft/s)", row=1, col=1, secondary_y=True,
+        range=[0, 50], dtick=10, showgrid=False, title_font=dict(size=14), tickfont=dict(size=12)
+    )
+    # Rear View
+    fig.update_xaxes(
+        title_text="Lateral Position (ft)", row=1, col=2,
+        range=rear_range, tickmode='linear', dtick=1, showgrid=True, gridwidth=1, gridcolor='lightgrey',
+        title_font=dict(size=14), tickfont=dict(size=12)
+    )
+    fig.update_yaxes(
+        title_text="Height (ft)", row=1, col=2, secondary_y=False,
+        range=[2, 11], dtick=1, showgrid=True, gridwidth=1, gridcolor='lightgrey',
+        title_font=dict(size=14), tickfont=dict(size=12), title_standoff=20
+    )
+    fig.update_yaxes(
+        title_text="Velocity (ft/s)", row=1, col=2, secondary_y=True,
+        range=[0, 50], dtick=10, showgrid=False, title_font=dict(size=14), tickfont=dict(size=12)
     )
 
     # --- OVERALL LAYOUT ---
-    # Set figure dimensions for square 1 ft x 1 ft grid boxes
-    pixels_per_foot = 60  # Equal pixels per foot for X and Y
-    subplot_width = 4 * pixels_per_foot   # 4 ft = 240 pixels
-    subplot_height = 9 * pixels_per_foot  # 9 ft = 540 pixels
-    total_width = subplot_width * 2 + 100  # Two subplots + spacing
+    pixels_per_foot = 60
+    subplot_width = 4 * pixels_per_foot
+    subplot_height = 9 * pixels_per_foot
+    total_width = subplot_width * 2 + 100
 
     fig.update_layout(
-        height=subplot_height + 200,  # Extra space for title and legend
-        width=total_width,
-        title_text="Ball Path Analysis",
-        title_x=0.4,
-        title_font=dict(size=20),
+        height=subplot_height + 200, width=total_width,
+        title_text="Ball Path Analysis with Velocity",
+        title_x=0.4, title_font=dict(size=20),
         margin=dict(t=120, b=100, l=80, r=80),
         legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5, font=dict(size=12)),
-        plot_bgcolor='rgba(255, 255, 255, 1)',
-        paper_bgcolor='rgba(255, 255, 255, 1)',
-        showlegend=True,
-        autosize=False
+        plot_bgcolor='rgba(255, 255, 255, 1)', paper_bgcolor='rgba(255, 255, 255, 1)',
+        showlegend=True, autosize=False
     )
 
-    # Ensure equal scaling by matching pixel size to data range
+    # Ensure equal scaling
     for col in [1, 2]:
-        fig.update_xaxes(
-            row=1, col=col,
-            scaleanchor=f"y{col}",
-            scaleratio=1,  # Enforce equal scaling (1 ft = same pixels on X and Y)
-            constrain='domain'
-        )
-        fig.update_yaxes(
-            row=1, col=col,
-            constrain='domain'
-        )
+        fig.update_xaxes(row=1, col=col, scaleanchor=f"y{col}", scaleratio=1, constrain='domain')
+        fig.update_yaxes(row=1, col=col, secondary_y=False, constrain='domain')
 
     for annotation in fig.layout.annotations:
         annotation.y = 1.05

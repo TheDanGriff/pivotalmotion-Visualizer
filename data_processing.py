@@ -1497,7 +1497,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
             row=1, col=1
         )
     
-    fig.update_xaxes(title_text="% of Release (Extended)", row=1, col=1)
+    fig.update_xaxes(title_text="% of Release", row=1, col=1)
     fig.update_yaxes(title_text="Normalized Acceleration", row=1, col=1, secondary_y=False)
     fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=1, secondary_y=True)
     
@@ -1536,7 +1536,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
             fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]),
                           row=1, col=2)
     
-    fig.update_xaxes(title_text="% of Release (Extended)", row=1, col=2)
+    fig.update_xaxes(title_text="% of Release", row=1, col=2)
     fig.update_yaxes(title_text="Curvature (1/ft)", row=1, col=2, secondary_y=False)
     fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=2, secondary_y=True)
     
