@@ -367,7 +367,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
     if not df_ball.empty:
         st.subheader("Shot Location")
         shot_location_fig = plot_shot_location(df_ball, metrics)
-        st.plotly_chart(shot_location_fig)  # No use_container_width=True to respect fixed size
+        st.plotly_chart(shot_location_fig, use_container_width=True) 
 
     # Existing Visualizations
     fig = plot_curvature_analysis(df_ball, metrics, weighting_exponent=3, num_interp=300, curvature_scale=2.3)
