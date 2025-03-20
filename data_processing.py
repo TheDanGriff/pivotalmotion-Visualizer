@@ -916,7 +916,7 @@ def compute_tau(points):
     diffs = np.diff(points, axis=0)
     distances = np.linalg.norm(diffs, axis=1)
     cumulative = np.cumsum(distances)
-    total = cumulative[-1] if cumulative[-1] != 0 else 1e-10  # Avoid division by zero
+    total = cumulative[-1] if cumulative[-1] != 0 else 1e-10
     tau = np.r_[0, cumulative / total]
     return tau
 
@@ -946,22 +946,21 @@ def bernstein_poly(k, n, tau):
 def compute_curvature(P, tau, h=1e-6):
     """Compute curvature at tau for a 2D Bezier curve using numerical derivatives."""
     try:
-        # Ensure tau is a float
         tau = float(tau)
         tau_minus = max(0.0, tau - h)
         tau_plus = min(1.0, tau + h)
 
-        # Evaluate Bezier curve and convert to float array
-        B = np.asarray(evaluate_bezier(P, tau), dtype=np.float64)
-        B_minus = np.asarray(evaluate_bezier(P, tau_minus), dtype=np.float64)
-        B_plus = np.asarray(evaluate_bezier(P, tau_plus), dtype=np.float64)
+        # Evaluate Bezier curve and ensure float array, flatten to handle (2, 1)
+        B = np.asarray(evaluate_bezier(P, tau), dtype=np.float64).flatten()
+        B_minus = np.asarray(evaluate_bezier(P, tau_minus), dtype=np.float64).flatten()
+        B_plus = np.asarray(evaluate_bezier(P, tau_plus), dtype=np.float64).flatten()
 
-        # Debug the output shape
+        # Debug the output shape and value
         logger.debug(f"evaluate_bezier(P, {tau}) shape: {B.shape}, value: {B}")
-        
-        # Check if output is a 2-element array
-        if B.size != 2 or B.ndim != 1:
-            raise ValueError(f"evaluate_bezier returned {B.shape} array, expected (2,) for [x, z] or [y, z]")
+
+        # Check if output has exactly 2 elements
+        if B.size != 2:
+            raise ValueError(f"evaluate_bezier returned array with {B.size} elements, expected 2 for [x, z] or [y, z]")
 
         # Numerical derivatives
         x1 = (B_plus[0] - B_minus[0]) / (2 * h)  # dx/dtau or dy/dtau
@@ -984,7 +983,7 @@ def compute_terminal_curvature(P, tau_max, N=50):
         z = np.linspace(0, 1, N)
         tau_z = tau_max + z * (1 - tau_max)
         kappa_z = np.array([compute_curvature(P, tau) for tau in tau_z], dtype=np.float64)
-        w_z = 4 * z**3  # Cubic weighting function
+        w_z = 4 * z**3
         sigma = trapezoid(w_z * kappa_z, z)
         return float(sigma)
     except Exception as e:
@@ -996,7 +995,7 @@ def compute_weighted_curvature_area(P, N=100):
     try:
         tau_grid = np.linspace(0, 1, N)
         kappa_grid = np.array([compute_curvature(P, tau) for tau in tau_grid], dtype=np.float64)
-        w_grid = 4 * tau_grid**3  # Cubic weighting, heavier near release
+        w_grid = 4 * tau_grid**3
         weighted_area = trapezoid(w_grid * kappa_grid, tau_grid)
         return float(weighted_area)
     except Exception as e:
@@ -1014,7 +1013,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
     """
     metrics = {}
     INCHES_TO_FEET = 1 / 12
-    BALL_RADIUS_INCHES = 4.7  # Approximate basketball radius
+    BALL_RADIUS_INCHES = 4.7
     BALL_RADIUS_FEET = BALL_RADIUS_INCHES * INCHES_TO_FEET
 
     try:
@@ -1024,7 +1023,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             'RHEEL_X', 'RHEEL_Y', 'RBIGTOE_X', 'RBIGTOE_Y',
             'MIDHIP_X', 'MIDHIP_Y', 'NECK_X', 'NECK_Y',
             'LSHOULDER_X', 'LSHOULDER_Y', 'RSHOULDER_X', 'RSHOULDER_Y',
-            'RELBOW_Z'  # Added for lift index
+            'RELBOW_Z'
         ]
         missing_pose = [col for col in required_pose if col not in pose_df.columns]
         if missing_pose:
@@ -1065,7 +1064,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['release_idx'] = ball_df['velocity_magnitude'].iloc[apex_window_start:metrics['apex_idx']].idxmax()
         release_window_start = max(0, metrics['release_idx'] - 40)
         metrics['set_idx'] = ball_df.iloc[release_window_start:metrics['release_idx']]['Basketball_X'].idxmin()
-        metrics['rim_impact_idx'] = (basketball_z <= 120).idxmax()  # 10 ft = 120 inches
+        metrics['rim_impact_idx'] = (basketball_z <= 120).idxmax()
 
         # 6. Determine hoop position
         release_point = ball_df.loc[metrics['release_idx']]
@@ -1142,7 +1141,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         ball_df['Basketball_Z_ft'] = ball_df['Basketball_Z'] * INCHES_TO_FEET
         points_side = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_X_ft', 'Basketball_Z_ft']].dropna().values
         print(f"Debug (Side): Number of points = {len(points_side)}")
-        if len(points_side) > 7:  # For 6th-order Bezier
+        if len(points_side) > 7:
             P_side = fit_bezier(points_side, n=6)
             if P_side is not None:
                 tau_grid = np.linspace(0, 1, 100, dtype=np.float64)
@@ -1166,7 +1165,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         # 14. Compute release curvature using Bezier curves for lateral view (YZ plane)
         points_lateral = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_Y_ft', 'Basketball_Z_ft']].dropna().values
         print(f"Debug (Lateral): Number of points = {len(points_lateral)}")
-        if len(points_lateral) > 7:  # For 6th-order Bezier
+        if len(points_lateral) > 7:
             P_lateral = fit_bezier(points_lateral, n=6)
             if P_lateral is not None:
                 tau_grid = np.linspace(0, 1, 100, dtype=np.float64)
@@ -1236,7 +1235,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
 
     except Exception as e:
         logger.error(f"Error calculating shot metrics: {str(e)}")
-        metrics['release_velocity'] = 0.0  # Fallback
+        metrics['release_velocity'] = 0.0
 
     return metrics, pose_df, ball_df
 
