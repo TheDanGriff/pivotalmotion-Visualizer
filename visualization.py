@@ -242,14 +242,22 @@ def plot_shot_analysis(df_ball, metrics):
     release_idx = clamp_index(metrics.get('release_idx', 0), max_idx)
     start_idx = max(0, release_idx - 32)
     lift_idx = clamp_index(metrics.get('lift_idx', start_idx), max_idx)
-    
-    # Redefine set_idx as minimum X position within visualized range
-    candidate_set_window = df_ball.iloc[lift_idx:release_idx + 1]
-    if not candidate_set_window.empty:
-        set_idx = candidate_set_window['Basketball_X_ft'].idxmin()  # Minimum horizontal position
+
+    # Check if lift_idx is above 5 ft
+    lift_z_ft = df_ball.at[lift_idx, 'Basketball_Z_ft'] if 'Basketball_Z_ft' in df_ball.columns else df_ball.at[lift_idx, 'Basketball_Z'] * INCHES_TO_FEET
+    if lift_z_ft > 5:
+        logger.warning(f"Lift point Z ({lift_z_ft:.2f} ft) above 5 ft, using first frame of 32-frame window")
+        lift_idx = start_idx  # Use first frame of 32-frame window
+
+    # Redefine set_idx: minimum X position, at least 7 frames after lift and before release
+    set_window_start = max(lift_idx + 7, start_idx)
+    set_window_end = min(release_idx - 7 + 1, max_idx + 1)
+    candidate_set_window = df_ball.iloc[set_window_start:set_window_end]
+    if not candidate_set_window.empty and len(candidate_set_window) >= 1:
+        set_idx = candidate_set_window['Basketball_X_ft'].idxmin()
     else:
-        set_idx = release_idx
-    logger.debug(f"Set_idx redefined as minimum X position: {set_idx}")
+        set_idx = release_idx  # Fallback to release_idx if range is invalid
+    logger.debug(f"Set_idx redefined as minimum X position between {set_window_start} and {set_window_end}: {set_idx}")
 
     # --- SIDE VIEW ---
     traj_x = get_slice(df_ball, 'Basketball_X_ft', lift_idx, release_idx + 1)
@@ -290,8 +298,8 @@ def plot_shot_analysis(df_ball, metrics):
         proj_x = proj_x[proj_mask]
         proj_z = proj_z[proj_mask]
 
-    tickvals_x = np.linspace(side_range[0], side_range[1], 5)  # Absolute court positions
-    ticktext_x = [f"{val:.1f}" for val in tickvals_x]  # Use actual X_ft values
+    tickvals_x = np.linspace(side_range[0], side_range[1], 5)  # Absolute court positions in feet
+    ticktext_x = [f"{val:.1f}" for val in tickvals_x]  # Display in feet
     tickvals_y = np.arange(2, 12, 1)
 
     # --- REAR VIEW ---
