@@ -295,8 +295,10 @@ def plot_shot_analysis(df_ball, metrics):
                     cmin=0,  # Min velocity
                     cmax=max(traj_v.max(), 40),  # Max velocity (cap at 40 ft/s or higher)
                     colorbar=dict(
-                        title="Velocity (ft/s)",
-                        titleside="right",
+                        title=dict(
+                            text="Velocity (ft/s)",
+                            side="right"  # Moved titleside to title.side
+                        ),
                         thickness=15,
                         len=0.5,
                         x=1.05  # Position to right of plot
