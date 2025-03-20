@@ -1294,7 +1294,6 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from math import comb
-from numpy import trapz
 from scipy.signal import savgol_filter
 
 def fit_bezier_curve(x_data, z_data, n=6):
