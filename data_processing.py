@@ -1315,18 +1315,21 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
     INCHES_TO_FEET = 1 / 12
     import numpy as np
     import plotly.graph_objects as go
+    from scipy.signal import savgol_filter
 
     # Extract indices from metrics (ensure these keys exist)
-    lift_idx   = int(metrics.get('lift_idx', 0))
-    release_idx = int(metrics.get('release_idx', lift_idx + 1))
+    lift_idx = int(metrics.get('lift_idx', 0))
+    set_idx = int(metrics.get('set_idx', lift_idx + 1))  # Add set_idx
+    release_idx = int(metrics.get('release_idx', set_idx + 1))  # Ensure release is after set
     
     # Use only lift_idx to release_idx (no extra frames)
     total_frames = release_idx - lift_idx
     if total_frames <= 0:
         raise ValueError("Invalid indices: release_idx must be greater than lift_idx.")
     
-    # Compute time parameters relative to lift_idx:
-    lift_t    = 0.0  # Start at 0%
+    # Compute time parameters relative to lift_idx
+    lift_t = 0.0  # Start at 0%
+    set_t = (set_idx - lift_idx) / total_frames  # Set as a fraction between lift and release
     release_t = 1.0  # End at 100%
     
     # t_fine for interpolation over [0,1]
@@ -1334,7 +1337,6 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
     
     # LEFT PANEL: Normalized Acceleration (calculated from lift_idx to release_idx, smoothed)
     t_raw, norm_acc, acc_raw = compute_normalized_acceleration_from_raw(df_ball, lift_idx, release_idx, fps)
-    # Apply smoothing to norm_acc if enough data
     if len(norm_acc) > 3:
         window_length = min(11, len(norm_acc) - 1)
         if window_length % 2 == 0:
@@ -1352,8 +1354,8 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
     velocity_interp = np.interp(t_fine, t_raw, velocity_segment)
     
     # Compute Transition Marker using a Bézier fit on (Basketball_X, Basketball_Z), smoothed
-    seg_x = df_ball['Basketball_X'].iloc[lift_idx:release_idx+1].to_numpy() * INCHES_TO_FEET  # Convert to feet
-    seg_z = df_ball['Basketball_Z'].iloc[lift_idx:release_idx+1].to_numpy() * INCHES_TO_FEET  # Convert to feet
+    seg_x = df_ball['Basketball_X'].iloc[lift_idx:release_idx+1].to_numpy() * INCHES_TO_FEET
+    seg_z = df_ball['Basketball_Z'].iloc[lift_idx:release_idx+1].to_numpy() * INCHES_TO_FEET
     if len(seg_x) > 3:
         window_length = min(11, len(seg_x) - 1)
         if window_length % 2 == 0:
@@ -1370,34 +1372,34 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
             break
     if transition_idx is None:
         transition_idx = np.argmin(np.abs(signed_side))
-    t_transition = t_fine[transition_idx] if transition_idx is not None else 0.5  # Default to midpoint if no transition
+    t_transition = t_fine[transition_idx] if transition_idx is not None else 0.5
     
     l_exp = weighting_exponent
     w = (l_exp + 1) * (t_fine ** l_exp)
     weighted_acc = np.abs(norm_acc_interp) * w
     
     # RIGHT PANEL: Lateral (Side View) Curvature Analysis, smoothed
-    seg_y = df_ball['Basketball_Y'].iloc[lift_idx:release_idx+1].to_numpy() * INCHES_TO_FEET  # Convert to feet
+    seg_y = df_ball['Basketball_Y'].iloc[lift_idx:release_idx+1].to_numpy() * INCHES_TO_FEET
     if len(seg_y) > 3:
         window_length = min(11, len(seg_y) - 1)
         if window_length % 2 == 0:
             window_length += 1
         seg_y = savgol_filter(seg_y, window_length=window_length, polyorder=2)
     P_lat, _ = fit_bezier_curve(seg_y, seg_z, n=bezier_order)
-    # Apply curvature scaling factor (curvature in 1/feet)
-    lateral_curve = bezier_curvature(P_lat, t_fine, scale=curvature_scale / 12)  # Adjust scale for feet
+    lateral_curve = bezier_curvature(P_lat, t_fine, scale=curvature_scale / 12)
     if len(lateral_curve) > 3:
         window_length = min(11, len(lateral_curve) - 1)
         if window_length % 2 == 0:
             window_length += 1
         lateral_curve = savgol_filter(lateral_curve, window_length=window_length, polyorder=2)
-    velocity_lateral = velocity_interp  # Already in feet/second, smoothed above
+    velocity_lateral = velocity_interp
     weighted_lateral = np.abs(lateral_curve) * w
     
     t_percent = t_fine * 100
 
     COLOR_PALETTE = {
         'lift': 'rgba(147, 112, 219, 1)',
+        'set': 'rgba(255, 182, 193, 1)',  # Added for set point
         'release': 'rgba(255, 102, 102, 1)',
         'acceleration': 'rgba(0, 0, 0, 1)',
         'curvature': 'rgba(0, 0, 0, 1)',
@@ -1407,6 +1409,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
     }
     DASH_STYLES = {
         'lift': 'dash',
+        'set': 'dot',  # Added for set point
         'release': 'dashdot'
     }
     
@@ -1414,6 +1417,9 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
     dummy_lift = go.Scatter(x=[None], y=[None], mode='lines',
                             line=dict(color=COLOR_PALETTE['lift'], dash=DASH_STYLES['lift'], width=2),
                             name=f"Lift (index: {lift_idx})")
+    dummy_set = go.Scatter(x=[None], y=[None], mode='lines',
+                           line=dict(color=COLOR_PALETTE['set'], dash=DASH_STYLES['set'], width=2),
+                           name=f"Set (index: {set_idx})")  # Added for set point
     dummy_release = go.Scatter(x=[None], y=[None], mode='lines',
                                line=dict(color=COLOR_PALETTE['release'], dash=DASH_STYLES['release'], width=2),
                                name=f"Release (index: {release_idx})")
@@ -1448,7 +1454,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
             x=t_percent, y=norm_acc_interp,
             mode='lines',
             name='Normalized Acceleration',
-            line=dict(color=COLOR_PALETTE['acceleration'], width=2)  # Reduced line width
+            line=dict(color=COLOR_PALETTE['acceleration'], width=2)
         ),
         row=1, col=1, secondary_y=False
     )
@@ -1462,7 +1468,8 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
         ),
         row=1, col=1, secondary_y=True
     )
-    for phase, phase_t in zip(['lift', 'release'], [lift_t, release_t]):
+    # Add vertical lines for all three phases
+    for phase, phase_t in zip(['lift', 'set', 'release'], [lift_t, set_t, release_t]):
         if phase_t is not None:
             fig.add_vline(x=phase_t*100, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]),
                           row=1, col=1)
@@ -1472,7 +1479,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
                 x=[t_transition*100],
                 y=[norm_acc_interp[transition_idx]],
                 mode='markers',
-                marker=dict(color='red', size=10, symbol='asterisk'),  # Reduced marker size
+                marker=dict(color='red', size=10, symbol='asterisk'),
                 name='Transition',
                 showlegend=False
             ),
@@ -1499,7 +1506,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
             x=t_percent, y=lateral_curve,
             mode='lines',
             name='Side View Curvature (1/ft)',
-            line=dict(color=COLOR_PALETTE['curvature'], width=2)  # Reduced line width
+            line=dict(color=COLOR_PALETTE['curvature'], width=2)
         ),
         row=1, col=2, secondary_y=False
     )
@@ -1513,27 +1520,40 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
         ),
         row=1, col=2, secondary_y=True
     )
-    for phase, phase_t in zip(['lift', 'release'], [lift_t, release_t]):
+    # Add vertical lines for all three phases
+    for phase, phase_t in zip(['lift', 'set', 'release'], [lift_t, set_t, release_t]):
         if phase_t is not None:
             fig.add_vline(x=phase_t*100, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]),
                           row=1, col=2)
+    
     fig.update_xaxes(title_text="% of Release", row=1, col=2)
     fig.update_yaxes(title_text="Curvature (1/ft)", row=1, col=2, secondary_y=False)
     fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=2, secondary_y=True)
     
+    # Update layout with better title and legend spacing
     fig.update_layout(
-        height=400,  # Reduced height
-        width=800,   # Reduced width
-        margin=dict(t=60, b=40, l=40, r=40),  # Reduced margins
+        height=500,  # Increased height to accommodate spacing
+        width=800,
+        title_text="Ball Curvature Analysis",  # Added main title
+        title_x=0.5,  # Centered title
+        title_font=dict(size=20),
+        margin=dict(t=100, b=100, l=40, r=40),  # Adjusted margins for spacing
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=1.12,
+            y=-0.2,  # Moved legend below plot to avoid overlap
             xanchor="center",
-            x=0.5
-        )
+            x=0.5,
+            font=dict(size=12)
+        ),
+        plot_bgcolor='rgba(255, 255, 255, 1)',
+        paper_bgcolor='rgba(255, 255, 255, 1)',
+        showlegend=True
     )
+    
+    # Add all dummy traces to legend
     fig.add_trace(dummy_lift)
+    fig.add_trace(dummy_set)  # Added set point to legend
     fig.add_trace(dummy_release)
     fig.add_trace(dummy_transition)
     fig.add_trace(dummy_velocity)
