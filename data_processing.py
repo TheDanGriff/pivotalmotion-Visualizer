@@ -627,74 +627,31 @@ def adjust_shot_coordinates(ball_df, pose_df=None):
 
 
 
-def remap_shot_coordinates(ball_df, pose_df, hoop_x, hoop_y, release_idx, INCHES_TO_FEET=1/12):
+def remap_shot_coordinates(ball_df, pose_df, hoop_x, hoop_y, release_idx, INCHES_TO_FEET):
     """
-    Remap all ball (and optionally pose) coordinates from inches to feet so that the shot's
-    release point has a Y coordinate of 0 while preserving the distance from the hoop.
-    
-    The transformation rotates all points about the hoop (converted to feet).
-    
-    Parameters:
-      ball_df: DataFrame with ball tracking data (expects 'Basketball_X' and 'Basketball_Y' in inches).
-      pose_df: DataFrame with pose data (can be None). All columns ending in _X and _Y are assumed to be in inches.
-      hoop_x, hoop_y: Coordinates of the hoop in inches.
-      release_idx: The index of the release frame in ball_df.
-      INCHES_TO_FEET: Conversion factor from inches to feet.
-      
-    Returns:
-      ball_df_new: A copy of ball_df with new columns 'Basketball_X_ft' and 'Basketball_Y_ft' holding the
-                   remapped coordinates (in feet).
-      pose_df_new: A copy of pose_df with all _X and _Y columns converted and rotated (or None if pose_df is None).
-      theta: The rotation angle (in radians) used in the transformation.
+    Remap basketball coordinates to feet and rotate relative to the hoop.
     """
-    # Work on a copy so that original data is preserved.
-    ball_df_new = ball_df.copy()
-    # Convert ball coordinates from inches to feet.
-    ball_df_new['Basketball_X_ft'] = ball_df_new['Basketball_X'] * INCHES_TO_FEET
-    ball_df_new['Basketball_Y_ft'] = ball_df_new['Basketball_Y'] * INCHES_TO_FEET
+    # Convert coordinates from inches to feet
+    ball_df['Basketball_X_ft'] = ball_df['Basketball_X'] * INCHES_TO_FEET
+    ball_df['Basketball_Y_ft'] = ball_df['Basketball_Y'] * INCHES_TO_FEET
+    ball_df['Basketball_Z_ft'] = ball_df['Basketball_Z'] * INCHES_TO_FEET  # Ensure Z is included
 
-    # Hoop position in feet.
-    H = np.array([hoop_x * INCHES_TO_FEET, hoop_y * INCHES_TO_FEET])
-    # Get the release point in feet.
-    R = np.array([ball_df_new.loc[release_idx, 'Basketball_X_ft'],
-                  ball_df_new.loc[release_idx, 'Basketball_Y_ft']])
-    # Compute the vector from hoop to release.
-    V = R - H
-    # Compute the angle theta (in radians) that V makes with the horizontal.
-    theta = np.arctan2(V[1], V[0])
-    # Build the rotation matrix that rotates by -theta.
-    c, s = np.cos(-theta), np.sin(-theta)
-    rot_matrix = np.array([[c, -s],
-                           [s,  c]])
+    # Example rotation (adjust as needed based on your actual requirements)
+    # For Z (height), typically no rotation is applied, just unit conversion
+    theta = np.arctan2(hoop_y - ball_df['Basketball_Y'].iloc[release_idx],
+                       hoop_x - ball_df['Basketball_X'].iloc[release_idx])
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
     
-    # Rotate every ball coordinate (in feet) about the hoop.
-    def rotate_point(P):
-        return rot_matrix.dot(P - H) + H
+    # Rotate X and Y around the hoop
+    x_shifted = ball_df['Basketball_X_ft'] - (hoop_x * INCHES_TO_FEET)
+    y_shifted = ball_df['Basketball_Y_ft'] - (hoop_y * INCHES_TO_FEET)
+    ball_df['Basketball_X_ft'] = x_shifted * cos_theta + y_shifted * sin_theta
+    ball_df['Basketball_Y_ft'] = -x_shifted * sin_theta + y_shifted * cos_theta
     
-    ball_coords = ball_df_new[['Basketball_X_ft', 'Basketball_Y_ft']].to_numpy()
-    rotated = np.apply_along_axis(rotate_point, 1, ball_coords)
-    ball_df_new['Basketball_X_ft'] = rotated[:, 0]
-    ball_df_new['Basketball_Y_ft'] = rotated[:, 1]
-    
-    # For pose data, apply a similar transformation if provided.
-    pose_df_new = None
-    if pose_df is not None:
-        pose_df_new = pose_df.copy()
-        # Convert all columns ending in _X and _Y from inches to feet.
-        for col in pose_df_new.columns:
-            if col.endswith('_X') or col.endswith('_Y'):
-                pose_df_new[col] = pose_df_new[col] * INCHES_TO_FEET
-        # For each coordinate pair (assumes _X and _Y come in pairs), apply the rotation.
-        for col in list(pose_df_new.columns):
-            if col.endswith('_X'):
-                base = col[:-2]
-                col_x, col_y = f"{base}_X", f"{base}_Y"
-                if col_y in pose_df_new.columns:
-                    pts = pose_df_new[[col_x, col_y]].to_numpy()
-                    rotated_pts = np.apply_along_axis(rotate_point, 1, pts)
-                    pose_df_new[col_x] = rotated_pts[:, 0]
-                    pose_df_new[col_y] = rotated_pts[:, 1]
-    return ball_df_new, pose_df_new, theta
+    # Z remains unchanged except for unit conversion
+    # No modification to pose_df assumed here; adjust if needed
+    return ball_df, pose_df, theta
 
 def calculate_foot_angles(df):
     """Calculate foot angles using both old and new column names."""
@@ -1074,7 +1031,12 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['hoop_y'] = hoop_y
 
         # 7. Remap shot coordinates to feet and rotate about the hoop
+        # After step 7
         ball_df, pose_df, theta_used = remap_shot_coordinates(ball_df, pose_df, hoop_x, hoop_y, metrics['release_idx'], INCHES_TO_FEET)
+        print("ball_df columns after remapping:", ball_df.columns.tolist())  # Debug
+        if 'Basketball_Z_ft' not in ball_df.columns:
+            logger.error("Basketball_Z_ft missing after remapping. Adding manually.")
+            ball_df['Basketball_Z_ft'] = ball_df['Basketball_Z'] * INCHES_TO_FEET
         release_point = ball_df.loc[metrics['release_idx']]
         hoop_x_ft = hoop_x * INCHES_TO_FEET
         hoop_y_ft = hoop_y * INCHES_TO_FEET
@@ -1126,71 +1088,61 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         dxy = np.sqrt(post_release['Basketball_X_ft'].diff()**2 + post_release['Basketball_Y_ft'].diff()**2).iloc[1:].mean()
         metrics['release_angle'] = np.degrees(np.arctan2(dz, dxy))
 
-        # 12. Compute release velocity
-        if pd.isna(metrics['release_idx']) or metrics['release_idx'] >= len(ball_df):
+        # Step 12
+        if pd.isna(metrics['release_idx']) or metrics['release_idx'] >= len(ball_df) or metrics['release_idx'] < 1:
             logger.error(f"Invalid release_idx: {metrics['release_idx']}, ball_df length: {len(ball_df)}")
             metrics['release_velocity'] = 0.0
         else:
-            rv_x = basketball_x.diff().fillna(0) * fps
-            rv_y = basketball_y.diff().fillna(0) * fps
-            rv_z = basketball_z.diff().fillna(0) * fps
+            rv_x = ball_df['Basketball_X'].diff().fillna(0) * fps  # inches/sec
+            rv_y = ball_df['Basketball_Y'].diff().fillna(0) * fps
+            rv_z = ball_df['Basketball_Z'].diff().fillna(0) * fps
             rvx = rv_x.iloc[metrics['release_idx']]
             rvy = rv_y.iloc[metrics['release_idx']]
             rvz = rv_z.iloc[metrics['release_idx']]
-            release_velocity = np.sqrt(rvx**2 + rvy**2 + rvz**2) * INCHES_TO_FEET
-            metrics['release_velocity'] = 0.0 if pd.isna(release_velocity) or release_velocity < 0 else release_velocity
+            release_velocity = np.sqrt(rvx**2 + rvy**2 + rvz**2) * INCHES_TO_FEET  # Convert to ft/sec
+            print(f"Release velocity components (ft/s): vx={rvx*INCHES_TO_FEET:.2f}, vy={rvy*INCHES_TO_FEET:.2f}, vz={rvz*INCHES_TO_FEET:.2f}")
+            print(f"Release velocity: {release_velocity:.2f} ft/s")
+            metrics['release_velocity'] = release_velocity if not pd.isna(release_velocity) and release_velocity > 0 else 0.0
 
-# 13. Compute release curvature using Bezier curves for side view (XZ plane)
+        # Step 13
         points_side = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_X_ft', 'Basketball_Z_ft']].dropna().values
-        print(f"Debug (Side): Number of points = {len(points_side)}")
-        logger.debug(f"Side view points: {points_side[:5]}...")
+        print(f"Side view points: {len(points_side)} points, sample: {points_side[:3]}")
         if len(points_side) > 7:
             P_side = fit_bezier(points_side, n=6)
             if P_side is not None:
-                logger.debug(f"Side view control points: {P_side}")
                 tau_grid = np.linspace(0, 1, 100, dtype=np.float64)
                 kappa_grid_side = np.array([compute_curvature(P_side, tau) for tau in tau_grid], dtype=np.float64)
-                logger.debug(f"Side view curvature sample: {kappa_grid_side[:5]}")
                 tau_max_side = tau_grid[np.argmax(kappa_grid_side)]
                 sigma_side = compute_terminal_curvature(P_side, tau_max_side)
                 weighted_area_side = compute_weighted_curvature_area(P_side)
-                print(f"Debug (Side): Terminal curvature (σ) = {sigma_side:.6f} 1/ft")
-                print(f"Debug (Side): Weighted curvature area = {weighted_area_side:.6f} 1/ft")
                 metrics['release_curvature_side'] = sigma_side
                 metrics['weighted_curvature_area_side'] = weighted_area_side
+                print(f"Side curvature: σ={sigma_side:.6f} 1/ft, weighted_area={weighted_area_side:.6f} 1/ft")
             else:
-                logger.warning("Bezier fit failed for side view")
                 metrics['release_curvature_side'] = 0.0
                 metrics['weighted_curvature_area_side'] = 0.0
         else:
-            logger.warning(f"Insufficient points ({len(points_side)}) for Bezier fit in side view")
             metrics['release_curvature_side'] = 0.0
             metrics['weighted_curvature_area_side'] = 0.0
 
-        # 14. Compute release curvature using Bezier curves for rear view (YZ plane)
+        # Step 14 (similarly)
         points_lateral = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_Y_ft', 'Basketball_Z_ft']].dropna().values
-        print(f"Debug (Rear): Number of points = {len(points_lateral)}")
-        logger.debug(f"Rear view points: {points_lateral[:5]}...")
+        print(f"Rear view points: {len(points_lateral)} points, sample: {points_lateral[:3]}")
         if len(points_lateral) > 7:
             P_lateral = fit_bezier(points_lateral, n=6)
             if P_lateral is not None:
-                logger.debug(f"Rear view control points: {P_lateral}")
                 tau_grid = np.linspace(0, 1, 100, dtype=np.float64)
                 kappa_grid_lateral = np.array([compute_curvature(P_lateral, tau) for tau in tau_grid], dtype=np.float64)
-                logger.debug(f"Rear view curvature sample: {kappa_grid_lateral[:5]}")
                 tau_max_lateral = tau_grid[np.argmax(kappa_grid_lateral)]
                 sigma_lateral = compute_terminal_curvature(P_lateral, tau_max_lateral)
                 weighted_area_lateral = compute_weighted_curvature_area(P_lateral)
-                print(f"Debug (Rear): Terminal curvature (σ) = {sigma_lateral:.6f} 1/ft")
-                print(f"Debug (Rear): Weighted curvature area = {weighted_area_lateral:.6f} 1/ft")
-                metrics['release_curvature_rear'] = sigma_lateral  # Renamed to 'rear' for clarity
+                metrics['release_curvature_rear'] = sigma_lateral
                 metrics['weighted_curvature_area_rear'] = weighted_area_lateral
+                print(f"Rear curvature: σ={sigma_lateral:.6f} 1/ft, weighted_area={weighted_area_lateral:.6f} 1/ft")
             else:
-                logger.warning("Bezier fit failed for rear view")
                 metrics['release_curvature_rear'] = 0.0
                 metrics['weighted_curvature_area_rear'] = 0.0
         else:
-            logger.warning(f"Insufficient points ({len(points_lateral)}) for Bezier fit in rear view")
             metrics['release_curvature_rear'] = 0.0
             metrics['weighted_curvature_area_rear'] = 0.0
 
@@ -1199,20 +1151,14 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
                                                     metrics.get('weighted_curvature_area_rear', 0.0))
         print(f"Debug: Total weighted curvature area = {metrics['total_weighted_curvature_area']:.6f} 1/ft")
 
-        # 16. Compute lateral deviation
-        lateral_dev = calculate_lateral_deviation(
-            ball_df,
-            metrics['release_idx'],
-            hoop_x=metrics['hoop_x'],
-            hoop_y=metrics['hoop_y']
-        )
-        if lateral_dev:
+        # Step 16
+        lateral_dev = calculate_lateral_deviation(ball_df, metrics['release_idx'], hoop_x=metrics['hoop_x'], hoop_y=metrics['hoop_y'])
+        if lateral_dev and len(lateral_dev) >= 4:
             metrics['lateral_deviation'] = lateral_dev[0]
-            metrics['lateral_final_x'] = lateral_dev[1]
-            metrics['lateral_actual_y'] = lateral_dev[2]
-            metrics['lateral_expected_y'] = lateral_dev[3]
+            print(f"Lateral deviation: {lateral_dev[0]:.2f} ft")
         else:
             metrics['lateral_deviation'] = 0.0
+            logger.warning("Lateral deviation calculation failed")
 
         # 17. Additional pose computations
         pose_df = compute_joint_angles(pose_df)
@@ -1241,7 +1187,15 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
 
     except Exception as e:
         logger.error(f"Error calculating shot metrics: {str(e)}")
-        metrics['release_velocity'] = 0.0
+        # Set defaults only for uncalculated metrics
+        if 'release_velocity' not in metrics:
+            metrics['release_velocity'] = 0.0
+        if 'release_curvature_side' not in metrics:
+            metrics['release_curvature_side'] = 0.0
+        if 'release_curvature_rear' not in metrics:
+            metrics['release_curvature_rear'] = 0.0
+        if 'lateral_deviation' not in metrics:
+            metrics['lateral_deviation'] = 0.0
 
     return metrics, pose_df, ball_df
 
@@ -1526,8 +1480,8 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
 
     # Create subplots: 1 row, 3 columns
     fig = make_subplots(
-        rows=1, cols=3,
-        subplot_titles=("Side View Curvature (XZ)", "Normalized Ball Acceleration", "Rear View Curvature (YZ)"),
+        rows=1, cols=2,
+        subplot_titles=("Side View Curvature (XZ)", "Rear View Curvature (YZ)"),
         specs=[[ {"secondary_y": True}, {"secondary_y": True}, {"secondary_y": True} ]],
         horizontal_spacing=0.1
     )
@@ -1547,22 +1501,6 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     )
     for phase, phase_t in zip(['lift', 'set', 'release'], [0, set_t * 100, 100]):
         fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]), row=1, col=1)
-
-    # Middle: Normalized Acceleration (Col 2)
-    fig.add_trace(
-        go.Scatter(x=t_percent, y=weighted_acc, mode='none', fill='tozeroy', fillcolor=COLOR_PALETTE['weighted_acc'], name='Weighted Area (Acceleration)'),
-        row=1, col=2
-    )
-    fig.add_trace(
-        go.Scatter(x=t_percent, y=norm_acc_interp, mode='lines', name='Normalized Acceleration', line=dict(color=COLOR_PALETTE['acceleration'], width=2)),
-        row=1, col=2, secondary_y=False
-    )
-    fig.add_trace(
-        go.Scatter(x=t_percent, y=velocity_interp, mode='lines', name='Velocity (ft/s)', line=dict(color=COLOR_PALETTE['velocity'], width=2), showlegend=False),
-        row=1, col=2, secondary_y=True
-    )
-    for phase, phase_t in zip(['lift', 'set', 'release'], [0, set_t * 100, 100]):
-        fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]), row=1, col=2)
 
     # Right: Rear View Curvature (Col 3)
     fig.add_trace(
@@ -1584,9 +1522,6 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     fig.update_xaxes(title_text="% of Release", row=1, col=1)
     fig.update_yaxes(title_text="Curvature (1/ft)", row=1, col=1, secondary_y=False)
     fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=1, secondary_y=True)
-    fig.update_xaxes(title_text="% of Release", row=1, col=2)
-    fig.update_yaxes(title_text="Normalized Acceleration", row=1, col=2, secondary_y=False)
-    fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=2, secondary_y=True)
     fig.update_xaxes(title_text="% of Release", row=1, col=3)
     fig.update_yaxes(title_text="Curvature (1/ft)", row=1, col=3, secondary_y=False)
     fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=3, secondary_y=True)
@@ -1595,8 +1530,8 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     fig.update_layout(
         height=500,
         width=1200,  # Increased width for three subplots side-by-side
-        title_text="Ball Curvature and Acceleration Analysis",
-        title_x=0.5,
+        title_text="Ball Curvature",
+        title_x=0.3,
         title_font=dict(size=20),
         margin=dict(t=100, b=100, l=40, r=40),
         legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=12)),
