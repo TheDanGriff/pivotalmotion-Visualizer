@@ -423,7 +423,7 @@ def plot_shot_analysis(df_ball, metrics):
 
     fig.update_layout(
         height=subplot_height + 200, width=total_width,
-        title_text="Ball Path Analysis (Velocity by Color)",
+        title_text="Ball Path Analysis",
         title_x=0.4, title_font=dict(size=20),
         margin=dict(t=120, b=100, l=80, r=80),
         legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5, font=dict(size=12)),
