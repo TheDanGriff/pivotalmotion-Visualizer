@@ -1541,7 +1541,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=-0.2,  # Moved legend below plot to avoid overlap
+            y=-0.4,  # Moved legend below plot to avoid overlap
             xanchor="center",
             x=0.5,
             font=dict(size=12)
