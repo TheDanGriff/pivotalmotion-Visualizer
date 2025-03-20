@@ -246,9 +246,9 @@ def plot_shot_analysis(df_ball, metrics):
     # Redefine set_idx as minimum X position within visualized range
     candidate_set_window = df_ball.iloc[lift_idx:release_idx + 1]
     if not candidate_set_window.empty:
-        set_idx = candidate_set_window['Basketball_X_ft'].idxmin()  # Minimum horizontal position
+        set_idx = candidate_set_window['Basketball_X_ft'].idxmin()
     else:
-        set_idx = release_idx  # Fallback to release_idx if empty
+        set_idx = release_idx
     logger.debug(f"Set_idx redefined as minimum X position: {set_idx}")
 
     # --- SIDE VIEW ---
@@ -263,7 +263,8 @@ def plot_shot_analysis(df_ball, metrics):
         traj_x = -traj_x
         release_x = -release_x if release_x < 0 else release_x
 
-    side_range = [release_x - 2, release_x + 2]
+    # Shift X-axis: Release at -1, range shifted 1 foot left
+    side_range = [release_x - 3, release_x + 1]  # 4 ft range, release at -1 from right edge
     if len(traj_x) > 0 and len(traj_z) > 0 and len(traj_v) > 0:
         min_len = min(len(traj_x), len(traj_z), len(traj_v))
         traj_x = traj_x[:min_len]
@@ -289,8 +290,8 @@ def plot_shot_analysis(df_ball, metrics):
         proj_x = proj_x[proj_mask]
         proj_z = proj_z[proj_mask]
 
-    tickvals_x = np.linspace(side_range[0], side_range[1], 5)
-    ticktext_x = [f"{val:.1f}" for val in tickvals_x]
+    tickvals_x = np.linspace(side_range[0], side_range[1], 5)  # e.g., [release_x-3, -2, -1, 0, 1]
+    ticktext_x = [-3, -2, -1, 0, 1]  # Relative to release at -1
     tickvals_y = np.arange(2, 12, 1)
 
     # --- REAR VIEW ---
@@ -360,7 +361,7 @@ def plot_shot_analysis(df_ball, metrics):
             if lift_idx <= idx <= release_idx:
                 marker_x = df_ball.at[idx, 'Basketball_X_ft']
                 if marker_x < 0:
-                    marker_x = -marker_x  # Ensure positive
+                    marker_x = -marker_x
                 marker_z = df_ball.at[idx, 'Basketball_Z_ft']
                 if side_range[0] <= marker_x <= side_range[1] and 2 <= marker_z <= 11:
                     fig.add_trace(
@@ -474,7 +475,7 @@ def plot_shot_analysis(df_ball, metrics):
         title_text="Ball Path Analysis",
         title_x=0.4, title_font=dict(size=20),
         margin=dict(t=120, b=100, l=80, r=80),
-        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5, font=dict(size=12)),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=12)),
         plot_bgcolor='rgba(255, 255, 255, 1)', paper_bgcolor='rgba(255, 255, 255, 1)',
         showlegend=True, autosize=False
     )
@@ -487,6 +488,7 @@ def plot_shot_analysis(df_ball, metrics):
         annotation.y = 1.05
 
     return fig
+
 
 
 

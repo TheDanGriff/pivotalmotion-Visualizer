@@ -1015,9 +1015,9 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         apex_window_start = max(0, metrics['apex_idx'] - 75)
         metrics['release_idx'] = ball_df['velocity_magnitude'].iloc[apex_window_start:metrics['apex_idx']].idxmax()
         release_window_start = max(0, metrics['release_idx'] - 40)
-        metrics['set_idx'] = ball_df.iloc[release_window_start:metrics['release_idx']]['Basketball_X'].idxmax()  # Max X before release
-        set_window_start = max(0, metrics['release_idx'] - 32)  # Align with visualization frames
-        metrics['lift_idx'] = ball_df.iloc[set_window_start:metrics['release_idx']]['Basketball_Z'].idxmin()  # Min Z before release
+        metrics['set_idx'] = ball_df.iloc[release_window_start:metrics['release_idx']]['Basketball_X'].idxmax()
+        set_window_start = max(0, metrics['release_idx'] - 32)
+        metrics['lift_idx'] = ball_df.iloc[set_window_start:metrics['release_idx']]['Basketball_Z'].idxmin()
         metrics['rim_impact_idx'] = (basketball_z <= 120).idxmax()
 
         # 5. Determine hoop position
@@ -1075,18 +1075,19 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             release_velocity = np.sqrt(rv_x**2 + rv_y**2 + rv_z**2) * INCHES_TO_FEET
             metrics['release_velocity'] = release_velocity if not pd.isna(release_velocity) and release_velocity > 0 else 0.0
 
-        # 12. Release Curvature with Outlier Handling
+        # 12. Release Curvature with Total Weighted Area
         points_side = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_X_ft', 'Basketball_Z_ft']].dropna().values
         if len(points_side) > 7:
             P_side = fit_bezier(points_side, n=6)
             if P_side is not None:
                 tau_grid = np.linspace(0, 1, 100, dtype=np.float64)
                 kappa_grid_side = np.array([compute_curvature(P_side, tau) for tau in tau_grid], dtype=np.float64)
-                kappa_grid_side = np.clip(kappa_grid_side, 0, 5)  # Cap at 5 1/ft
+                kappa_grid_side = np.clip(kappa_grid_side, 0, 5)
                 tau_max_side = tau_grid[np.argmax(kappa_grid_side)]
                 sigma_side = compute_terminal_curvature(P_side, tau_max_side)
-                weighted_area_side = compute_weighted_curvature_area(P_side)
-                metrics['release_curvature_side'] = min(sigma_side, 5)  # Cap at 5 1/ft
+                w_grid = 4 * tau_grid**3  # Cubic weighting
+                weighted_area_side = trapezoid(np.abs(kappa_grid_side) * w_grid, tau_grid)
+                metrics['release_curvature_side'] = min(sigma_side, 5)
                 metrics['weighted_curvature_area_side'] = weighted_area_side
             else:
                 metrics['release_curvature_side'] = 0.0
@@ -1101,11 +1102,12 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             if P_rear is not None:
                 tau_grid = np.linspace(0, 1, 100, dtype=np.float64)
                 kappa_grid_rear = np.array([compute_curvature(P_rear, tau) for tau in tau_grid], dtype=np.float64)
-                kappa_grid_rear = np.clip(kappa_grid_rear, 0, 5)  # Cap at 5 1/ft
+                kappa_grid_rear = np.clip(kappa_grid_rear, 0, 5)
                 tau_max_rear = tau_grid[np.argmax(kappa_grid_rear)]
                 sigma_rear = compute_terminal_curvature(P_rear, tau_max_rear)
-                weighted_area_rear = compute_weighted_curvature_area(P_rear)
-                metrics['release_curvature_rear'] = min(sigma_rear, 5)  # Cap at 5 1/ft
+                w_grid = 4 * tau_grid**3  # Cubic weighting
+                weighted_area_rear = trapezoid(np.abs(kappa_grid_rear) * w_grid, tau_grid)
+                metrics['release_curvature_rear'] = min(sigma_rear, 5)
                 metrics['weighted_curvature_area_rear'] = weighted_area_rear
             else:
                 metrics['release_curvature_rear'] = 0.0
@@ -1113,6 +1115,12 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         else:
             metrics['release_curvature_rear'] = 0.0
             metrics['weighted_curvature_area_rear'] = 0.0
+
+        # Total Weighted Curvature KPI
+        metrics['total_weighted_curvature_area'] = (
+            metrics.get('weighted_curvature_area_side', 0.0) +
+            metrics.get('weighted_curvature_area_rear', 0.0)
+        )
 
         # 13. Lateral Deviation
         lateral_dev = calculate_lateral_deviation(ball_df, metrics['release_idx'], hoop_x=metrics['hoop_x'], hoop_y=metrics['hoop_y'])
@@ -1311,42 +1319,30 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     set_idx = int(metrics.get('set_idx', lift_idx + 1))
     release_idx = int(metrics.get('release_idx', set_idx + 1))
 
-    lift_to_release_frames = release_idx - lift_idx
-    if lift_to_release_frames <= 0:
+    # Use same range as plot_shot_analysis (lift to release)
+    start_idx = lift_idx
+    end_idx = release_idx + 1
+    total_frames = end_idx - start_idx
+
+    if total_frames <= 0:
         raise ValueError("Invalid indices: release_idx must be greater than lift_idx.")
 
-    extra_frames = int(lift_to_release_frames * 0.25)
-    max_idx = len(df_ball) - 1
-    start_idx = max(0, lift_idx - extra_frames)
-    end_idx = min(max_idx, release_idx + extra_frames)
-    total_frames_extended = end_idx - start_idx
-
-    lift_t = (lift_idx - start_idx) / total_frames_extended
-    set_t = (set_idx - lift_idx) / lift_to_release_frames
-    release_t = (release_idx - start_idx) / total_frames_extended
     t_fine = np.linspace(0, 1, num_interp)
-    t_percent = ((t_fine - lift_t) / (release_t - lift_t)) * 100
+    t_percent = t_fine * 100  # 0-100% from lift to release
 
-    t_raw, norm_acc, acc_raw = compute_normalized_acceleration_from_raw(df_ball, start_idx, end_idx, fps)
-    if len(norm_acc) > 31:
-        window_length = min(31, len(norm_acc) - 1)
-        if window_length % 2 == 0:
-            window_length += 1
-        norm_acc = savgol_filter(norm_acc, window_length=window_length, polyorder=2)
-    norm_acc_interp = np.interp(t_fine, t_raw, norm_acc)
-    w = (weighting_exponent + 1) * (t_fine ** weighting_exponent)
-    weighted_acc = np.abs(norm_acc_interp) * w
-
-    velocity_segment = df_ball['velocity_magnitude'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
+    # Velocity
+    velocity_segment = df_ball['velocity_magnitude'].iloc[start_idx:end_idx].to_numpy() * INCHES_TO_FEET
     if len(velocity_segment) > 31:
         window_length = min(31, len(velocity_segment) - 1)
         if window_length % 2 == 0:
             window_length += 1
         velocity_segment = savgol_filter(velocity_segment, window_length=window_length, polyorder=2)
+    t_raw = np.linspace(0, 1, len(velocity_segment))
     velocity_interp = np.interp(t_fine, t_raw, velocity_segment)
 
-    seg_x = df_ball['Basketball_X'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
-    seg_z = df_ball['Basketball_Z'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
+    # Side View Curvature (XZ plane)
+    seg_x = df_ball['Basketball_X'].iloc[start_idx:end_idx].to_numpy() * INCHES_TO_FEET
+    seg_z = df_ball['Basketball_Z'].iloc[start_idx:end_idx].to_numpy() * INCHES_TO_FEET
     if len(seg_x) > 3:
         window_length = min(11, len(seg_x) - 1)
         if window_length % 2 == 0:
@@ -1355,16 +1351,18 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         seg_z = savgol_filter(seg_z, window_length=window_length, polyorder=2)
     P_side, _ = fit_bezier_curve(seg_x, seg_z, n=bezier_order)
     side_curve = bezier_curvature(P_side, t_fine, scale=curvature_scale / 12)
-    side_curve_clipped = np.clip(side_curve, 0, 5)  # Cap at 5 1/ft
-    side_outliers = np.where(side_curve > 5, side_curve, np.nan)  # Mark outliers
+    side_curve_clipped = np.clip(side_curve, 0, 5)
+    side_outliers = np.where(side_curve > 5, side_curve, np.nan)
     if len(side_curve) > 3:
         window_length = min(11, len(side_curve) - 1)
         if window_length % 2 == 0:
             window_length += 1
         side_curve_clipped = savgol_filter(side_curve_clipped, window_length=window_length, polyorder=2)
+    w = (weighting_exponent + 1) * (t_fine ** weighting_exponent)
     weighted_side = np.abs(side_curve_clipped) * w
 
-    seg_y = df_ball['Basketball_Y'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
+    # Rear View Curvature (YZ plane)
+    seg_y = df_ball['Basketball_Y'].iloc[start_idx:end_idx].to_numpy() * INCHES_TO_FEET
     if len(seg_y) > 3:
         window_length = min(11, len(seg_y) - 1)
         if window_length % 2 == 0:
@@ -1372,8 +1370,8 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         seg_y = savgol_filter(seg_y, window_length=window_length, polyorder=2)
     P_rear, _ = fit_bezier_curve(seg_y, seg_z, n=bezier_order)
     rear_curve = bezier_curvature(P_rear, t_fine, scale=curvature_scale / 12)
-    rear_curve_clipped = np.clip(rear_curve, 0, 5)  # Cap at 5 1/ft
-    rear_outliers = np.where(rear_curve > 5, rear_curve, np.nan)  # Mark outliers
+    rear_curve_clipped = np.clip(rear_curve, 0, 5)
+    rear_outliers = np.where(rear_curve > 5, rear_curve, np.nan)
     if len(rear_curve) > 3:
         window_length = min(11, len(rear_curve) - 1)
         if window_length % 2 == 0:
@@ -1389,7 +1387,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         'velocity': 'rgba(107, 174, 214, 1)',
         'weighted_side': 'rgba(31, 119, 180, 0.3)',
         'weighted_rear': 'rgba(31, 119, 180, 0.3)',
-        'outlier': 'rgba(255, 165, 0, 1)'  # Orange for outliers
+        'outlier': 'rgba(255, 165, 0, 1)'
     }
     DASH_STYLES = {
         'lift': 'dash',
@@ -1426,7 +1424,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         go.Scatter(x=t_percent, y=velocity_interp, mode='lines', name='Velocity (ft/s)', line=dict(color=COLOR_PALETTE['velocity'], width=2), showlegend=False),
         row=1, col=1, secondary_y=True
     )
-    for phase, phase_t in zip(['lift', 'set', 'release'], [0, set_t * 100, 100]):
+    for phase, phase_t in zip(['lift', 'set', 'release'], [0, (set_idx - lift_idx) / total_frames * 100, 100]):
         fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]), row=1, col=1)
 
     # Rear View
@@ -1446,21 +1444,20 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         go.Scatter(x=t_percent, y=velocity_interp, mode='lines', name='Velocity (ft/s)', line=dict(color=COLOR_PALETTE['velocity'], width=2), showlegend=False),
         row=1, col=2, secondary_y=True
     )
-    for phase, phase_t in zip(['lift', 'set', 'release'], [0, set_t * 100, 100]):
+    for phase, phase_t in zip(['lift', 'set', 'release'], [0, (set_idx - lift_idx) / total_frames * 100, 100]):
         fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]), row=1, col=2)
 
     fig.update_xaxes(title_text="% of Release", row=1, col=1)
     fig.update_yaxes(title_text="Curvature (1/ft)", row=1, col=1, secondary_y=False)
     fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=1, secondary_y=True)
-    fig.update_xaxes(title_text="% of Release", row=1,
-                     col=2)
+    fig.update_xaxes(title_text="% of Release", row=1, col=2)
     fig.update_yaxes(title_text="Curvature (1/ft)", row=1, col=2, secondary_y=False)
     fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=2, secondary_y=True)
 
     fig.update_layout(
         height=500,
         width=1000,
-        title_text="Ball Curvature",
+        title_text="Ball Curvature Analysis",
         title_x=0.5,
         title_font=dict(size=20),
         margin=dict(t=100, b=100, l=40, r=40),
