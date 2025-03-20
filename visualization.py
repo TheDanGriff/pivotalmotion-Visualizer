@@ -245,10 +245,17 @@ def plot_shot_analysis(df_ball, metrics):
     set_idx = clamp_index(metrics.get('set_idx', release_idx), max_idx)
 
     # --- SIDE VIEW ---
-    traj_x = get_slice(df_ball, 'Basketball_X_ft', start_idx, release_idx + 1)
-    traj_z = get_slice(df_ball, 'Basketball_Z_ft', start_idx, release_idx + 1, clip_min=2, clip_max=11)
-    traj_v = get_slice(df_ball, 'velocity_magnitude', start_idx, release_idx + 1)
+    traj_x = get_slice(df_ball, 'Basketball_X_ft', lift_idx, release_idx + 1)
+    traj_z = get_slice(df_ball, 'Basketball_Z_ft', lift_idx, release_idx + 1, clip_min=2, clip_max=11)
+    traj_v = get_slice(df_ball, 'velocity_magnitude', lift_idx, release_idx + 1)
     release_x = df_ball.at[release_idx, 'Basketball_X_ft']
+
+    # Force positive X-axis by flipping if negative
+    if np.any(traj_x < 0):
+        logger.debug(f"Negative X values detected in traj_x (e.g., {traj_x[:5]}), flipping to positive")
+        traj_x = -traj_x  # Flip to positive
+        release_x = -release_x if release_x < 0 else release_x
+
     side_range = [release_x - 2, release_x + 2]
     if len(traj_x) > 0 and len(traj_z) > 0 and len(traj_v) > 0:
         min_len = min(len(traj_x), len(traj_z), len(traj_v))
@@ -263,6 +270,10 @@ def plot_shot_analysis(df_ball, metrics):
     post_release_end = min(max_idx, release_idx + 20)
     proj_x = get_slice(df_ball, 'Basketball_X_ft', release_idx, post_release_end + 1)
     proj_z = get_slice(df_ball, 'Basketball_Z_ft', release_idx, post_release_end + 1, clip_min=2, clip_max=11)
+    if np.any(proj_x < 0):
+        logger.debug(f"Negative X values detected in proj_x (e.g., {proj_x[:5]}), flipping to positive")
+        proj_x = -proj_x
+
     if len(proj_x) > 0 and len(proj_z) > 0:
         min_len = min(len(proj_x), len(proj_z))
         proj_x = proj_x[:min_len]
@@ -276,7 +287,7 @@ def plot_shot_analysis(df_ball, metrics):
     tickvals_y = np.arange(2, 12, 1)
 
     # --- REAR VIEW ---
-    traj_y = get_slice(df_ball, 'Basketball_Y_ft', start_idx, release_idx + 1)
+    traj_y = get_slice(df_ball, 'Basketball_Y_ft', lift_idx, release_idx + 1)
     traj_z_rear = traj_z
     traj_v_rear = traj_v
     rear_range = [-2, 2]
@@ -339,8 +350,10 @@ def plot_shot_analysis(df_ball, metrics):
         }
         for phase, info in phase_info.items():
             idx = info['idx']
-            if start_idx <= idx <= release_idx:
+            if lift_idx <= idx <= release_idx:
                 marker_x = df_ball.at[idx, 'Basketball_X_ft']
+                if marker_x < 0:
+                    marker_x = -marker_x  # Ensure positive
                 marker_z = df_ball.at[idx, 'Basketball_Z_ft']
                 if side_range[0] <= marker_x <= side_range[1] and 2 <= marker_z <= 11:
                     fig.add_trace(
@@ -389,7 +402,7 @@ def plot_shot_analysis(df_ball, metrics):
         )
         for phase, info in phase_info.items():
             idx = info['idx']
-            if start_idx <= idx <= release_idx:
+            if lift_idx <= idx <= release_idx:
                 marker_y = df_ball.at[idx, 'Basketball_Y_ft']
                 marker_z = df_ball.at[idx, 'Basketball_Z_ft']
                 if -2 <= marker_y <= 2 and 2 <= marker_z <= 11:
