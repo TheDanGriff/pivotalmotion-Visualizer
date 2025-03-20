@@ -968,17 +968,14 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
     """
     metrics = {}
     INCHES_TO_FEET = 1 / 12
-    BALL_RADIUS_INCHES = 4.7
-    BALL_RADIUS_FEET = BALL_RADIUS_INCHES * INCHES_TO_FEET
 
     try:
-        # 1. Validate Pose and Ball DataFrames
+        # 1. Validate DataFrames
         required_pose = [
             'LHEEL_X', 'LHEEL_Y', 'LBIGTOE_X', 'LBIGTOE_Y',
             'RHEEL_X', 'RHEEL_Y', 'RBIGTOE_X', 'RBIGTOE_Y',
             'MIDHIP_X', 'MIDHIP_Y', 'NECK_X', 'NECK_Y',
-            'LSHOULDER_X', 'LSHOULDER_Y', 'RSHOULDER_X', 'RSHOULDER_Y',
-            'RELBOW_Z'  # Added for lift index
+            'LSHOULDER_X', 'LSHOULDER_Y', 'RSHOULDER_X', 'RSHOULDER_Y'
         ]
         missing_pose = [col for col in required_pose if col not in pose_df.columns]
         if missing_pose:
@@ -990,18 +987,13 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             logger.error(f"Missing columns in ball_df: {missing_ball}")
             return metrics, pose_df, ball_df
 
-        # 2. Adjust coordinates if shot comes from the negative side
+        # 2. Adjust coordinates to ensure positive X
         ball_df, pose_df = adjust_shot_coordinates(ball_df, pose_df)
 
-        # 3. Compute additional pose angles
-        pose_df = calculate_foot_angles(pose_df)
-        pose_df = calculate_rotation_angles(pose_df)
-
-        # 4. Compute velocities in inches/second
+        # 3. Compute velocities
         basketball_x = ball_df['Basketball_X']
         basketball_y = ball_df['Basketball_Y']
         basketball_z = ball_df['Basketball_Z']
-
         ball_df['velocity_x'] = basketball_x.diff() * fps
         ball_df['velocity_y'] = basketball_y.diff() * fps
         ball_df['velocity_z'] = basketball_z.diff() * fps
@@ -1018,19 +1010,17 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             .fillna(method='ffill')
         )
 
-        # 5. Identify key shot indices
+        # 4. Identify key indices
         metrics['apex_idx'] = basketball_z.idxmax()
         apex_window_start = max(0, metrics['apex_idx'] - 75)
         metrics['release_idx'] = ball_df['velocity_magnitude'].iloc[apex_window_start:metrics['apex_idx']].idxmax()
-
-        # Initial set and lift indices (will refine after remapping)
         release_window_start = max(0, metrics['release_idx'] - 40)
-        metrics['set_idx'] = ball_df.iloc[release_window_start:metrics['release_idx']]['Basketball_X'].idxmin()
-        set_window_start = max(0, metrics['set_idx'] - 25)
-        metrics['lift_idx'] = ball_df.iloc[set_window_start:metrics['set_idx']]['Basketball_X'].idxmax()
+        metrics['set_idx'] = ball_df.iloc[release_window_start:metrics['release_idx']]['Basketball_X'].idxmax()  # Max X before release
+        set_window_start = max(0, metrics['release_idx'] - 32)  # Align with visualization frames
+        metrics['lift_idx'] = ball_df.iloc[set_window_start:metrics['release_idx']]['Basketball_Z'].idxmin()  # Min Z before release
         metrics['rim_impact_idx'] = (basketball_z <= 120).idxmax()
 
-        # 6. Determine hoop position
+        # 5. Determine hoop position
         release_point = ball_df.loc[metrics['release_idx']]
         player_x = release_point['Basketball_X']
         hoop_x = 501.0 if player_x >= 0 else -501.0
@@ -1038,13 +1028,17 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['hoop_x'] = hoop_x
         metrics['hoop_y'] = hoop_y
 
-        # 7. Remap shot coordinates
+        # 6. Remap coordinates (ensure positive X preserved)
         ball_df, pose_df, theta_used = remap_shot_coordinates(ball_df, pose_df, hoop_x, hoop_y, metrics['release_idx'], INCHES_TO_FEET)
         release_point = ball_df.loc[metrics['release_idx']]
         hoop_x_ft = hoop_x * INCHES_TO_FEET
         hoop_y_ft = hoop_y * INCHES_TO_FEET
-        dx = hoop_x_ft - release_point['Basketball_X_ft']
-        dy = hoop_y_ft - release_point['Basketball_Y_ft']
+
+        # 7. Shot Distance using raw coordinates / 12
+        release_x_ft = release_point['Basketball_X'] * INCHES_TO_FEET
+        release_y_ft = release_point['Basketball_Y'] * INCHES_TO_FEET
+        dx = hoop_x_ft - release_x_ft
+        dy = hoop_y_ft - release_y_ft
         original_shot_distance = np.sqrt(dx**2 + dy**2)
         if original_shot_distance > 47.0:
             shot_distance = 94.0 - original_shot_distance
@@ -1056,37 +1050,21 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['original_shot_distance'] = original_shot_distance
         metrics['flip'] = flip
 
-        # 8. Refine set and lift indices using remapped coordinates
-        candidate_set_window = ball_df.iloc[max(0, metrics['release_idx'] - 30):metrics['release_idx']]
-        if not candidate_set_window.empty:
-            metrics['set_idx'] = candidate_set_window['Basketball_X_ft'].idxmax()  # Max X position
-        else:
-            metrics['set_idx'] = metrics['release_idx']
+        # 8. Refine set_idx (should be max X, already set above)
+        # Refine lift_idx (already set as min Z)
 
-        if 'RELBOW_Z' not in pose_df.columns or pose_df['RELBOW_Z'].isna().all():
-            logger.warning("RELBOW_Z unavailable, using fallback for lift_idx")
-            metrics['lift_idx'] = max(0, metrics['set_idx'] - 30)
-        else:
-            elbow_z_ft = pose_df['RELBOW_Z'] * INCHES_TO_FEET
-            ball_bottom_z_ft = (ball_df['Basketball_Z'] * INCHES_TO_FEET) - BALL_RADIUS_FEET
-            pre_set_df = ball_df.loc[:metrics['set_idx']].copy()
-            pre_set_df['ball_bottom_z_ft'] = ball_bottom_z_ft
-            pre_set_df['elbow_z_ft'] = elbow_z_ft
-            lift_candidates = pre_set_df.index[pre_set_df['ball_bottom_z_ft'] > pre_set_df['elbow_z_ft']]
-            metrics['lift_idx'] = lift_candidates[0] if len(lift_candidates) > 0 else max(0, metrics['set_idx'] - 30)
-
-        # 9. Compute additional KPIs
+        # 9. Compute KPIs
         metrics['release_height'] = release_point['Basketball_Z'] * INCHES_TO_FEET
         metrics['release_time'] = (metrics['release_idx'] - metrics['lift_idx']) / fps
         metrics['apex_height'] = basketball_z.max() * INCHES_TO_FEET
 
-        # 10. Compute Release Angle
+        # 10. Release Angle
         post_release = ball_df.loc[metrics['release_idx']:metrics['release_idx'] + 3]
         dz = post_release['Basketball_Z'].diff().iloc[1:].mean() * INCHES_TO_FEET
-        dxy = np.sqrt(post_release['Basketball_X_ft'].diff()**2 + post_release['Basketball_Y_ft'].diff()**2).iloc[1:].mean()
+        dxy = np.sqrt(post_release['Basketball_X'].diff()**2 + post_release['Basketball_Y'].diff()**2).iloc[1:].mean() * INCHES_TO_FEET
         metrics['release_angle'] = np.degrees(np.arctan2(dz, dxy))
 
-        # 11. Compute Release Velocity
+        # 11. Release Velocity
         if pd.isna(metrics['release_idx']) or metrics['release_idx'] >= len(ball_df) or metrics['release_idx'] < 1:
             logger.error(f"Invalid release_idx: {metrics['release_idx']}, ball_df length: {len(ball_df)}")
             metrics['release_velocity'] = 0.0
@@ -1097,17 +1075,18 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             release_velocity = np.sqrt(rv_x**2 + rv_y**2 + rv_z**2) * INCHES_TO_FEET
             metrics['release_velocity'] = release_velocity if not pd.isna(release_velocity) and release_velocity > 0 else 0.0
 
-        # 12. Compute Release Curvature (Side and Rear)
+        # 12. Release Curvature with Outlier Handling
         points_side = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_X_ft', 'Basketball_Z_ft']].dropna().values
         if len(points_side) > 7:
             P_side = fit_bezier(points_side, n=6)
             if P_side is not None:
                 tau_grid = np.linspace(0, 1, 100, dtype=np.float64)
                 kappa_grid_side = np.array([compute_curvature(P_side, tau) for tau in tau_grid], dtype=np.float64)
+                kappa_grid_side = np.clip(kappa_grid_side, 0, 5)  # Cap at 5 1/ft
                 tau_max_side = tau_grid[np.argmax(kappa_grid_side)]
                 sigma_side = compute_terminal_curvature(P_side, tau_max_side)
                 weighted_area_side = compute_weighted_curvature_area(P_side)
-                metrics['release_curvature_side'] = sigma_side
+                metrics['release_curvature_side'] = min(sigma_side, 5)  # Cap at 5 1/ft
                 metrics['weighted_curvature_area_side'] = weighted_area_side
             else:
                 metrics['release_curvature_side'] = 0.0
@@ -1122,10 +1101,11 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             if P_rear is not None:
                 tau_grid = np.linspace(0, 1, 100, dtype=np.float64)
                 kappa_grid_rear = np.array([compute_curvature(P_rear, tau) for tau in tau_grid], dtype=np.float64)
+                kappa_grid_rear = np.clip(kappa_grid_rear, 0, 5)  # Cap at 5 1/ft
                 tau_max_rear = tau_grid[np.argmax(kappa_grid_rear)]
                 sigma_rear = compute_terminal_curvature(P_rear, tau_max_rear)
                 weighted_area_rear = compute_weighted_curvature_area(P_rear)
-                metrics['release_curvature_rear'] = sigma_rear
+                metrics['release_curvature_rear'] = min(sigma_rear, 5)  # Cap at 5 1/ft
                 metrics['weighted_curvature_area_rear'] = weighted_area_rear
             else:
                 metrics['release_curvature_rear'] = 0.0
@@ -1134,37 +1114,12 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             metrics['release_curvature_rear'] = 0.0
             metrics['weighted_curvature_area_rear'] = 0.0
 
-        # 13. Compute Lateral Deviation
+        # 13. Lateral Deviation
         lateral_dev = calculate_lateral_deviation(ball_df, metrics['release_idx'], hoop_x=metrics['hoop_x'], hoop_y=metrics['hoop_y'])
         if lateral_dev and len(lateral_dev) >= 4:
             metrics['lateral_deviation'] = lateral_dev[0]
         else:
             metrics['lateral_deviation'] = 0.0
-
-        # 14. Additional Pose Computations
-        pose_df = compute_joint_angles(pose_df)
-        pose_df = calculate_centroid(pose_df)
-        pose_df = calculate_stability(pose_df)
-        pose_df = calculate_guide_hand_release(pose_df)
-
-        # 15. Recompute Joint Angles
-        def calculate_angle(df, a_x, a_y, a_z, b_x, b_y, b_z, c_x, c_y, c_z):
-            ab = np.sqrt((df[a_x] - df[b_x])**2 + (df[a_y] - df[b_y])**2 + (df[a_z] - df[b_z])**2)
-            bc = np.sqrt((df[c_x] - df[b_x])**2 + (df[c_y] - df[b_y])**2 + (df[c_z] - df[b_z])**2)
-            ac = np.sqrt((df[a_x] - df[c_x])**2 + (df[a_y] - df[c_y])**2 + (df[a_z] - df[c_z])**2)
-            cos_angle = (ab**2 + bc**2 - ac**2) / (2 * ab * bc)
-            cos_angle = np.clip(cos_angle, -1, 1)
-            return np.degrees(np.arccos(cos_angle))
-
-        angles = {
-            'elbow_angle': calculate_angle(pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z', 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z', 'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z'),
-            'shoulder_angle': calculate_angle(pose_df, 'MIDHIP_X', 'MIDHIP_Y', 'MIDHIP_Z', 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z', 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z'),
-            'wrist_angle': calculate_angle(pose_df, 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z', 'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z', 'RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z'),
-            'hip_angle': calculate_angle(pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z', 'RHIP_X', 'RHIP_Y', 'RHIP_Z', 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z'),
-            'knee_angle': calculate_angle(pose_df, 'RHIP_X', 'RHIP_Y', 'RHIP_Z', 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z', 'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z'),
-            'ankle_angle': calculate_angle(pose_df, 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z', 'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z', 'RBIGTOE_X', 'RBIGTOE_Y', 'RBIGTOE_Z')
-        }
-        pose_df = pd.concat([pose_df, pd.DataFrame(angles, index=pose_df.index)], axis=1)
 
     except Exception as e:
         logger.error(f"Error calculating shot metrics: {str(e)}")
@@ -1372,7 +1327,6 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     t_fine = np.linspace(0, 1, num_interp)
     t_percent = ((t_fine - lift_t) / (release_t - lift_t)) * 100
 
-    # Normalized Acceleration with heavy smoothing
     t_raw, norm_acc, acc_raw = compute_normalized_acceleration_from_raw(df_ball, start_idx, end_idx, fps)
     if len(norm_acc) > 31:
         window_length = min(31, len(norm_acc) - 1)
@@ -1383,16 +1337,14 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     w = (weighting_exponent + 1) * (t_fine ** weighting_exponent)
     weighted_acc = np.abs(norm_acc_interp) * w
 
-    # Velocity with heavier smoothing
     velocity_segment = df_ball['velocity_magnitude'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
-    if len(velocity_segment) > 31:  # Increased window length from 11 to 31
+    if len(velocity_segment) > 31:
         window_length = min(31, len(velocity_segment) - 1)
         if window_length % 2 == 0:
             window_length += 1
         velocity_segment = savgol_filter(velocity_segment, window_length=window_length, polyorder=2)
     velocity_interp = np.interp(t_fine, t_raw, velocity_segment)
 
-    # Side View Curvature (XZ plane)
     seg_x = df_ball['Basketball_X'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
     seg_z = df_ball['Basketball_Z'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
     if len(seg_x) > 3:
@@ -1403,14 +1355,15 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         seg_z = savgol_filter(seg_z, window_length=window_length, polyorder=2)
     P_side, _ = fit_bezier_curve(seg_x, seg_z, n=bezier_order)
     side_curve = bezier_curvature(P_side, t_fine, scale=curvature_scale / 12)
+    side_curve_clipped = np.clip(side_curve, 0, 5)  # Cap at 5 1/ft
+    side_outliers = np.where(side_curve > 5, side_curve, np.nan)  # Mark outliers
     if len(side_curve) > 3:
         window_length = min(11, len(side_curve) - 1)
         if window_length % 2 == 0:
             window_length += 1
-        side_curve = savgol_filter(side_curve, window_length=window_length, polyorder=2)
-    weighted_side = np.abs(side_curve) * w
+        side_curve_clipped = savgol_filter(side_curve_clipped, window_length=window_length, polyorder=2)
+    weighted_side = np.abs(side_curve_clipped) * w
 
-    # Rear View Curvature (YZ plane)
     seg_y = df_ball['Basketball_Y'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
     if len(seg_y) > 3:
         window_length = min(11, len(seg_y) - 1)
@@ -1419,24 +1372,24 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         seg_y = savgol_filter(seg_y, window_length=window_length, polyorder=2)
     P_rear, _ = fit_bezier_curve(seg_y, seg_z, n=bezier_order)
     rear_curve = bezier_curvature(P_rear, t_fine, scale=curvature_scale / 12)
+    rear_curve_clipped = np.clip(rear_curve, 0, 5)  # Cap at 5 1/ft
+    rear_outliers = np.where(rear_curve > 5, rear_curve, np.nan)  # Mark outliers
     if len(rear_curve) > 3:
         window_length = min(11, len(rear_curve) - 1)
         if window_length % 2 == 0:
             window_length += 1
-        rear_curve = savgol_filter(rear_curve, window_length=window_length, polyorder=2)
-    weighted_rear = np.abs(rear_curve) * w
+        rear_curve_clipped = savgol_filter(rear_curve_clipped, window_length=window_length, polyorder=2)
+    weighted_rear = np.abs(rear_curve_clipped) * w
 
-    # Color Palette and Styles
     COLOR_PALETTE = {
         'lift': 'rgba(147, 112, 219, 1)',
         'set': 'rgba(255, 182, 193, 1)',
         'release': 'rgba(255, 102, 102, 1)',
-        'acceleration': 'rgba(0, 0, 0, 1)',
         'curvature': 'rgba(0, 0, 0, 1)',
         'velocity': 'rgba(107, 174, 214, 1)',
-        'weighted_acc': 'rgba(255, 102, 102, 0.3)',
         'weighted_side': 'rgba(31, 119, 180, 0.3)',
-        'weighted_rear': 'rgba(31, 119, 180, 0.3)'
+        'weighted_rear': 'rgba(31, 119, 180, 0.3)',
+        'outlier': 'rgba(255, 165, 0, 1)'  # Orange for outliers
     }
     DASH_STYLES = {
         'lift': 'dash',
@@ -1444,13 +1397,11 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         'release': 'dashdot'
     }
 
-    # Dummy traces for legend
     dummy_lift = go.Scatter(x=[None], y=[None], mode='lines', line=dict(color=COLOR_PALETTE['lift'], dash=DASH_STYLES['lift'], width=2), name=f"Lift (index: {lift_idx})")
     dummy_set = go.Scatter(x=[None], y=[None], mode='lines', line=dict(color=COLOR_PALETTE['set'], dash=DASH_STYLES['set'], width=2), name=f"Set (index: {set_idx})")
     dummy_release = go.Scatter(x=[None], y=[None], mode='lines', line=dict(color=COLOR_PALETTE['release'], dash=DASH_STYLES['release'], width=2), name=f"Release (index: {release_idx})")
     dummy_velocity = go.Scatter(x=[None], y=[None], mode='lines', line=dict(color=COLOR_PALETTE['velocity'], width=2), name="Velocity (ft/s)")
 
-    # Create subplots: 1 row, 2 columns
     fig = make_subplots(
         rows=1, cols=2,
         subplot_titles=("Side View Curvature (XZ)", "Rear View Curvature (YZ)"),
@@ -1458,13 +1409,17 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         horizontal_spacing=0.1
     )
 
-    # Left: Side View Curvature (Col 1)
+    # Side View
     fig.add_trace(
         go.Scatter(x=t_percent, y=weighted_side, mode='none', fill='tozeroy', fillcolor=COLOR_PALETTE['weighted_side'], name='Weighted Area (Side)'),
         row=1, col=1
     )
     fig.add_trace(
-        go.Scatter(x=t_percent, y=side_curve, mode='lines', name='Side Curvature (1/ft)', line=dict(color=COLOR_PALETTE['curvature'], width=2)),
+        go.Scatter(x=t_percent, y=side_curve_clipped, mode='lines', name='Side Curvature (1/ft)', line=dict(color=COLOR_PALETTE['curvature'], width=2)),
+        row=1, col=1, secondary_y=False
+    )
+    fig.add_trace(
+        go.Scatter(x=t_percent, y=side_outliers, mode='markers', name='Side Outliers (>5 1/ft)', marker=dict(color=COLOR_PALETTE['outlier'], size=6)),
         row=1, col=1, secondary_y=False
     )
     fig.add_trace(
@@ -1474,13 +1429,17 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     for phase, phase_t in zip(['lift', 'set', 'release'], [0, set_t * 100, 100]):
         fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]), row=1, col=1)
 
-    # Right: Rear View Curvature (Col 2)
+    # Rear View
     fig.add_trace(
         go.Scatter(x=t_percent, y=weighted_rear, mode='none', fill='tozeroy', fillcolor=COLOR_PALETTE['weighted_rear'], name='Weighted Area (Rear)'),
         row=1, col=2
     )
     fig.add_trace(
-        go.Scatter(x=t_percent, y=rear_curve, mode='lines', name='Rear Curvature (1/ft)', line=dict(color=COLOR_PALETTE['curvature'], width=2)),
+        go.Scatter(x=t_percent, y=rear_curve_clipped, mode='lines', name='Rear Curvature (1/ft)', line=dict(color=COLOR_PALETTE['curvature'], width=2)),
+        row=1, col=2, secondary_y=False
+    )
+    fig.add_trace(
+        go.Scatter(x=t_percent, y=rear_outliers, mode='markers', name='Rear Outliers (>5 1/ft)', marker=dict(color=COLOR_PALETTE['outlier'], size=6)),
         row=1, col=2, secondary_y=False
     )
     fig.add_trace(
@@ -1490,15 +1449,14 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     for phase, phase_t in zip(['lift', 'set', 'release'], [0, set_t * 100, 100]):
         fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]), row=1, col=2)
 
-    # Update axes
     fig.update_xaxes(title_text="% of Release", row=1, col=1)
     fig.update_yaxes(title_text="Curvature (1/ft)", row=1, col=1, secondary_y=False)
     fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=1, secondary_y=True)
-    fig.update_xaxes(title_text="% of Release", row=1, col=2)
+    fig.update_xaxes(title_text="% of Release", row=1,
+                     col=2)
     fig.update_yaxes(title_text="Curvature (1/ft)", row=1, col=2, secondary_y=False)
     fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=2, secondary_y=True)
 
-    # Update layout
     fig.update_layout(
         height=500,
         width=1000,
