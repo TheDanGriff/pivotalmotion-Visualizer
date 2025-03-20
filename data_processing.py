@@ -1398,7 +1398,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
 
     # Normalized Acceleration with heavy smoothing
     t_raw, norm_acc, acc_raw = compute_normalized_acceleration_from_raw(df_ball, start_idx, end_idx, fps)
-    if len(norm_acc) > 31:  # Increased window length
+    if len(norm_acc) > 31:
         window_length = min(31, len(norm_acc) - 1)
         if window_length % 2 == 0:
             window_length += 1
@@ -1407,10 +1407,10 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     w = (weighting_exponent + 1) * (t_fine ** weighting_exponent)
     weighted_acc = np.abs(norm_acc_interp) * w
 
-    # Velocity
+    # Velocity with heavier smoothing
     velocity_segment = df_ball['velocity_magnitude'].iloc[start_idx:end_idx+1].to_numpy() * INCHES_TO_FEET
-    if len(velocity_segment) > 3:
-        window_length = min(11, len(velocity_segment) - 1)
+    if len(velocity_segment) > 31:  # Increased window length from 11 to 31
+        window_length = min(31, len(velocity_segment) - 1)
         if window_length % 2 == 0:
             window_length += 1
         velocity_segment = savgol_filter(velocity_segment, window_length=window_length, polyorder=2)
