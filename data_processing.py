@@ -1075,48 +1075,54 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             release_velocity = np.sqrt(rv_x**2 + rv_y**2 + rv_z**2) * INCHES_TO_FEET
             metrics['release_velocity'] = release_velocity if not pd.isna(release_velocity) and release_velocity > 0 else 0.0
 
-        # 12. Release Curvature with Total Weighted Area
-        points_side = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_X_ft', 'Basketball_Z_ft']].dropna().values
+        # 12. Release Curvature with Total Weighted Area (extended range)
+        lift_idx = int(metrics.get('lift_idx', 0))
+        release_idx = int(metrics.get('release_idx', lift_idx + 1))
+        lift_to_release_frames = release_idx - lift_idx
+        extra_frames = int(lift_to_release_frames * 0.25)
+        max_idx = len(ball_df) - 1
+        start_idx = max(0, lift_idx - extra_frames)
+        end_idx = min(max_idx, release_idx + extra_frames)
+
+        # Side View (XZ plane)
+        points_side = ball_df.loc[start_idx:end_idx, ['Basketball_X_ft', 'Basketball_Z_ft']].dropna().values
         if len(points_side) > 7:
             P_side = fit_bezier(points_side, n=6)
             if P_side is not None:
                 tau_grid = np.linspace(0, 1, 100, dtype=np.float64)
                 kappa_grid_side = np.array([compute_curvature(P_side, tau) for tau in tau_grid], dtype=np.float64)
-                kappa_grid_side = np.clip(kappa_grid_side, 0, 5)
-                tau_max_side = tau_grid[np.argmax(kappa_grid_side)]
-                sigma_side = compute_terminal_curvature(P_side, tau_max_side)
+                median_curvature = np.median(kappa_grid_side[int(100 * 0.01):])  # Exclude first 1%
+                cap_value = min(3 * median_curvature, 0.5)
+                kappa_grid_side = np.clip(kappa_grid_side, 0, cap_value)
                 w_grid = 4 * tau_grid**3  # Cubic weighting
                 weighted_area_side = trapezoid(np.abs(kappa_grid_side) * w_grid, tau_grid)
-                metrics['release_curvature_side'] = min(sigma_side, 5)
                 metrics['weighted_curvature_area_side'] = weighted_area_side
+                logger.debug(f"Side weighted curvature area: {weighted_area_side}")
             else:
-                metrics['release_curvature_side'] = 0.0
                 metrics['weighted_curvature_area_side'] = 0.0
         else:
-            metrics['release_curvature_side'] = 0.0
             metrics['weighted_curvature_area_side'] = 0.0
 
-        points_rear = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_Y_ft', 'Basketball_Z_ft']].dropna().values
+        # Rear View (YZ plane)
+        points_rear = ball_df.loc[start_idx:end_idx, ['Basketball_Y_ft', 'Basketball_Z_ft']].dropna().values
         if len(points_rear) > 7:
             P_rear = fit_bezier(points_rear, n=6)
             if P_rear is not None:
                 tau_grid = np.linspace(0, 1, 100, dtype=np.float64)
                 kappa_grid_rear = np.array([compute_curvature(P_rear, tau) for tau in tau_grid], dtype=np.float64)
-                kappa_grid_rear = np.clip(kappa_grid_rear, 0, 5)
-                tau_max_rear = tau_grid[np.argmax(kappa_grid_rear)]
-                sigma_rear = compute_terminal_curvature(P_rear, tau_max_rear)
+                median_curvature = np.median(kappa_grid_rear[int(100 * 0.01):])  # Exclude first 1%
+                cap_value = min(3 * median_curvature, 0.5)
+                kappa_grid_rear = np.clip(kappa_grid_rear, 0, cap_value)
                 w_grid = 4 * tau_grid**3  # Cubic weighting
                 weighted_area_rear = trapezoid(np.abs(kappa_grid_rear) * w_grid, tau_grid)
-                metrics['release_curvature_rear'] = min(sigma_rear, 5)
                 metrics['weighted_curvature_area_rear'] = weighted_area_rear
+                logger.debug(f"Rear weighted curvature area: {weighted_area_rear}")
             else:
-                metrics['release_curvature_rear'] = 0.0
                 metrics['weighted_curvature_area_rear'] = 0.0
         else:
-            metrics['release_curvature_rear'] = 0.0
             metrics['weighted_curvature_area_rear'] = 0.0
 
-        # Total Weighted Curvature KPI
+        # Total Weighted Curvature KPI (optional, if still needed)
         metrics['total_weighted_curvature_area'] = (
             metrics.get('weighted_curvature_area_side', 0.0) +
             metrics.get('weighted_curvature_area_rear', 0.0)
@@ -1488,7 +1494,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         height=500,
         width=1000,
         title_text="Ball Curvature Analysis",
-        title_x=0.5,
+        title_x=0.3,
         title_font=dict(size=20),
         margin=dict(t=100, b=100, l=40, r=40),
         legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=12)),
