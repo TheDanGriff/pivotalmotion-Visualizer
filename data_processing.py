@@ -1319,23 +1319,26 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
 
     # Extract indices from metrics (ensure these keys exist)
     lift_idx = int(metrics.get('lift_idx', 0))
-    set_idx = int(metrics.get('set_idx', lift_idx + 1))
+    set_idx = int(metrics.get('set_idx', lift_idx + 1))  # Consistent with original
     release_idx = int(metrics.get('release_idx', set_idx + 1))
     
-    # Extend range: 15 frames before lift and 15 frames after release
-    max_idx = len(df_ball) - 1
-    start_idx = max(0, lift_idx - 15)  # 15 frames before lift
-    end_idx = min(max_idx, release_idx + 15)  # 15 frames after release
-    
-    # Total frames including extended range
-    total_frames_extended = end_idx - start_idx
+    # Core range: lift to release
     lift_to_release_frames = release_idx - lift_idx
     if lift_to_release_frames <= 0:
         raise ValueError("Invalid indices: release_idx must be greater than lift_idx.")
     
-    # Compute time parameters relative to the extended range
+    # Extend range: 25% before lift and 25% after release
+    extra_frames = int(lift_to_release_frames * 0.25)  # 25% of core range
+    max_idx = len(df_ball) - 1
+    start_idx = max(0, lift_idx - extra_frames)  # 25% before lift
+    end_idx = min(max_idx, release_idx + extra_frames)  # 25% after release
+    
+    # Total frames including extended range
+    total_frames_extended = end_idx - start_idx
+    
+    # Compute time parameters
     lift_t = (lift_idx - start_idx) / total_frames_extended  # Time of lift in extended range
-    set_t = (set_idx - start_idx) / total_frames_extended    # Time of set in extended range
+    set_t = (set_idx - lift_idx) / lift_to_release_frames  # Set as fraction of lift-to-release (consistent with original)
     release_t = (release_idx - start_idx) / total_frames_extended  # Time of release in extended range
     
     # t_fine for interpolation over the extended range [0, 1]
@@ -1401,7 +1404,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
     velocity_lateral = velocity_interp
     weighted_lateral = np.abs(lateral_curve) * w
     
-    # Adjust t_percent to show lift at 0% and release at 100%, with extended ranges
+    # Adjust t_percent to show lift at 0% and release at 100%, with 25% on each side
     t_percent = ((t_fine - lift_t) / (release_t - lift_t)) * 100  # Normalize lift-to-release as 0-100%
 
     COLOR_PALETTE = {
@@ -1432,7 +1435,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
                                name=f"Release (index: {release_idx})")
     dummy_transition = go.Scatter(x=[None], y=[None], mode='markers',
                                   marker=dict(color='red', size=12, symbol='asterisk'),
-                                  name=f"Transition (index: {lift_idx + int(t_transition * (release_idx - lift_idx))})")
+                                  name=f"Transition (index: {lift_idx + int(t_transition * lift_to_release_frames)})")
     dummy_velocity = go.Scatter(x=[None], y=[None], mode='lines',
                                 line=dict(color=COLOR_PALETTE['velocity'], width=2),
                                 name="Velocity (ft/s)")
@@ -1475,7 +1478,8 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
         ),
         row=1, col=1, secondary_y=True
     )
-    for phase, phase_t in zip(['lift', 'set', 'release'], [0, set_t, 100]):  # Adjusted for percentage scale
+    # Use original set_t scaled to percentage
+    for phase, phase_t in zip(['lift', 'set', 'release'], [0, set_t * 100, 100]):
         if phase_t is not None:
             fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]),
                           row=1, col=1)
@@ -1483,14 +1487,14 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
         transition_percent = ((t_transition - lift_t) / (release_t - lift_t)) * 100
         fig.add_trace(
             go.Scatter(
-            x=[transition_percent],
-            y=[norm_acc_interp[transition_idx]],
-            mode='markers',
-            marker=dict(color='red', size=10, symbol='asterisk'),
-            name='Transition',
-            showlegend=False
+                x=[transition_percent],
+                y=[norm_acc_interp[transition_idx]],
+                mode='markers',
+                marker=dict(color='red', size=10, symbol='asterisk'),
+                name='Transition',
+                showlegend=False
             ),
-        row=1, col=1
+            row=1, col=1
         )
     
     fig.update_xaxes(title_text="% of Release (Extended)", row=1, col=1)
@@ -1527,7 +1531,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
         ),
         row=1, col=2, secondary_y=True
     )
-    for phase, phase_t in zip(['lift', 'set', 'release'], [0, set_t, 100]):  # Adjusted for percentage scale
+    for phase, phase_t in zip(['lift', 'set', 'release'], [0, set_t * 100, 100]):
         if phase_t is not None:
             fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]),
                           row=1, col=2)
