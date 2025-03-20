@@ -1470,7 +1470,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     fig = make_subplots(
         rows=1, cols=2,
         subplot_titles=("Side View Curvature (XZ)", "Rear View Curvature (YZ)"),
-        specs=[[{"secondary_y": True}, {"secondary_y": True}]],  # Corrected to 2 columns
+        specs=[[{"secondary_y": True}, {"secondary_y": True}]],
         horizontal_spacing=0.1
     )
 
@@ -1535,7 +1535,6 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     fig.add_trace(dummy_velocity)
 
     return fig
-
 def calculate_lateral_deviation(df, release_index, hoop_x=501.0, hoop_y=0.0):
     """
     Calculate lateral deviation of the ball from the intended shot line to the hoop, in feet.

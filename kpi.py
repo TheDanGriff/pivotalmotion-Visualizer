@@ -538,6 +538,12 @@ def animated_flip_kpi_card(label, value, unit, player_average, min_value=None, m
         color = get_metallic_color(value, player_average, min_value, max_value)
         arrow = "↑" if value > player_average else "↓" if value < player_average else "="
 
+    # Use 3 decimal places for curvature KPIs, 1 for others
+    if "Curvature" in label:
+        formatted_value = f"{value:.3f}"
+    else:
+        formatted_value = f"{value:.1f}"
+
     # HTML for the card with tooltip and back-side description
     html_code = f"""
     <style>
@@ -630,7 +636,7 @@ def animated_flip_kpi_card(label, value, unit, player_average, min_value=None, m
       <div class="flip-card-inner">
         <div class="flip-card-front">
           <h3>{label.upper()} <span class="tooltip">ℹ<span class="tooltiptext">{calculation_info}</span></span></h3>
-          <div class="kpi-value">{value:.1f} {unit} {arrow}</div>
+          <div class="kpi-value">{formatted_value} {unit} {arrow}</div>
         </div>
         <div class="flip-card-back">
           <p><strong>Player Average:</strong> {player_average if player_average is not None else "N/A"} {unit}</p>
