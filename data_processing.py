@@ -1364,18 +1364,17 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     P_side, _ = fit_bezier_curve(seg_x, seg_z, n=bezier_order)
     side_curve = bezier_curvature(P_side, t_fine, scale=curvature_scale / 12)
     
-    # Remove outliers: Cap at 3x the median curvature (excluding first 1% if spike)
+    # Remove outliers: Cap at 3x median curvature (excluding first 1%)
     median_curvature = np.median(side_curve[int(num_interp * 0.01):])  # Exclude first 1%
-    cap_value = min(3 * median_curvature, 5)  # Cap at 3x median or 5 1/ft
-    side_outliers = np.where(side_curve > cap_value, side_curve, np.nan)
-    side_curve_clipped = np.clip(side_curve, 0, cap_value)
-    if len(side_curve_clipped) > 3:
-        window_length = min(11, len(side_curve_clipped) - 1)
+    cap_value = min(3 * median_curvature, 0.5)  # Cap at 3x median or 0.5 1/ft
+    side_curve = np.clip(side_curve, 0, cap_value)  # Apply cap before smoothing
+    if len(side_curve) > 3:
+        window_length = min(11, len(side_curve) - 1)
         if window_length % 2 == 0:
             window_length += 1
-        side_curve_clipped = savgol_filter(side_curve_clipped, window_length=window_length, polyorder=2)
+        side_curve = savgol_filter(side_curve, window_length=window_length, polyorder=2)
     w = (weighting_exponent + 1) * (t_fine ** weighting_exponent)
-    weighted_side = np.abs(side_curve_clipped) * w
+    weighted_side = np.abs(side_curve) * w
 
     # Rear View Curvature (YZ plane)
     seg_y = df_ball['Basketball_Y'].iloc[start_idx:end_idx].to_numpy() * INCHES_TO_FEET
@@ -1387,17 +1386,16 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     P_rear, _ = fit_bezier_curve(seg_y, seg_z, n=bezier_order)
     rear_curve = bezier_curvature(P_rear, t_fine, scale=curvature_scale / 12)
     
-    # Remove outliers: Cap at 3x the median curvature (excluding first 1% if spike)
+    # Remove outliers: Cap at 3x median curvature (excluding first 1%)
     median_curvature = np.median(rear_curve[int(num_interp * 0.01):])  # Exclude first 1%
-    cap_value = min(3 * median_curvature, 5)  # Cap at 3x median or 5 1/ft
-    rear_outliers = np.where(rear_curve > cap_value, rear_curve, np.nan)
-    rear_curve_clipped = np.clip(rear_curve, 0, cap_value)
-    if len(rear_curve_clipped) > 3:
-        window_length = min(11, len(rear_curve_clipped) - 1)
+    cap_value = min(3 * median_curvature, 0.5)  # Cap at 3x median or 0.5 1/ft
+    rear_curve = np.clip(rear_curve, 0, cap_value)  # Apply cap before smoothing
+    if len(rear_curve) > 3:
+        window_length = min(11, len(rear_curve) - 1)
         if window_length % 2 == 0:
             window_length += 1
-        rear_curve_clipped = savgol_filter(rear_curve_clipped, window_length=window_length, polyorder=2)
-    weighted_rear = np.abs(rear_curve_clipped) * w
+        rear_curve = savgol_filter(rear_curve, window_length=window_length, polyorder=2)
+    weighted_rear = np.abs(rear_curve) * w
 
     COLOR_PALETTE = {
         'lift': 'rgba(147, 112, 219, 1)',
@@ -1407,7 +1405,6 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         'velocity': 'rgba(107, 174, 214, 1)',
         'weighted_side': 'rgba(31, 119, 180, 0.3)',
         'weighted_rear': 'rgba(31, 119, 180, 0.3)',
-        'outlier': 'rgba(255, 165, 0, 1)'
     }
     DASH_STYLES = {
         'lift': 'dash',
@@ -1433,11 +1430,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         row=1, col=1
     )
     fig.add_trace(
-        go.Scatter(x=t_percent, y=side_curve_clipped, mode='lines', name='Side Curvature (1/ft)', line=dict(color=COLOR_PALETTE['curvature'], width=2)),
-        row=1, col=1, secondary_y=False
-    )
-    fig.add_trace(
-        go.Scatter(x=t_percent, y=side_outliers, mode='markers', name='Side Outliers', marker=dict(color=COLOR_PALETTE['outlier'], size=6)),
+        go.Scatter(x=t_percent, y=side_curve, mode='lines', name='Side Curvature (1/ft)', line=dict(color=COLOR_PALETTE['curvature'], width=2)),
         row=1, col=1, secondary_y=False
     )
     fig.add_trace(
@@ -1453,11 +1446,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         row=1, col=2
     )
     fig.add_trace(
-        go.Scatter(x=t_percent, y=rear_curve_clipped, mode='lines', name='Rear Curvature (1/ft)', line=dict(color=COLOR_PALETTE['curvature'], width=2)),
-        row=1, col=2, secondary_y=False
-    )
-    fig.add_trace(
-        go.Scatter(x=t_percent, y=rear_outliers, mode='markers', name='Rear Outliers', marker=dict(color=COLOR_PALETTE['outlier'], size=6)),
+        go.Scatter(x=t_percent, y=rear_curve, mode='lines', name='Rear Curvature (1/ft)', line=dict(color=COLOR_PALETTE['curvature'], width=2)),
         row=1, col=2, secondary_y=False
     )
     fig.add_trace(
@@ -1467,18 +1456,30 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     for phase, phase_t in zip(['lift', 'set', 'release'], [-25, ((set_idx - lift_idx) / lift_to_release_frames * 100) if lift_to_release_frames > 0 else 50, 100]):
         fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]), row=1, col=2)
 
+    # Adjust Y-axis scales
+    max_weighted = max(np.max(weighted_side), np.max(weighted_rear), 0.1)  # Ensure minimum scale
+    max_curvature = max(np.max(side_curve), np.max(rear_curve), 0.1)
+    fig.update_yaxes(
+        title_text="Curvature (1/ft)", row=1, col=1, secondary_y=False, range=[0, max_curvature * 1.2]
+    )
+    fig.update_yaxes(
+        title_text="Velocity (ft/s)", row=1, col=1, secondary_y=True, range=[0, max(velocity_interp.max(), 40)]
+    )
+    fig.update_yaxes(
+        title_text="Curvature (1/ft)", row=1, col=2, secondary_y=False, range=[0, max_curvature * 1.2]
+    )
+    fig.update_yaxes(
+        title_text="Velocity (ft/s)", row=1, col=2, secondary_y=True, range=[0, max(velocity_interp.max(), 40)]
+    )
+
     fig.update_xaxes(title_text="% of Motion", row=1, col=1)
-    fig.update_yaxes(title_text="Curvature (1/ft)", row=1, col=1, secondary_y=False)
-    fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=1, secondary_y=True)
     fig.update_xaxes(title_text="% of Motion", row=1, col=2)
-    fig.update_yaxes(title_text="Curvature (1/ft)", row=1, col=2, secondary_y=False)
-    fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=2, secondary_y=True)
 
     fig.update_layout(
         height=500,
         width=1000,
         title_text="Ball Curvature Analysis",
-        title_x=0.38,
+        title_x=0.5,
         title_font=dict(size=20),
         margin=dict(t=100, b=100, l=40, r=40),
         legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=12)),
