@@ -214,10 +214,9 @@ def plot_distance_over_height(df_ball):
 def plot_shot_analysis(df_ball, metrics):
     """
     Create interactive basketball shot analysis visualization with two 2D trajectory plots:
-    - Side View: Basketball_X_ft vs Basketball_Z (ft), release at 2nd-to-last left grid line,
-                 trajectory color reflects velocity (darker = higher).
-    - Rear View: Basketball_Y_ft vs Basketball_Z (ft), fixed [-2, 2] ft range, same color scheme.
-    Both show last 32 frames prior to release, with markers and projected path.
+    - Side View: Basketball_X_ft vs Basketball_Z (ft), 4 ft span (±2 ft from release), 2-11 ft height.
+    - Rear View: Basketball_Y_ft vs Basketball_Z (ft), 4 ft span (-2 to 2 ft), 2-11 ft height.
+    Both show last 32 frames prior to release, with markers and projected path, 1:1 grid boxes.
     """
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
@@ -229,8 +228,8 @@ def plot_shot_analysis(df_ball, metrics):
     logger = logging.getLogger(__name__)
     INCHES_TO_FEET = 1 / 12
 
-    # Helper function to smooth a slice of data
-    def get_slice(data, start, end):
+    # Helper function to smooth and clip a slice of data
+    def get_slice(data, start, end, clip_min=None, clip_max=None):
         if isinstance(data, (pd.Series, np.ndarray, list)) and len(data) > 0:
             seg = data[start:end].to_numpy() if hasattr(data, 'to_numpy') else np.array(data[start:end])
             if len(seg) > 3:
@@ -238,6 +237,8 @@ def plot_shot_analysis(df_ball, metrics):
                 if win_length % 2 == 0:
                     win_length += 1
                 seg = savgol_filter(seg, window_length=win_length, polyorder=2)
+            if clip_min is not None or clip_max is not None:
+                seg = np.clip(seg, clip_min, clip_max)
             return seg
         return np.array([])
 
@@ -257,32 +258,48 @@ def plot_shot_analysis(df_ball, metrics):
 
     # --- SIDE VIEW ---
     traj_x = get_slice(df_ball['Basketball_X_ft'], start_idx, release_idx + 1)
-    traj_z = get_slice(df_ball['Basketball_Z'], start_idx, release_idx + 1) * INCHES_TO_FEET
-    traj_v = get_slice(df_ball['velocity_magnitude'], start_idx, release_idx + 1) * INCHES_TO_FEET  # Velocity in ft/s
+    traj_z = get_slice(df_ball['Basketball_Z'] * INCHES_TO_FEET, start_idx, release_idx + 1, clip_min=2, clip_max=11)
+    traj_v = get_slice(df_ball['velocity_magnitude'] * INCHES_TO_FEET, start_idx, release_idx + 1)  # Velocity in ft/s
     release_x = df_ball.at[release_idx, 'Basketball_X_ft']
     
-    # Ensure X-axis is positive and oriented correctly
+    # Ensure X-axis is positive
     if release_x < 0:
-        logger.warning(f"Release_x is negative ({release_x}), flipping trajectory for visualization")
-        traj_x = -traj_x  # Flip to positive if negative
-        release_x = -release_x
+        logger.warning(f"Release_x is negative ({release_x}), flipping to positive for visualization")
+        traj_x = -traj_x  # Flip to positive
+        release_x = abs(release_x)
 
-    side_range = [release_x - 1, release_x + 3]  # 4 ft span, release near left
+    # Define 4 ft range centered around release_x
+    side_range = [release_x - 2, release_x + 2]  # ±2 ft from release
+    traj_mask = (traj_x >= side_range[0]) & (traj_x <= side_range[1]) & (traj_z >= 2) & (traj_z <= 11)
+    traj_x = traj_x[traj_mask]
+    traj_z = traj_z[traj_mask]
+    traj_v = traj_v[traj_mask]
 
     # Projected trajectory
     post_release_end = min(max_idx, release_idx + 20)
     proj_x = get_slice(df_ball['Basketball_X_ft'], release_idx, post_release_end + 1)
-    proj_z = get_slice(df_ball['Basketball_Z'], release_idx, post_release_end + 1) * INCHES_TO_FEET
+    proj_z = get_slice(df_ball['Basketball_Z'] * INCHES_TO_FEET, release_idx, post_release_end + 1, clip_min=2, clip_max=11)
     if release_x < 0:
         proj_x = -proj_x  # Flip projection too
+    proj_mask = (proj_x >= side_range[0]) & (proj_x <= side_range[1]) & (proj_z >= 2) & (proj_z <= 11)
+    proj_x = proj_x[proj_mask]
+    proj_z = proj_z[proj_mask]
 
-    tickvals = np.linspace(side_range[0], side_range[1], 5)
-    ticktext = [f"{val:.1f}" for val in tickvals]
+    tickvals_x = np.linspace(side_range[0], side_range[1], 5)  # 4 ft, 1 ft per tick
+    ticktext_x = [f"{val:.1f}" for val in tickvals_x]
+    tickvals_y = np.arange(2, 12, 1)  # 2 to 11 ft, 1 ft per tick
 
     # --- REAR VIEW ---
     traj_y = get_slice(df_ball['Basketball_Y_ft'], start_idx, release_idx + 1)
     rear_range = [-2, 2]  # Fixed 4 ft span
+    rear_mask = (traj_y >= -2) & (traj_y <= 2) & (traj_z >= 2) & (traj_z <= 11)
+    traj_y = traj_y[rear_mask]
+    traj_z_rear = traj_z[rear_mask]  # Reuse traj_z with new mask
+    traj_v_rear = traj_v[rear_mask]
+
     proj_y = get_slice(df_ball['Basketball_Y_ft'], release_idx, post_release_end + 1)
+    proj_z_rear = proj_z[proj_mask & (proj_y >= -2) & (proj_y <= 2)]
+    proj_y = proj_y[proj_mask & (proj_y >= -2) & (proj_y <= 2)]
 
     # Create subplots
     fig = make_subplots(
@@ -326,20 +343,21 @@ def plot_shot_analysis(df_ball, metrics):
             idx = info['idx']
             if start_idx <= idx <= release_idx:
                 marker_x = df_ball.at[idx, 'Basketball_X_ft']
-                if release_x < 0:  # Apply same flip as trajectory
+                if df_ball.at[idx, 'Basketball_X_ft'] < 0:  # Apply flip if negative
                     marker_x = -marker_x
                 marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
-                fig.add_trace(
-                    go.Scatter(
-                        x=[marker_x],
-                        y=[marker_z],
-                        mode='markers',
-                        marker=dict(color=info['color'], symbol=info['symbol'], size=12),
-                        name=f'{phase.capitalize()}'
-                    ),
-                    row=1, col=1
-                )
-        if release_idx < post_release_end:
+                if side_range[0] <= marker_x <= side_range[1] and 2 <= marker_z <= 11:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[marker_x],
+                            y=[marker_z],
+                            mode='markers',
+                            marker=dict(color=info['color'], symbol=info['symbol'], size=12),
+                            name=f'{phase.capitalize()}'
+                        ),
+                        row=1, col=1
+                    )
+        if release_idx < post_release_end and len(proj_x) > 0:
             fig.add_trace(
                 go.Scatter(
                     x=proj_x,
@@ -351,23 +369,23 @@ def plot_shot_analysis(df_ball, metrics):
                 row=1, col=1
             )
     else:
-        fig.add_trace(go.Scatter(x=[0], y=[2.0], mode='text', text=["No Data"]), row=1, col=1)
+        fig.add_trace(go.Scatter(x=[release_x], y=[2.0], mode='text', text=["No Data"]), row=1, col=1)
 
     # --- REAR VIEW PLOT ---
-    if len(traj_y) > 0 and len(traj_z) > 0 and len(traj_v) > 0:
+    if len(traj_y) > 0 and len(traj_z_rear) > 0 and len(traj_v_rear) > 0:
         fig.add_trace(
             go.Scatter(
                 x=traj_y,
-                y=traj_z,
+                y=traj_z_rear,
                 mode='lines+markers',
                 name='Trajectory',
                 line=dict(width=2, color='grey'),
                 marker=dict(
                     size=8,
-                    color=traj_v,
+                    color=traj_v_rear,
                     colorscale='Blues',
                     cmin=0,
-                    cmax=max(traj_v.max(), 40),
+                    cmax=max(traj_v_rear.max(), 40),
                     showscale=False
                 )
             ),
@@ -378,21 +396,22 @@ def plot_shot_analysis(df_ball, metrics):
             if start_idx <= idx <= release_idx:
                 marker_y = df_ball.at[idx, 'Basketball_Y_ft']
                 marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
-                fig.add_trace(
-                    go.Scatter(
-                        x=[marker_y],
-                        y=[marker_z],
-                        mode='markers',
-                        marker=dict(color=info['color'], symbol=info['symbol'], size=12),
-                        name=f'{phase.capitalize()}'
-                    ),
-                    row=1, col=2
-                )
-        if release_idx < post_release_end:
+                if -2 <= marker_y <= 2 and 2 <= marker_z <= 11:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[marker_y],
+                            y=[marker_z],
+                            mode='markers',
+                            marker=dict(color=info['color'], symbol=info['symbol'], size=12),
+                            name=f'{phase.capitalize()}'
+                        ),
+                        row=1, col=2
+                    )
+        if release_idx < post_release_end and len(proj_y) > 0:
             fig.add_trace(
                 go.Scatter(
                     x=proj_y,
-                    y=proj_z,
+                    y=proj_z_rear,
                     mode='lines',
                     name='Projected Path',
                     line=dict(color='red', width=2, dash='dot')
@@ -406,29 +425,32 @@ def plot_shot_analysis(df_ball, metrics):
     # Side View
     fig.update_xaxes(
         title_text="Horizontal Position (ft)", row=1, col=1,
-        range=side_range, tickmode='array', tickvals=tickvals, ticktext=ticktext,
-        dtick=1, showgrid=True, gridwidth=1, gridcolor='lightgrey',
+        range=side_range, tickmode='array', tickvals=tickvals_x, ticktext=ticktext_x,
+        showgrid=True, gridwidth=1, gridcolor='lightgrey',
         title_font=dict(size=14), tickfont=dict(size=12)
     )
     fig.update_yaxes(
         title_text="Height (ft)", row=1, col=1,
-        range=[2, 11], dtick=1, showgrid=True, gridwidth=1, gridcolor='lightgrey',
+        range=[2, 11], tickmode='array', tickvals=tickvals_y, ticktext=[f"{val:.0f}" for val in tickvals_y],
+        showgrid=True, gridwidth=1, gridcolor='lightgrey',
         title_font=dict(size=14), tickfont=dict(size=12), title_standoff=20
     )
     # Rear View
     fig.update_xaxes(
         title_text="Lateral Position (ft)", row=1, col=2,
-        range=rear_range, tickmode='linear', dtick=1, showgrid=True, gridwidth=1, gridcolor='lightgrey',
+        range=rear_range, tickmode='linear', dtick=1,
+        showgrid=True, gridwidth=1, gridcolor='lightgrey',
         title_font=dict(size=14), tickfont=dict(size=12)
     )
     fig.update_yaxes(
         title_text="Height (ft)", row=1, col=2,
-        range=[2, 11], dtick=1, showgrid=True, gridwidth=1, gridcolor='lightgrey',
+        range=[2, 11], tickmode='array', tickvals=tickvals_y, ticktext=[f"{val:.0f}" for val in tickvals_y],
+        showgrid=True, gridwidth=1, gridcolor='lightgrey',
         title_font=dict(size=14), tickfont=dict(size=12), title_standoff=20
     )
 
     # --- OVERALL LAYOUT ---
-    pixels_per_foot = 60
+    pixels_per_foot = 60  # Equal scaling for 1:1 aspect ratio
     subplot_width = 4 * pixels_per_foot  # 4 ft
     subplot_height = 9 * pixels_per_foot  # 9 ft (2 to 11)
     total_width = subplot_width * 2 + 100
@@ -443,10 +465,10 @@ def plot_shot_analysis(df_ball, metrics):
         showlegend=True, autosize=False
     )
 
-    # Ensure equal scaling
+    # Ensure 1:1 aspect ratio (square grid boxes)
     for col in [1, 2]:
         fig.update_xaxes(row=1, col=col, scaleanchor=f"y{col}", scaleratio=1, constrain='domain')
-        fig.update_yaxes(row=1, col=col, constrain='domain')
+        fig.update_yaxes(row=1, col=col, scaleanchor=f"x{col}", scaleratio=1, constrain='domain')
 
     for annotation in fig.layout.annotations:
         annotation.y = 1.05
