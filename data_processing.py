@@ -943,7 +943,6 @@ def bernstein_poly(k, n, tau):
     """Compute Bernstein polynomial."""
     return comb(n, k) * (1 - tau)**(n - k) * tau**k
 
-# Updated compute_curvature to handle evaluate_bezier output as float and return scalar
 def compute_curvature(P, tau, h=1e-6):
     """Compute curvature at tau for a 2D Bezier curve using numerical derivatives."""
     try:
@@ -952,26 +951,29 @@ def compute_curvature(P, tau, h=1e-6):
         tau_minus = max(0.0, tau - h)
         tau_plus = min(1.0, tau + h)
 
-        # Evaluate Bezier curve and convert to float
+        # Evaluate Bezier curve and convert to float array
         B = np.asarray(evaluate_bezier(P, tau), dtype=np.float64)
         B_minus = np.asarray(evaluate_bezier(P, tau_minus), dtype=np.float64)
         B_plus = np.asarray(evaluate_bezier(P, tau_plus), dtype=np.float64)
 
-        # Ensure B, B_minus, B_plus are 2D points
-        if B.shape != (2,) or B_minus.shape != (2,) or B_plus.shape != (2,):
-            raise ValueError("evaluate_bezier must return a 2-element array [x, z]")
+        # Debug the output shape
+        logger.debug(f"evaluate_bezier(P, {tau}) shape: {B.shape}, value: {B}")
+        
+        # Check if output is a 2-element array
+        if B.size != 2 or B.ndim != 1:
+            raise ValueError(f"evaluate_bezier returned {B.shape} array, expected (2,) for [x, z] or [y, z]")
 
         # Numerical derivatives
-        x1 = (B_plus[0] - B_minus[0]) / (2 * h)  # dx/dtau
+        x1 = (B_plus[0] - B_minus[0]) / (2 * h)  # dx/dtau or dy/dtau
         z1 = (B_plus[1] - B_minus[1]) / (2 * h)  # dz/dtau
-        x2 = (B_plus[0] - 2 * B[0] + B_minus[0]) / (h**2)  # d^2x/dtau^2
+        x2 = (B_plus[0] - 2 * B[0] + B_minus[0]) / (h**2)  # d^2x/dtau^2 or d^2y/dtau^2
         z2 = (B_plus[1] - 2 * B[1] + B_minus[1]) / (h**2)  # d^2z/dtau^2
 
         denom = (x1**2 + z1**2)**1.5
         if denom == 0:
             return 0.0
         curvature = abs(x1 * z2 - z1 * x2) / denom
-        return float(curvature)  # Ensure scalar float output
+        return float(curvature)
     except Exception as e:
         logger.error(f"Error computing curvature: {str(e)}")
         return 0.0
