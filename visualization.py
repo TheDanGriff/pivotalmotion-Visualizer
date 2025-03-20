@@ -285,22 +285,20 @@ def plot_shot_analysis(df_ball, metrics):
             go.Scatter(
                 x=traj_x,
                 y=traj_z,
-                mode='lines+markers',  # Use lines+markers to enable color gradient
+                mode='lines+markers',
                 name='Trajectory',
                 line=dict(width=2, color='grey'),  # Thin grey line to connect points
-                marker=dict(
-                    size=8,  # Marker size for visibility
-                    color=traj_v,  # Velocity mapped to color
-                    colorscale='Blues',  # Light to dark blue
-                    cmin=0,  # Min velocity
-                    cmax=max(traj_v.max(), 40),  # Max velocity (cap at 40 ft/s or higher)
-                    colorbar=dict(
-                        title="Velocity (ft/s)",
-                        titleside="right",
-                        thickness=15,
-                        len=0.5,
-                        x=1.05  # Position to right of plot
-                    )
+                marker=dict(size=8),  # Marker size for visibility
+                color=traj_v,  # Velocity mapped to color at trace level
+                colorscale='Blues',  # Light to dark blue
+                cmin=0,  # Min velocity
+                cmax=max(traj_v.max(), 40),  # Max velocity (cap at 40 ft/s or higher)
+                colorbar=dict(
+                    title="Velocity (ft/s)",
+                    titleside="right",
+                    thickness=15,
+                    len=0.5,
+                    x=1.05  # Position to right of plot
                 )
             ),
             row=1, col=1
@@ -350,14 +348,12 @@ def plot_shot_analysis(df_ball, metrics):
                 mode='lines+markers',
                 name='Trajectory',
                 line=dict(width=2, color='grey'),
-                marker=dict(
-                    size=8,
-                    color=traj_v,
-                    colorscale='Blues',
-                    cmin=0,
-                    cmax=max(traj_v.max(), 40),
-                    showscale=False  # Only one colorbar needed
-                )
+                marker=dict(size=8),
+                color=traj_v,
+                colorscale='Blues',
+                cmin=0,
+                cmax=max(traj_v.max(), 40),
+                showscale=False  # Only one colorbar needed
             ),
             row=1, col=2
         )
@@ -423,7 +419,7 @@ def plot_shot_analysis(df_ball, metrics):
 
     fig.update_layout(
         height=subplot_height + 200, width=total_width,
-        title_text="Ball Path Analysis",
+        title_text="Ball Path Analysis (Velocity by Color)",
         title_x=0.4, title_font=dict(size=20),
         margin=dict(t=120, b=100, l=80, r=80),
         legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5, font=dict(size=12)),
