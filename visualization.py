@@ -288,17 +288,19 @@ def plot_shot_analysis(df_ball, metrics):
                 mode='lines+markers',
                 name='Trajectory',
                 line=dict(width=2, color='grey'),  # Thin grey line to connect points
-                marker=dict(size=8),  # Marker size for visibility
-                color=traj_v,  # Velocity mapped to color at trace level
-                colorscale='Blues',  # Light to dark blue
-                cmin=0,  # Min velocity
-                cmax=max(traj_v.max(), 40),  # Max velocity (cap at 40 ft/s or higher)
-                colorbar=dict(
-                    title="Velocity (ft/s)",
-                    titleside="right",
-                    thickness=15,
-                    len=0.5,
-                    x=1.05  # Position to right of plot
+                marker=dict(
+                    size=8,
+                    color=traj_v,  # Velocity mapped to color
+                    colorscale='Blues',  # Light to dark blue
+                    cmin=0,  # Min velocity
+                    cmax=max(traj_v.max(), 40),  # Max velocity (cap at 40 ft/s or higher)
+                    colorbar=dict(
+                        title="Velocity (ft/s)",
+                        titleside="right",
+                        thickness=15,
+                        len=0.5,
+                        x=1.05  # Position to right of plot
+                    )
                 )
             ),
             row=1, col=1
@@ -348,12 +350,14 @@ def plot_shot_analysis(df_ball, metrics):
                 mode='lines+markers',
                 name='Trajectory',
                 line=dict(width=2, color='grey'),
-                marker=dict(size=8),
-                color=traj_v,
-                colorscale='Blues',
-                cmin=0,
-                cmax=max(traj_v.max(), 40),
-                showscale=False  # Only one colorbar needed
+                marker=dict(
+                    size=8,
+                    color=traj_v,
+                    colorscale='Blues',
+                    cmin=0,
+                    cmax=max(traj_v.max(), 40),
+                    showscale=False  # Only one colorbar needed
+                )
             ),
             row=1, col=2
         )
