@@ -224,7 +224,7 @@ def plot_shot_analysis(df_ball, metrics):
       Its horizontal axis is fixed to [-2, 2] ft (with the release point at 0).
 
     Both plots have a fixed vertical (Z) axis from 2 to 11 ft (9 ft tall) and show the last 32 frames prior to release.
-    The plot area is a 4:9 width-to-height rectangle to match physical proportions.
+    Grid boxes are square, with equal scaling per foot on both axes.
     """
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
@@ -286,7 +286,7 @@ def plot_shot_analysis(df_ball, metrics):
     # Use the same vertical axis (traj_z) as above.
     rear_range = [-2, 2]  # Fixed horizontal range for rear view.
 
-    # Create subplots with custom grid to control aspect ratio.
+    # Create subplots.
     fig = make_subplots(
         rows=1, cols=2,
         subplot_titles=("Side View (X vs. Z)", "Rear View (Y vs. Z)"),
@@ -450,10 +450,10 @@ def plot_shot_analysis(df_ball, metrics):
     )
 
     # --- OVERALL LAYOUT ---
-    # Set figure dimensions to enforce 4:9 ratio (width:height)
-    # Each subplot should be roughly 4:9, so total width accounts for two subplots + spacing
-    subplot_width = 400  # pixels for 4 ft
-    subplot_height = 900  # pixels for 9 ft
+    # Set figure dimensions to match 4 ft x 9 ft with equal scaling (square grid boxes)
+    pixels_per_foot = 80  # Same scale for both axes
+    subplot_width = 4 * pixels_per_foot   # 4 ft = 320 pixels
+    subplot_height = 9 * pixels_per_foot  # 9 ft = 720 pixels
     total_width = subplot_width * 2 + 100  # Two subplots + spacing
 
     fig.update_layout(
@@ -466,14 +466,11 @@ def plot_shot_analysis(df_ball, metrics):
         legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(size=12)),
         plot_bgcolor='rgba(255, 255, 255, 1)',
         paper_bgcolor='rgba(255, 255, 255, 1)',
-        showlegend=True
+        showlegend=True,
+        autosize=False
     )
 
-    # Ensure each subplot maintains the 4:9 ratio
-    fig.update_layout(
-        autosize=False,
-        grid={'rows': 1, 'columns': 2, 'pattern': "independent"}
-    )
+    # Ensure equal scaling by matching data range to pixel ratio
     for col in [1, 2]:
         fig.update_xaxes(row=1, col=col, constrain='domain')
         fig.update_yaxes(row=1, col=col, constrain='domain')
@@ -482,12 +479,6 @@ def plot_shot_analysis(df_ball, metrics):
         annotation.y = 1.05
 
     return fig
-
-
-
-
-
-
 
 
 
