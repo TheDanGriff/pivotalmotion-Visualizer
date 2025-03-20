@@ -288,7 +288,7 @@ def plot_shot_analysis(df_ball, metrics):
                 mode='lines',
                 name='Trajectory',
                 line=dict(width=4),
-                line_color='Blues',  # Sequential colorscale
+                line_color='blue',  # Sequential colorscale
                 cmin=0,  # Min velocity (adjust if needed)
                 cmax=max(traj_v.max(), 40),  # Cap at 40 ft/s or max observed
                 color=traj_v,  # Map velocity to color
@@ -348,7 +348,7 @@ def plot_shot_analysis(df_ball, metrics):
                 mode='lines',
                 name='Trajectory',
                 line=dict(width=4),
-                line_color='Blues',
+                line_color='blue',
                 cmin=0,
                 cmax=max(traj_v.max(), 40),
                 color=traj_v,
