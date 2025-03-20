@@ -906,7 +906,7 @@ def save_adjusted_data(df, user_email, job_id, segment_id, file_format='csv'):
 import numpy as np
 import pandas as pd
 from scipy.special import comb
-from scipy.integrate import trapezoid  # Updated from trapz to trapezoid
+from scipy.integrate import trapezoid  # Updated from trapz to trapezoids
 import logging
 
 logger = logging.getLogger(__name__)
