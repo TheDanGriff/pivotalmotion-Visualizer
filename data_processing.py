@@ -1315,20 +1315,32 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     from scipy.signal import savgol_filter
     from plotly.subplots import make_subplots
 
+    # Use stored indices from metrics
     lift_idx = int(metrics.get('lift_idx', 0))
-    set_idx = int(metrics.get('set_idx', lift_idx + 1))
-    release_idx = int(metrics.get('release_idx', set_idx + 1))
+    release_idx = int(metrics.get('release_idx', lift_idx + 1))
 
-    # Use same range as plot_shot_analysis (lift to release)
-    start_idx = lift_idx
-    end_idx = release_idx + 1
+    # Calculate set_idx as minimum X position, matching plot_shot_analysis
+    candidate_set_window = df_ball.iloc[lift_idx:release_idx + 1]
+    if not candidate_set_window.empty:
+        set_idx = candidate_set_window['Basketball_X_ft'].idxmin()
+    else:
+        set_idx = release_idx
+    logger.debug(f"Set_idx redefined as minimum X position: {set_idx}")
+
+    # Extend range: 25% before lift and 25% after release
+    lift_to_release_frames = release_idx - lift_idx
+    extra_frames = int(lift_to_release_frames * 0.25)
+    max_idx = len(df_ball) - 1
+    start_idx = max(0, lift_idx - extra_frames)
+    end_idx = min(max_idx, release_idx + extra_frames)
     total_frames = end_idx - start_idx
 
     if total_frames <= 0:
-        raise ValueError("Invalid indices: release_idx must be greater than lift_idx.")
+        raise ValueError("Invalid indices: end_idx must be greater than start_idx.")
 
+    # Time parameterization
     t_fine = np.linspace(0, 1, num_interp)
-    t_percent = t_fine * 100  # 0-100% from lift to release
+    t_percent = np.linspace(-25, 125, num_interp)  # -25% to 125% relative to lift-to-release
 
     # Velocity
     velocity_segment = df_ball['velocity_magnitude'].iloc[start_idx:end_idx].to_numpy() * INCHES_TO_FEET
@@ -1424,7 +1436,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         go.Scatter(x=t_percent, y=velocity_interp, mode='lines', name='Velocity (ft/s)', line=dict(color=COLOR_PALETTE['velocity'], width=2), showlegend=False),
         row=1, col=1, secondary_y=True
     )
-    for phase, phase_t in zip(['lift', 'set', 'release'], [0, (set_idx - lift_idx) / total_frames * 100, 100]):
+    for phase, phase_t in zip(['lift', 'set', 'release'], [-25, ((set_idx - lift_idx) / lift_to_release_frames * 100) if lift_to_release_frames > 0 else 50, 100]):
         fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]), row=1, col=1)
 
     # Rear View
@@ -1444,13 +1456,13 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         go.Scatter(x=t_percent, y=velocity_interp, mode='lines', name='Velocity (ft/s)', line=dict(color=COLOR_PALETTE['velocity'], width=2), showlegend=False),
         row=1, col=2, secondary_y=True
     )
-    for phase, phase_t in zip(['lift', 'set', 'release'], [0, (set_idx - lift_idx) / total_frames * 100, 100]):
+    for phase, phase_t in zip(['lift', 'set', 'release'], [-25, ((set_idx - lift_idx) / lift_to_release_frames * 100) if lift_to_release_frames > 0 else 50, 100]):
         fig.add_vline(x=phase_t, line=dict(color=COLOR_PALETTE[phase], width=2, dash=DASH_STYLES[phase]), row=1, col=2)
 
-    fig.update_xaxes(title_text="% of Release", row=1, col=1)
+    fig.update_xaxes(title_text="% of Motion", row=1, col=1)
     fig.update_yaxes(title_text="Curvature (1/ft)", row=1, col=1, secondary_y=False)
     fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=1, secondary_y=True)
-    fig.update_xaxes(title_text="% of Release", row=1, col=2)
+    fig.update_xaxes(title_text="% of Motion", row=1, col=2)
     fig.update_yaxes(title_text="Curvature (1/ft)", row=1, col=2, secondary_y=False)
     fig.update_yaxes(title_text="Velocity (ft/s)", row=1, col=2, secondary_y=True)
 
@@ -1473,7 +1485,6 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     fig.add_trace(dummy_velocity)
 
     return fig
-
 
 def calculate_lateral_deviation(df, release_index, hoop_x=501.0, hoop_y=0.0):
     """
