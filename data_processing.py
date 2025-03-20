@@ -901,12 +901,12 @@ def save_adjusted_data(df, user_email, job_id, segment_id, file_format='csv'):
     except Exception as e:
         logger.error(f"Error saving adjusted data: {e}")
         return None
-#---------------------------------#
+#------------------
 
 import numpy as np
 import pandas as pd
 from scipy.special import comb
-from scipy.integrate import trapz
+from scipy.integrate import trapezoid  # Updated from trapz to trapezoid
 import logging
 
 logger = logging.getLogger(__name__)
@@ -978,7 +978,7 @@ def compute_terminal_curvature(P, tau_max, N=50):
         tau_z = tau_max + z * (1 - tau_max)
         kappa_z = np.array([compute_curvature(P, tau) for tau in tau_z])
         w_z = 4 * z**3  # Cubic weighting function
-        sigma = trapz(w_z * kappa_z, z)
+        sigma = trapezoid(w_z * kappa_z, z)  # Updated from trapz to trapezoid
         return sigma
     except Exception as e:
         logger.error(f"Error computing terminal curvature: {str(e)}")
@@ -1123,7 +1123,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             release_velocity = np.sqrt(rvx**2 + rvy**2 + rvz**2) * INCHES_TO_FEET
             metrics['release_velocity'] = 0.0 if pd.isna(release_velocity) or release_velocity < 0 else release_velocity
 
-        # 11. Compute Release Curvature using Bezier curves
+        # 11. Compute Release Curvature using Bezier curves (Updated Implementation)
         ball_df['Basketball_Z_ft'] = ball_df['Basketball_Z'] * INCHES_TO_FEET
         points = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_X_ft', 'Basketball_Z_ft']].dropna().values
         if len(points) > 11:  # Ensure enough points for 10th-order fit
@@ -1135,6 +1135,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
                 sigma = compute_terminal_curvature(P, tau_max)
                 metrics['release_curvature'] = sigma
             else:
+                logger.error("Bezier fit returned None, setting release_curvature to 0.0")
                 metrics['release_curvature'] = 0.0
         else:
             logger.warning(f"Insufficient points ({len(points)}) for Bezier fit between lift_idx {metrics['lift_idx']} and release_idx {metrics['release_idx']}")
@@ -1213,6 +1214,11 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['release_velocity'] = 0.0  # Fallback
 
     return metrics, pose_df, ball_df
+
+
+
+
+
 
 
 
