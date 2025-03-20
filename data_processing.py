@@ -1140,7 +1140,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             release_velocity = np.sqrt(rvx**2 + rvy**2 + rvz**2) * INCHES_TO_FEET
             metrics['release_velocity'] = 0.0 if pd.isna(release_velocity) or release_velocity < 0 else release_velocity
 
-        # 13. Compute release curvature using Bezier curves for side view (XZ plane)
+            # 13. Compute release curvature using Bezier curves for side view (XZ plane)
         points_side = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_X_ft', 'Basketball_Z_ft']].dropna().values
         print(f"Debug (Side): Number of points = {len(points_side)}")
         logger.debug(f"Side view points: {points_side[:5]}...")
