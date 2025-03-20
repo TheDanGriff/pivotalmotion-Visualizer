@@ -243,28 +243,42 @@ def plot_shot_analysis(df_ball, metrics):
     start_idx = max(0, release_idx - 32)
     lift_idx = clamp_index(metrics.get('lift_idx', start_idx), max_idx)
 
+    # Initial set_idx calculation (minimum X position within lift to release)
+    candidate_set_window = df_ball.iloc[lift_idx:release_idx + 1]
+    if not candidate_set_window.empty:
+        set_idx = candidate_set_window['Basketball_X'].idxmin()  # Use Basketball_X initially
+    else:
+        set_idx = release_idx
+    logger.debug(f"Initial set_idx: {set_idx}")
+
     # Check lift point height and adjust if above 5 ft
     lift_z = df_ball.at[lift_idx, 'Basketball_Z'] if 'Basketball_Z' in df_ball.columns else 0
     lift_z_ft = lift_z * INCHES_TO_FEET
     if lift_z_ft > 5:
-        logger.warning(f"Lift point Z ({lift_z_ft:.2f} ft) above 5 ft, finding first frame at or above 3 ft")
-        candidate_window = df_ball.iloc[start_idx:release_idx + 1]
-        valid_lift = candidate_window[candidate_window['Basketball_Z'] * INCHES_TO_FEET >= 3].index
-        lift_idx = valid_lift[0] if not valid_lift.empty else start_idx
-        logger.debug(f"New lift_idx: {lift_idx}, Z: {df_ball.at[lift_idx, 'Basketball_Z'] * INCHES_TO_FEET:.2f} ft")
+        logger.warning(f"Lift point Z ({lift_z_ft:.2f} ft) above 5 ft, using 20 frames before set_idx")
+        # Use 20 frames before set_idx
+        new_start_idx = max(0, set_idx - 20)
+        candidate_window = df_ball.iloc[new_start_idx:set_idx + 1]
+        # Find first frame at or near 3 ft (within ±0.5 ft tolerance)
+        z_values = candidate_window['Basketball_Z'] * INCHES_TO_FEET
+        valid_lift = candidate_window[(z_values >= 2.5) & (z_values <= 3.5)].index
+        lift_idx = valid_lift[0] if not valid_lift.empty else new_start_idx
+        logger.debug(f"Adjusted lift_idx: {lift_idx}, Z: {df_ball.at[lift_idx, 'Basketball_Z'] * INCHES_TO_FEET:.2f} ft")
+    else:
+        logger.debug(f"Lift point Z ({lift_z_ft:.2f} ft) within threshold, using original lift_idx")
 
-    # Redefine set_idx: minimum X position, at least 7 frames after lift and before release
+    # Recalculate set_idx with 7-frame constraints after lift_idx adjustment
     set_window_start = max(lift_idx + 7, start_idx)
     set_window_end = min(release_idx - 7 + 1, max_idx + 1)
     candidate_set_window = df_ball.iloc[set_window_start:set_window_end]
     if not candidate_set_window.empty and len(candidate_set_window) >= 1:
-        set_idx = candidate_set_window['Basketball_X'].idxmin()  # Use Basketball_X for consistency
+        set_idx = candidate_set_window['Basketball_X'].idxmin()
     else:
         set_idx = release_idx
-    logger.debug(f"Set_idx redefined as minimum X position between {set_window_start} and {set_window_end}: {set_idx}")
+    logger.debug(f"Final set_idx between {set_window_start} and {set_window_end}: {set_idx}")
 
     # --- SIDE VIEW ---
-    traj_x = get_slice(df_ball, 'Basketball_X', lift_idx, release_idx + 1) * INCHES_TO_FEET  # Convert to feet
+    traj_x = get_slice(df_ball, 'Basketball_X', lift_idx, release_idx + 1) * INCHES_TO_FEET
     traj_z = get_slice(df_ball, 'Basketball_Z', lift_idx, release_idx + 1, clip_min=2, clip_max=11) * INCHES_TO_FEET
     traj_v = get_slice(df_ball, 'velocity_magnitude', lift_idx, release_idx + 1)
     release_x = df_ball.at[release_idx, 'Basketball_X'] * INCHES_TO_FEET
@@ -275,14 +289,13 @@ def plot_shot_analysis(df_ball, metrics):
         traj_x = -traj_x
         release_x = -release_x if release_x < 0 else release_x
 
-    # Define range to capture full motion from lift_idx
-    side_range = [release_x - 1, release_x + 3]  # 4 ft range, adjustable based on motion
+    # Define range to capture motion
+    side_range = [release_x - 1, release_x + 3]  # 4 ft range, adjustable
     if len(traj_x) > 0 and len(traj_z) > 0 and len(traj_v) > 0:
         min_len = min(len(traj_x), len(traj_z), len(traj_v))
         traj_x = traj_x[:min_len]
         traj_z = traj_z[:min_len]
         traj_v = traj_v[:min_len]
-        # No restrictive mask to ensure full motion is shown
     else:
         logger.error("Trajectory data empty after slicing")
         traj_x, traj_z, traj_v = [], [], []
@@ -299,11 +312,11 @@ def plot_shot_analysis(df_ball, metrics):
         proj_x = proj_x[:min_len]
         proj_z = proj_z[:min_len]
     else:
-        logger.error("Projection data empty after slicing")
+        logger.debug("Projection data empty after slicing")
         proj_x, proj_z = [], []
 
     tickvals_x = np.linspace(side_range[0], side_range[1], 5)  # Absolute court positions in feet
-    ticktext_x = [f"{val:.1f}" for val in tickvals_x]  # Display in feet
+    ticktext_x = [f"{val:.1f}" for val in tickvals_x]
     tickvals_y = np.arange(2, 12, 1)
 
     # --- REAR VIEW ---
@@ -317,7 +330,7 @@ def plot_shot_analysis(df_ball, metrics):
         traj_z_rear = traj_z_rear[:min_len]
         traj_v_rear = traj_v_rear[:min_len]
     else:
-        logger.error("Rear trajectory data empty after slicing")
+        logger.debug("Rear trajectory data empty after slicing")
         traj_y, traj_z_rear, traj_v_rear = [], [], []
 
     proj_y = get_slice(df_ball, 'Basketball_Y', release_idx, post_release_end + 1) * INCHES_TO_FEET
@@ -327,7 +340,7 @@ def plot_shot_analysis(df_ball, metrics):
         proj_y = proj_y[:min_len]
         proj_z_rear = proj_z_rear[:min_len]
     else:
-        logger.error("Rear projection data empty after slicing")
+        logger.debug("Rear projection data empty after slicing")
         proj_y, proj_z_rear = [], []
 
     # Create subplots
@@ -374,7 +387,7 @@ def plot_shot_analysis(df_ball, metrics):
                 if marker_x < 0:
                     marker_x = -marker_x
                 marker_z = df_ball.at[idx, 'Basketball_Z'] * INCHES_TO_FEET
-                if 2 <= marker_z <= 11:  # Only check Z-range for visibility
+                if 2 <= marker_z <= 11:
                     fig.add_trace(
                         go.Scatter(
                             x=[marker_x],
@@ -466,7 +479,7 @@ def plot_shot_analysis(df_ball, metrics):
     )
     fig.update_xaxes(
         title_text="Lateral Position (ft)", row=1, col=2,
-        range=rear_range, tickmode='linear', dtick=1,
+        range=rear_range, tickmode='linear', tickvals=[-2,-1,0,1,2],ticktext=[-2,-1,0,1,2],
         showgrid=True, gridwidth=1, gridcolor='lightgrey',
         title_font=dict(size=14), tickfont=dict(size=12)
     )
