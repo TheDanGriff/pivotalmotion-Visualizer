@@ -1124,42 +1124,53 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             release_velocity = np.sqrt(rvx**2 + rvy**2 + rvz**2) * INCHES_TO_FEET
             metrics['release_velocity'] = 0.0 if pd.isna(release_velocity) or release_velocity < 0 else release_velocity
 
-        # 13. Compute release curvature using Bezier curves
+        # 13. Compute release curvature using Bezier curves for side view (XZ plane)
         ball_df['Basketball_Z_ft'] = ball_df['Basketball_Z'] * INCHES_TO_FEET
-        points = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_X_ft', 'Basketball_Z_ft']].dropna().values
-        print(f"Debug: Number of points = {len(points)}")
-        print(f"Debug: X range = {points[:,0].min():.2f} to {points[:,0].max():.2f} ft")
-        print(f"Debug: Z range = {points[:,1].min():.2f} to {points[:,1].max():.2f} ft")
-
-        if len(points) > 7:  # For 6th-order Bezier
-            P = fit_bezier(points, n=6)
-            if P is not None:
-                print(f"Debug: Bezier control points shape = {P.shape}")
-                print(f"Debug: Control points = \n{P}")
+        points_side = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_X_ft', 'Basketball_Z_ft']].dropna().values
+        print(f"Debug (Side): Number of points = {len(points_side)}")
+        if len(points_side) > 7:  # For 6th-order Bezier
+            P_side = fit_bezier(points_side, n=6)
+            if P_side is not None:
                 tau_grid = np.linspace(0, 1, 100)
-                kappa_grid = np.array([compute_curvature(P, tau) for tau in tau_grid])
-                print(f"Debug: Curvature - Max = {np.max(kappa_grid):.4f}, Min = {np.min(kappa_grid):.4f}, Mean = {np.mean(kappa_grid):.4f} 1/ft")
-                tau_max = tau_grid[np.argmax(kappa_grid)]
-                sigma = compute_terminal_curvature(P, tau_max)
-                print(f"Debug: Terminal curvature (σ) = {sigma:.4f} 1/ft")
-                metrics['release_curvature'] = sigma
+                kappa_grid_side = np.array([compute_curvature(P_side, tau) for tau in tau_grid])
+                tau_max_side = tau_grid[np.argmax(kappa_grid_side)]
+                sigma_side = compute_terminal_curvature(P_side, tau_max_side)
+                print(f"Debug (Side): Terminal curvature (σ) = {sigma_side:.6f} 1/ft")
+                metrics['release_curvature_side'] = sigma_side
             else:
-                logger.error("Bezier fit returned None")
-                print("Debug: Bezier fit failed")
-                metrics['release_curvature'] = 0.0
+                logger.warning("Bezier fit failed for side view")
+                metrics['release_curvature_side'] = 0.0
         else:
-            logger.warning(f"Insufficient points ({len(points)}) for Bezier fit")
-            print(f"Debug: Too few points for fit")
-            metrics['release_curvature'] = 0.0
+            logger.warning(f"Insufficient points ({len(points_side)}) for Bezier fit in side view")
+            metrics['release_curvature_side'] = 0.0
 
-        # 14. Classify release angle
+        # 14. Compute release curvature using Bezier curves for lateral view (YZ plane)
+        points_lateral = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_Y_ft', 'Basketball_Z_ft']].dropna().values
+        print(f"Debug (Lateral): Number of points = {len(points_lateral)}")
+        if len(points_lateral) > 7:  # For 6th-order Bezier
+            P_lateral = fit_bezier(points_lateral, n=6)
+            if P_lateral is not None:
+                tau_grid = np.linspace(0, 1, 100)
+                kappa_grid_lateral = np.array([compute_curvature(P_lateral, tau) for tau in tau_grid])
+                tau_max_lateral = tau_grid[np.argmax(kappa_grid_lateral)]
+                sigma_lateral = compute_terminal_curvature(P_lateral, tau_max_lateral)
+                print(f"Debug (Lateral): Terminal curvature (σ) = {sigma_lateral:.6f} 1/ft")
+                metrics['release_curvature_lateral'] = sigma_lateral
+            else:
+                logger.warning("Bezier fit failed for lateral view")
+                metrics['release_curvature_lateral'] = 0.0
+        else:
+            logger.warning(f"Insufficient points ({len(points_lateral)}) for Bezier fit in lateral view")
+            metrics['release_curvature_lateral'] = 0.0
+
+        # 15. Classify release angle
         metrics['release_class'] = classify_release_angle(
             metrics.get('release_angle', 0),
             metrics.get('shot_distance', 0),
             metrics.get('release_height', 0)
         )
 
-        # 15. Compute lateral deviation
+        # 16. Compute lateral deviation
         lateral_dev = calculate_lateral_deviation(
             ball_df,
             metrics['release_idx'],
@@ -1174,13 +1185,13 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         else:
             metrics['lateral_deviation'] = 0.0
 
-        # 16. Additional pose computations
+        # 17. Additional pose computations
         pose_df = compute_joint_angles(pose_df)
         pose_df = calculate_centroid(pose_df)
         pose_df = calculate_stability(pose_df)
         pose_df = calculate_guide_hand_release(pose_df)
 
-        # 17. Recompute joint angles
+        # 18. Recompute joint angles
         def calculate_angle(df, a_x, a_y, a_z, b_x, b_y, b_z, c_x, c_y, c_z):
             ab = np.sqrt((df[a_x] - df[b_x])**2 + (df[a_y] - df[b_y])**2 + (df[a_z] - df[b_z])**2)
             bc = np.sqrt((df[c_x] - df[b_x])**2 + (df[c_y] - df[b_y])**2 + (df[c_z] - df[b_z])**2)
