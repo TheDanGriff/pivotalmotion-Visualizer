@@ -224,7 +224,7 @@ def plot_shot_analysis(df_ball, metrics):
       Its horizontal axis is fixed to [-2, 2] ft (with the release point at 0).
 
     Both plots have a fixed vertical (Z) axis from 2 to 11 ft (9 ft tall) and show the last 32 frames prior to release.
-    Grid boxes are square, with equal scaling per foot on both axes.
+    Grid boxes are square, 1 ft x 1 ft, with 4 boxes wide and 9 boxes high.
     """
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
@@ -450,117 +450,42 @@ def plot_shot_analysis(df_ball, metrics):
     )
 
     # --- OVERALL LAYOUT ---
-    # Set figure dimensions to match 4 ft x 9 ft with equal scaling (square grid boxes)
-    pixels_per_foot = 80  # Same scale for both axes
-    subplot_width = 4 * pixels_per_foot   # 4 ft = 320 pixels
-    subplot_height = 9 * pixels_per_foot  # 9 ft = 720 pixels
+    # Set figure dimensions for square 1 ft x 1 ft grid boxes
+    pixels_per_foot = 60  # Equal pixels per foot for X and Y
+    subplot_width = 4 * pixels_per_foot   # 4 ft = 240 pixels
+    subplot_height = 9 * pixels_per_foot  # 9 ft = 540 pixels
     total_width = subplot_width * 2 + 100  # Two subplots + spacing
 
     fig.update_layout(
         height=subplot_height + 200,  # Extra space for title and legend
         width=total_width,
-        title_text="Ball Path",
+        title_text="Ball Path Analysis",
         title_x=0.38,
         title_font=dict(size=20),
         margin=dict(t=120, b=100, l=80, r=80),
-        legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(size=12)),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5, font=dict(size=12)),
         plot_bgcolor='rgba(255, 255, 255, 1)',
         paper_bgcolor='rgba(255, 255, 255, 1)',
         showlegend=True,
         autosize=False
     )
 
-    # Ensure equal scaling by matching data range to pixel ratio
+    # Ensure equal scaling by matching pixel size to data range
     for col in [1, 2]:
-        fig.update_xaxes(row=1, col=col, constrain='domain')
-        fig.update_yaxes(row=1, col=col, constrain='domain')
+        fig.update_xaxes(
+            row=1, col=col,
+            scaleanchor=f"y{col}",
+            scaleratio=1,  # Enforce equal scaling (1 ft = same pixels on X and Y)
+            constrain='domain'
+        )
+        fig.update_yaxes(
+            row=1, col=col,
+            constrain='domain'
+        )
 
     for annotation in fig.layout.annotations:
         annotation.y = 1.05
 
-    return fig
-
-
-
-def plot_foot_alignment(df):
-    """Professional foot alignment visualization with error handling"""
-    fig = go.Figure()
-    basket_pos = (41.75, 0)
-    
-    # Style configuration
-    FOOT_STYLE = {
-        'left': {'color': '#89CFF0', 'width': 6},
-        'right': {'color': '#B0E0E6', 'width': 6}
-    }
-    
-    
-    # Plot feet with error handling
-    for side in ['left', 'right']:
-        try:
-            heel_x = f"{side.upper()}HEEL_X"
-            heel_y = f"{side.upper()}HEEL_Y"
-            toe_x = f"{side.upper()}BTOE_X"
-            toe_y = f"{side.upper()}BTOE_Y"
-            
-            if all(col in df.columns for col in [heel_x, heel_y, toe_x, toe_y]):
-                heel = (df[heel_x].mean(), df[heel_y].mean())
-                toe = (df[toe_x].mean(), df[toe_y].mean())
-                
-                # Foot line plot
-                fig.add_trace(go.Scatter(
-                    x=[heel[0], toe[0]],
-                    y=[heel[1], toe[1]],
-                    mode='lines',
-                    line=FOOT_STYLE[side],
-                    name=f"{side.capitalize()} Foot"
-                ))
-                
-                # Angle calculation
-                midpoint = ((heel[0]+toe[0])/2, (heel[1]+toe[1])/2)
-                foot_vec = np.array(toe) - np.array(heel)
-                basket_vec = np.array(basket_pos) - np.array(midpoint)
-                
-                # Safe angle calculation
-                cosine = np.dot(foot_vec, basket_vec) / (np.linalg.norm(foot_vec) * np.linalg.norm(basket_vec))
-                cosine = np.clip(cosine, -1.0, 1.0)  # Prevent arccos errors
-                angle = np.degrees(np.arccos(cosine))
-                
-                # Annotation positioning
-                fig.add_annotation(
-                    x=midpoint[0],
-                    y=midpoint[1] + (0.2 if side == 'left' else -0.2),
-                    text=f"{angle:.1f}°",
-                    showarrow=False,
-                    font=dict(size=12, color=FOOT_STYLE[side]['color']),
-                    bgcolor="rgba(255,255,255,0.9)"
-                )
-        except Exception as e:
-            st.error(f"Error plotting {side} foot: {str(e)}")
-            continue
-
-    # Dynamic axis ranges
-    x_vals = []
-    y_vals = []
-    for trace in fig.data:
-        x_vals.extend(trace.x)
-        y_vals.extend(trace.y)
-    
-    x_range = [min(x_vals + [40]) - 1, max(x_vals + [42]) + 1]
-    y_range = [min(y_vals + [-2]), max(y_vals + [2])]
-
-    fig.update_layout(
-        title="Foot Alignment Analysis",
-        xaxis_title="Court Position (ft)",
-        yaxis_title="Lateral Position (ft)",
-        xaxis_range=x_range,
-        yaxis_range=y_range,
-        showlegend=False,
-        template="plotly_white",
-        margin=dict(l=20, r=20, b=20, t=40),
-        height=400,
-        plot_bgcolor='rgba(248,248,248,1)'
-    )
-    
     return fig
 
 def plot_release_angle_analysis(metrics):
