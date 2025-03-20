@@ -1535,7 +1535,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3,
         height=500,  # Increased height to accommodate spacing
         width=800,
         title_text="Ball Curvature Analysis",  # Added main title
-        title_x=0.5,  # Centered title
+        title_x=0.4,  # Centered title
         title_font=dict(size=20),
         margin=dict(t=100, b=100, l=40, r=40),  # Adjusted margins for spacing
         legend=dict(
