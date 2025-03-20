@@ -459,7 +459,7 @@ def plot_shot_analysis(df_ball, metrics):
     fig.update_layout(
         height=subplot_height + 200,  # Extra space for title and legend
         width=total_width,
-        title_text="Ball Path Analysis",
+        title_text="Ball Path",
         title_x=0.38,
         title_font=dict(size=20),
         margin=dict(t=120, b=100, l=80, r=80),
