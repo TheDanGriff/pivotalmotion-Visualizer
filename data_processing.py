@@ -943,35 +943,34 @@ def bernstein_poly(k, n, tau):
     """Compute Bernstein polynomial."""
     return comb(n, k) * (1 - tau)**(n - k) * tau**k
 
-def compute_curvature(P, tau, h=1e-6):
-    """Compute curvature at tau for a 2D Bezier curve using numerical derivatives."""
+def compute_curvature(P, tau, h=1e-4):  # Increased h
     try:
         tau = float(tau)
         tau_minus = max(0.0, tau - h)
         tau_plus = min(1.0, tau + h)
 
-        # Evaluate Bezier curve and ensure float array, flatten to handle (2, 1)
         B = np.asarray(evaluate_bezier(P, tau), dtype=np.float64).flatten()
         B_minus = np.asarray(evaluate_bezier(P, tau_minus), dtype=np.float64).flatten()
         B_plus = np.asarray(evaluate_bezier(P, tau_plus), dtype=np.float64).flatten()
 
-        # Debug the output shape and value
-        logger.debug(f"evaluate_bezier(P, {tau}) shape: {B.shape}, value: {B}")
+        logger.debug(f"tau={tau}, B={B}, B_minus={B_minus}, B_plus={B_plus}")
 
-        # Check if output has exactly 2 elements
         if B.size != 2:
             raise ValueError(f"evaluate_bezier returned array with {B.size} elements, expected 2 for [x, z] or [y, z]")
 
-        # Numerical derivatives
-        x1 = (B_plus[0] - B_minus[0]) / (2 * h)  # dx/dtau or dy/dtau
-        z1 = (B_plus[1] - B_minus[1]) / (2 * h)  # dz/dtau
-        x2 = (B_plus[0] - 2 * B[0] + B_minus[0]) / (h**2)  # d^2x/dtau^2 or d^2y/dtau^2
-        z2 = (B_plus[1] - 2 * B[1] + B_minus[1]) / (h**2)  # d^2z/dtau^2
+        x1 = (B_plus[0] - B_minus[0]) / (2 * h)
+        z1 = (B_plus[1] - B_minus[1]) / (2 * h)
+        x2 = (B_plus[0] - 2 * B[0] + B_minus[0]) / (h**2)
+        z2 = (B_plus[1] - 2 * B[1] + B_minus[1]) / (h**2)
+
+        logger.debug(f"x1={x1}, z1={z1}, x2={x2}, z2={z2}")
 
         denom = (x1**2 + z1**2)**1.5
         if denom == 0:
+            logger.debug("Denominator = 0, curvature set to 0")
             return 0.0
         curvature = abs(x1 * z2 - z1 * x2) / denom
+        logger.debug(f"Curvature = {curvature}")
         return float(curvature)
     except Exception as e:
         logger.error(f"Error computing curvature: {str(e)}")
@@ -1141,8 +1140,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             release_velocity = np.sqrt(rvx**2 + rvy**2 + rvz**2) * INCHES_TO_FEET
             metrics['release_velocity'] = 0.0 if pd.isna(release_velocity) or release_velocity < 0 else release_velocity
 
-# 13. Compute release curvature using Bezier curves for side view (XZ plane)
-        ball_df['Basketball_Z_ft'] = ball_df['Basketball_Z'] * INCHES_TO_FEET
+        # 13. Compute release curvature using Bezier curves for side view (XZ plane)
         points_side = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_X_ft', 'Basketball_Z_ft']].dropna().values
         print(f"Debug (Side): Number of points = {len(points_side)}")
         logger.debug(f"Side view points: {points_side[:5]}...")
