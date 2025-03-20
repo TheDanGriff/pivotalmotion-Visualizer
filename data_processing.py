@@ -906,7 +906,7 @@ def save_adjusted_data(df, user_email, job_id, segment_id, file_format='csv'):
 import numpy as np
 import pandas as pd
 from scipy.special import comb
-from scipy.integrate import trapezoid  # Updated from trapz to trapezoids
+from scipy.integrate import trapezoid
 import logging
 
 logger = logging.getLogger(__name__)
@@ -929,7 +929,7 @@ def bezier_design_matrix(tau, n):
         A[:, k] = comb(n, k) * (1 - tau)**(n - k) * tau**k
     return A
 
-def fit_bezier(points, n=10):
+def fit_bezier(points, n=6):
     """Fit an nth-order Bezier curve to points."""
     try:
         tau = compute_tau(points)
@@ -978,7 +978,7 @@ def compute_terminal_curvature(P, tau_max, N=50):
         tau_z = tau_max + z * (1 - tau_max)
         kappa_z = np.array([compute_curvature(P, tau) for tau in tau_z])
         w_z = 4 * z**3  # Cubic weighting function
-        sigma = trapezoid(w_z * kappa_z, z)  # Updated from trapz to trapezoid
+        sigma = trapezoid(w_z * kappa_z, z)
         return sigma
     except Exception as e:
         logger.error(f"Error computing terminal curvature: {str(e)}")
@@ -989,38 +989,42 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
     Calculate basketball shot metrics entirely in FEET.
     Assumptions:
       - 'Basketball_X', 'Basketball_Y', 'Basketball_Z' in ball_df are in inches.
+      - Pose columns (e.g., 'RELBOW_Z') are in inches.
       - Hoops are located at (±501, 0) inches from center.
       - fps is frames per second, default 60.
     """
     metrics = {}
-    INCHES_TO_FEET = 1 / 12  # Conversion factor
+    INCHES_TO_FEET = 1 / 12
+    BALL_RADIUS_INCHES = 4.7  # Approximate basketball radius
+    BALL_RADIUS_FEET = BALL_RADIUS_INCHES * INCHES_TO_FEET
 
     try:
-        # 1. Validate Pose and Ball DataFrames.
+        # 1. Validate Pose and Ball DataFrames
         required_pose = [
             'LHEEL_X', 'LHEEL_Y', 'LBIGTOE_X', 'LBIGTOE_Y',
             'RHEEL_X', 'RHEEL_Y', 'RBIGTOE_X', 'RBIGTOE_Y',
             'MIDHIP_X', 'MIDHIP_Y', 'NECK_X', 'NECK_Y',
-            'LSHOULDER_X', 'LSHOULDER_Y', 'RSHOULDER_X', 'RSHOULDER_Y'
+            'LSHOULDER_X', 'LSHOULDER_Y', 'RSHOULDER_X', 'RSHOULDER_Y',
+            'RELBOW_Z'  # Added for lift index
         ]
         missing_pose = [col for col in required_pose if col not in pose_df.columns]
         if missing_pose:
-            logger.warning(f"Missing columns in pose_df: {missing_pose}.")
+            logger.warning(f"Missing columns in pose_df: {missing_pose}")
 
         required_ball = ['Basketball_X', 'Basketball_Y', 'Basketball_Z']
         missing_ball = [col for col in required_ball if col not in ball_df.columns]
         if missing_ball:
-            logger.error(f"Missing columns in ball_df: {missing_ball}.")
+            logger.error(f"Missing columns in ball_df: {missing_ball}")
             return metrics, pose_df, ball_df
 
-        # --- Step 1: Adjust coordinates if shot comes from the negative side.
+        # 2. Adjust coordinates if shot comes from the negative side
         ball_df, pose_df = adjust_shot_coordinates(ball_df, pose_df)
 
-        # 2. Compute additional pose angles.
+        # 3. Compute additional pose angles
         pose_df = calculate_foot_angles(pose_df)
         pose_df = calculate_rotation_angles(pose_df)
 
-        # 3. Compute velocities in inches/second.
+        # 4. Compute velocities in inches/second
         basketball_x = ball_df['Basketball_X']
         basketball_y = ball_df['Basketball_Y']
         basketball_z = ball_df['Basketball_Z']
@@ -1041,19 +1045,15 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             .fillna(method='ffill')
         )
 
-        # 4. Identify key shot indices.
+        # 5. Identify key shot indices
         metrics['apex_idx'] = basketball_z.idxmax()
         apex_window_start = max(0, metrics['apex_idx'] - 75)
         metrics['release_idx'] = ball_df['velocity_magnitude'].iloc[apex_window_start:metrics['apex_idx']].idxmax()
-
-        # Initially compute set and lift indices using raw data.
         release_window_start = max(0, metrics['release_idx'] - 40)
         metrics['set_idx'] = ball_df.iloc[release_window_start:metrics['release_idx']]['Basketball_X'].idxmin()
-        set_window_start = max(0, metrics['set_idx'] - 25)
-        metrics['lift_idx'] = ball_df.iloc[set_window_start:metrics['set_idx']]['Basketball_X'].idxmax()
         metrics['rim_impact_idx'] = (basketball_z <= 120).idxmax()  # 10 ft = 120 inches
 
-        # 5. Determine hoop position based on release point.
+        # 6. Determine hoop position
         release_point = ball_df.loc[metrics['release_idx']]
         player_x = release_point['Basketball_X']
         hoop_x = 501.0 if player_x >= 0 else -501.0
@@ -1061,7 +1061,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['hoop_x'] = hoop_x
         metrics['hoop_y'] = hoop_y
 
-        # 6. Remap shot coordinates: convert ball coordinates to feet and rotate about the hoop.
+        # 7. Remap shot coordinates to feet and rotate about the hoop
         ball_df, pose_df, theta_used = remap_shot_coordinates(ball_df, pose_df, hoop_x, hoop_y, metrics['release_idx'], INCHES_TO_FEET)
         release_point = ball_df.loc[metrics['release_idx']]
         hoop_x_ft = hoop_x * INCHES_TO_FEET
@@ -1079,37 +1079,38 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['original_shot_distance'] = original_shot_distance
         metrics['flip'] = flip
 
-        # 7. Recalculate set and lift points using remapped X coordinates.
+        # 8. Recalculate set index using remapped coordinates
         candidate_set_window = ball_df.iloc[max(0, metrics['release_idx'] - 30):metrics['release_idx']]
         if not candidate_set_window.empty:
             metrics['set_idx'] = candidate_set_window['Basketball_X_ft'].idxmax()
         else:
             metrics['set_idx'] = metrics['release_idx']
 
-        candidate_lift_window = ball_df.iloc[max(0, metrics['set_idx'] - 30):metrics['set_idx']].copy()
-        candidate_lift_window['dx'] = candidate_lift_window['Basketball_X_ft'].diff()
-        candidate_lift_window['dz'] = candidate_lift_window['Basketball_Z'].diff() * INCHES_TO_FEET
-        lift_idx_candidate = None
-        for i in range(1, len(candidate_lift_window)-1):
-            if candidate_lift_window['dx'].iloc[i-1] < -0.15 and candidate_lift_window['dx'].iloc[i] >= -0.15 and candidate_lift_window['dz'].iloc[i] > 0:
-                lift_idx_candidate = candidate_lift_window.index[i]
-                break
-        if lift_idx_candidate is None:
-            lift_idx_candidate = candidate_lift_window['dx'].idxmax()
-        metrics['lift_idx'] = lift_idx_candidate
+        # 9. Improved lift index using elbow position
+        elbow_z_ft = pose_df['RELBOW_Z'] * INCHES_TO_FEET
+        ball_bottom_z_ft = (ball_df['Basketball_Z'] * INCHES_TO_FEET) - BALL_RADIUS_FEET
+        pre_set_df = ball_df.loc[:metrics['set_idx']].copy()
+        pre_set_df['ball_bottom_z_ft'] = ball_bottom_z_ft
+        pre_set_df['elbow_z_ft'] = elbow_z_ft
+        lift_candidates = pre_set_df.index[pre_set_df['ball_bottom_z_ft'] > pre_set_df['elbow_z_ft']]
+        if len(lift_candidates) > 0:
+            metrics['lift_idx'] = lift_candidates[0]
+        else:
+            metrics['lift_idx'] = max(0, metrics['set_idx'] - 30)
+            logger.warning("No lift candidates found based on elbow position. Using fallback.")
 
-        # 8. Compute additional KPIs.
+        # 10. Compute additional KPIs
         metrics['release_height'] = release_point['Basketball_Z'] * INCHES_TO_FEET
         metrics['release_time'] = (metrics['release_idx'] - metrics['lift_idx']) / fps
         metrics['apex_height'] = basketball_z.max() * INCHES_TO_FEET
 
-        # 9. Compute Release Angle using remapped (ft) coordinates.
+        # 11. Compute release angle
         post_release = ball_df.loc[metrics['release_idx']:metrics['release_idx'] + 3]
         dz = post_release['Basketball_Z'].diff().iloc[1:].mean() * INCHES_TO_FEET
         dxy = np.sqrt(post_release['Basketball_X_ft'].diff()**2 + post_release['Basketball_Y_ft'].diff()**2).iloc[1:].mean()
         metrics['release_angle'] = np.degrees(np.arctan2(dz, dxy))
 
-        # 10. Compute Release Velocity.
+        # 12. Compute release velocity
         if pd.isna(metrics['release_idx']) or metrics['release_idx'] >= len(ball_df):
             logger.error(f"Invalid release_idx: {metrics['release_idx']}, ball_df length: {len(ball_df)}")
             metrics['release_velocity'] = 0.0
@@ -1123,32 +1124,42 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             release_velocity = np.sqrt(rvx**2 + rvy**2 + rvz**2) * INCHES_TO_FEET
             metrics['release_velocity'] = 0.0 if pd.isna(release_velocity) or release_velocity < 0 else release_velocity
 
-        # 11. Compute Release Curvature using Bezier curves (Updated Implementation)
+        # 13. Compute release curvature using Bezier curves
         ball_df['Basketball_Z_ft'] = ball_df['Basketball_Z'] * INCHES_TO_FEET
         points = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_X_ft', 'Basketball_Z_ft']].dropna().values
-        if len(points) > 11:  # Ensure enough points for 10th-order fit
-            P = fit_bezier(points, n=10)
+        print(f"Debug: Number of points = {len(points)}")
+        print(f"Debug: X range = {points[:,0].min():.2f} to {points[:,0].max():.2f} ft")
+        print(f"Debug: Z range = {points[:,1].min():.2f} to {points[:,1].max():.2f} ft")
+
+        if len(points) > 7:  # For 6th-order Bezier
+            P = fit_bezier(points, n=6)
             if P is not None:
+                print(f"Debug: Bezier control points shape = {P.shape}")
+                print(f"Debug: Control points = \n{P}")
                 tau_grid = np.linspace(0, 1, 100)
                 kappa_grid = np.array([compute_curvature(P, tau) for tau in tau_grid])
+                print(f"Debug: Curvature - Max = {np.max(kappa_grid):.4f}, Min = {np.min(kappa_grid):.4f}, Mean = {np.mean(kappa_grid):.4f} 1/ft")
                 tau_max = tau_grid[np.argmax(kappa_grid)]
                 sigma = compute_terminal_curvature(P, tau_max)
+                print(f"Debug: Terminal curvature (σ) = {sigma:.4f} 1/ft")
                 metrics['release_curvature'] = sigma
             else:
-                logger.error("Bezier fit returned None, setting release_curvature to 0.0")
+                logger.error("Bezier fit returned None")
+                print("Debug: Bezier fit failed")
                 metrics['release_curvature'] = 0.0
         else:
-            logger.warning(f"Insufficient points ({len(points)}) for Bezier fit between lift_idx {metrics['lift_idx']} and release_idx {metrics['release_idx']}")
+            logger.warning(f"Insufficient points ({len(points)}) for Bezier fit")
+            print(f"Debug: Too few points for fit")
             metrics['release_curvature'] = 0.0
 
-        # 12. Classify release angle.
+        # 14. Classify release angle
         metrics['release_class'] = classify_release_angle(
             metrics.get('release_angle', 0),
             metrics.get('shot_distance', 0),
             metrics.get('release_height', 0)
         )
 
-        # 13. Compute lateral deviation.
+        # 15. Compute lateral deviation
         lateral_dev = calculate_lateral_deviation(
             ball_df,
             metrics['release_idx'],
@@ -1163,13 +1174,13 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         else:
             metrics['lateral_deviation'] = 0.0
 
-        # 14. Additional Pose Computations.
+        # 16. Additional pose computations
         pose_df = compute_joint_angles(pose_df)
         pose_df = calculate_centroid(pose_df)
         pose_df = calculate_stability(pose_df)
         pose_df = calculate_guide_hand_release(pose_df)
 
-        # Recompute joint angles for consistency.
+        # 17. Recompute joint angles
         def calculate_angle(df, a_x, a_y, a_z, b_x, b_y, b_z, c_x, c_y, c_z):
             ab = np.sqrt((df[a_x] - df[b_x])**2 + (df[a_y] - df[b_y])**2 + (df[a_z] - df[b_z])**2)
             bc = np.sqrt((df[c_x] - df[b_x])**2 + (df[c_y] - df[b_y])**2 + (df[c_z] - df[b_z])**2)
@@ -1214,10 +1225,6 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['release_velocity'] = 0.0  # Fallback
 
     return metrics, pose_df, ball_df
-
-
-
-
 
 
 
