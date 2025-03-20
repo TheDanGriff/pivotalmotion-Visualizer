@@ -902,7 +902,6 @@ def save_adjusted_data(df, user_email, job_id, segment_id, file_format='csv'):
         logger.error(f"Error saving adjusted data: {e}")
         return None
 #------------------
-
 import numpy as np
 import pandas as pd
 from scipy.special import comb
@@ -944,51 +943,63 @@ def bernstein_poly(k, n, tau):
     """Compute Bernstein polynomial."""
     return comb(n, k) * (1 - tau)**(n - k) * tau**k
 
-# Assuming your existing evaluate_bezier is unchanged; we'll use numerical derivatives
+# Updated compute_curvature to handle evaluate_bezier output as float and return scalar
 def compute_curvature(P, tau, h=1e-6):
     """Compute curvature at tau for a 2D Bezier curve using numerical derivatives."""
     try:
-        B = evaluate_bezier(P, tau)        # Position
-        B_minus = evaluate_bezier(P, max(0, tau - h))  # Position slightly before
-        B_plus = evaluate_bezier(P, min(1, tau + h))   # Position slightly after
+        # Ensure tau is a float
+        tau = float(tau)
+        tau_minus = max(0.0, tau - h)
+        tau_plus = min(1.0, tau + h)
 
-        x1 = (B_plus[0] - B_minus[0]) / (2 * h)  # First derivative
-        z1 = (B_plus[1] - B_minus[1]) / (2 * h)
-        x2 = (B_plus[0] - 2 * B[0] + B_minus[0]) / (h**2)  # Second derivative
-        z2 = (B_plus[1] - 2 * B[1] + B_minus[1]) / (h**2)
+        # Evaluate Bezier curve and convert to float
+        B = np.asarray(evaluate_bezier(P, tau), dtype=np.float64)
+        B_minus = np.asarray(evaluate_bezier(P, tau_minus), dtype=np.float64)
+        B_plus = np.asarray(evaluate_bezier(P, tau_plus), dtype=np.float64)
+
+        # Ensure B, B_minus, B_plus are 2D points
+        if B.shape != (2,) or B_minus.shape != (2,) or B_plus.shape != (2,):
+            raise ValueError("evaluate_bezier must return a 2-element array [x, z]")
+
+        # Numerical derivatives
+        x1 = (B_plus[0] - B_minus[0]) / (2 * h)  # dx/dtau
+        z1 = (B_plus[1] - B_minus[1]) / (2 * h)  # dz/dtau
+        x2 = (B_plus[0] - 2 * B[0] + B_minus[0]) / (h**2)  # d^2x/dtau^2
+        z2 = (B_plus[1] - 2 * B[1] + B_minus[1]) / (h**2)  # d^2z/dtau^2
 
         denom = (x1**2 + z1**2)**1.5
         if denom == 0:
-            return 0
-        return abs(x1 * z2 - z1 * x2) / denom
+            return 0.0
+        curvature = abs(x1 * z2 - z1 * x2) / denom
+        return float(curvature)  # Ensure scalar float output
     except Exception as e:
         logger.error(f"Error computing curvature: {str(e)}")
-        return 0
+        return 0.0
 
 def compute_terminal_curvature(P, tau_max, N=50):
     """Compute terminal curvature σ with cubic weighting."""
     try:
         z = np.linspace(0, 1, N)
         tau_z = tau_max + z * (1 - tau_max)
-        kappa_z = np.array([compute_curvature(P, tau) for tau in tau_z])
+        kappa_z = np.array([compute_curvature(P, tau) for tau in tau_z], dtype=np.float64)
         w_z = 4 * z**3  # Cubic weighting function
         sigma = trapezoid(w_z * kappa_z, z)
-        return sigma
+        return float(sigma)
     except Exception as e:
         logger.error(f"Error computing terminal curvature: {str(e)}")
-        return 0
+        return 0.0
 
 def compute_weighted_curvature_area(P, N=100):
     """Compute the cubic-weighted curvature area from lift to release."""
     try:
         tau_grid = np.linspace(0, 1, N)
-        kappa_grid = np.array([compute_curvature(P, tau) for tau in tau_grid])
+        kappa_grid = np.array([compute_curvature(P, tau) for tau in tau_grid], dtype=np.float64)
         w_grid = 4 * tau_grid**3  # Cubic weighting, heavier near release
         weighted_area = trapezoid(w_grid * kappa_grid, tau_grid)
-        return weighted_area
+        return float(weighted_area)
     except Exception as e:
         logger.error(f"Error computing weighted curvature area: {str(e)}")
-        return 0
+        return 0.0
 
 def calculate_shot_metrics(pose_df, ball_df, fps=60):
     """
@@ -1132,8 +1143,8 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         if len(points_side) > 7:  # For 6th-order Bezier
             P_side = fit_bezier(points_side, n=6)
             if P_side is not None:
-                tau_grid = np.linspace(0, 1, 100)
-                kappa_grid_side = np.array([compute_curvature(P_side, tau) for tau in tau_grid])
+                tau_grid = np.linspace(0, 1, 100, dtype=np.float64)
+                kappa_grid_side = np.array([compute_curvature(P_side, tau) for tau in tau_grid], dtype=np.float64)
                 tau_max_side = tau_grid[np.argmax(kappa_grid_side)]
                 sigma_side = compute_terminal_curvature(P_side, tau_max_side)
                 weighted_area_side = compute_weighted_curvature_area(P_side)
@@ -1156,8 +1167,8 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         if len(points_lateral) > 7:  # For 6th-order Bezier
             P_lateral = fit_bezier(points_lateral, n=6)
             if P_lateral is not None:
-                tau_grid = np.linspace(0, 1, 100)
-                kappa_grid_lateral = np.array([compute_curvature(P_lateral, tau) for tau in tau_grid])
+                tau_grid = np.linspace(0, 1, 100, dtype=np.float64)
+                kappa_grid_lateral = np.array([compute_curvature(P_lateral, tau) for tau in tau_grid], dtype=np.float64)
                 tau_max_lateral = tau_grid[np.argmax(kappa_grid_lateral)]
                 sigma_lateral = compute_terminal_curvature(P_lateral, tau_max_lateral)
                 weighted_area_lateral = compute_weighted_curvature_area(P_lateral)
@@ -1226,7 +1237,6 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['release_velocity'] = 0.0  # Fallback
 
     return metrics, pose_df, ball_df
-
 
 def calculate_lateral_deviation(df, release_index, hoop_x=501.0, hoop_y=0.0):
     """
