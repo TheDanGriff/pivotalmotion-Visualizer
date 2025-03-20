@@ -944,25 +944,19 @@ def bernstein_poly(k, n, tau):
     """Compute Bernstein polynomial."""
     return comb(n, k) * (1 - tau)**(n - k) * tau**k
 
-def evaluate_bezier(P, tau, derivative=0):
-    """Evaluate Bezier curve or its derivatives at tau."""
-    n = len(P) - 1
-    if derivative == 0:  # Curve itself
-        return sum(P[k] * bernstein_poly(k, n, tau) for k in range(n + 1))
-    elif derivative == 1 and n >= 1:  # First derivative
-        return n * sum((P[k + 1] - P[k]) * bernstein_poly(k, n - 1, tau) for k in range(n))
-    elif derivative == 2 and n >= 2:  # Second derivative
-        return n * (n - 1) * sum((P[k + 2] - 2 * P[k + 1] + P[k]) * bernstein_poly(k, n - 2, tau) for k in range(n - 1))
-    else:
-        return np.zeros(2)  # Return zero vector for invalid cases
-
-def compute_curvature(P, tau):
-    """Compute curvature at tau for a 2D Bezier curve."""
+# Assuming your existing evaluate_bezier is unchanged; we'll use numerical derivatives
+def compute_curvature(P, tau, h=1e-6):
+    """Compute curvature at tau for a 2D Bezier curve using numerical derivatives."""
     try:
-        B1 = evaluate_bezier(P, tau, derivative=1)  # First derivative
-        B2 = evaluate_bezier(P, tau, derivative=2)  # Second derivative
-        x1, z1 = B1
-        x2, z2 = B2
+        B = evaluate_bezier(P, tau)        # Position
+        B_minus = evaluate_bezier(P, max(0, tau - h))  # Position slightly before
+        B_plus = evaluate_bezier(P, min(1, tau + h))   # Position slightly after
+
+        x1 = (B_plus[0] - B_minus[0]) / (2 * h)  # First derivative
+        z1 = (B_plus[1] - B_minus[1]) / (2 * h)
+        x2 = (B_plus[0] - 2 * B[0] + B_minus[0]) / (h**2)  # Second derivative
+        z2 = (B_plus[1] - 2 * B[1] + B_minus[1]) / (h**2)
+
         denom = (x1**2 + z1**2)**1.5
         if denom == 0:
             return 0
@@ -982,6 +976,18 @@ def compute_terminal_curvature(P, tau_max, N=50):
         return sigma
     except Exception as e:
         logger.error(f"Error computing terminal curvature: {str(e)}")
+        return 0
+
+def compute_weighted_curvature_area(P, N=100):
+    """Compute the cubic-weighted curvature area from lift to release."""
+    try:
+        tau_grid = np.linspace(0, 1, N)
+        kappa_grid = np.array([compute_curvature(P, tau) for tau in tau_grid])
+        w_grid = 4 * tau_grid**3  # Cubic weighting, heavier near release
+        weighted_area = trapezoid(w_grid * kappa_grid, tau_grid)
+        return weighted_area
+    except Exception as e:
+        logger.error(f"Error computing weighted curvature area: {str(e)}")
         return 0
 
 def calculate_shot_metrics(pose_df, ball_df, fps=60):
@@ -1024,7 +1030,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         pose_df = calculate_foot_angles(pose_df)
         pose_df = calculate_rotation_angles(pose_df)
 
-        # 4. Compute velocities in inches/second (Fix deprecation warning)
+        # 4. Compute velocities in inches/second
         basketball_x = ball_df['Basketball_X']
         basketball_y = ball_df['Basketball_Y']
         basketball_z = ball_df['Basketball_Z']
@@ -1130,14 +1136,19 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
                 kappa_grid_side = np.array([compute_curvature(P_side, tau) for tau in tau_grid])
                 tau_max_side = tau_grid[np.argmax(kappa_grid_side)]
                 sigma_side = compute_terminal_curvature(P_side, tau_max_side)
+                weighted_area_side = compute_weighted_curvature_area(P_side)
                 print(f"Debug (Side): Terminal curvature (σ) = {sigma_side:.6f} 1/ft")
+                print(f"Debug (Side): Weighted curvature area = {weighted_area_side:.6f} 1/ft")
                 metrics['release_curvature_side'] = sigma_side
+                metrics['weighted_curvature_area_side'] = weighted_area_side
             else:
                 logger.warning("Bezier fit failed for side view")
                 metrics['release_curvature_side'] = 0.0
+                metrics['weighted_curvature_area_side'] = 0.0
         else:
             logger.warning(f"Insufficient points ({len(points_side)}) for Bezier fit in side view")
             metrics['release_curvature_side'] = 0.0
+            metrics['weighted_curvature_area_side'] = 0.0
 
         # 14. Compute release curvature using Bezier curves for lateral view (YZ plane)
         points_lateral = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_Y_ft', 'Basketball_Z_ft']].dropna().values
@@ -1149,14 +1160,19 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
                 kappa_grid_lateral = np.array([compute_curvature(P_lateral, tau) for tau in tau_grid])
                 tau_max_lateral = tau_grid[np.argmax(kappa_grid_lateral)]
                 sigma_lateral = compute_terminal_curvature(P_lateral, tau_max_lateral)
+                weighted_area_lateral = compute_weighted_curvature_area(P_lateral)
                 print(f"Debug (Lateral): Terminal curvature (σ) = {sigma_lateral:.6f} 1/ft")
+                print(f"Debug (Lateral): Weighted curvature area = {weighted_area_lateral:.6f} 1/ft")
                 metrics['release_curvature_lateral'] = sigma_lateral
+                metrics['weighted_curvature_area_lateral'] = weighted_area_lateral
             else:
                 logger.warning("Bezier fit failed for lateral view")
                 metrics['release_curvature_lateral'] = 0.0
+                metrics['weighted_curvature_area_lateral'] = 0.0
         else:
             logger.warning(f"Insufficient points ({len(points_lateral)}) for Bezier fit in lateral view")
             metrics['release_curvature_lateral'] = 0.0
+            metrics['weighted_curvature_area_lateral'] = 0.0
 
         # 15. Classify release angle
         metrics['release_class'] = classify_release_angle(
@@ -1186,7 +1202,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         pose_df = calculate_stability(pose_df)
         pose_df = calculate_guide_hand_release(pose_df)
 
-        # 18. Recompute joint angles (Fix fragmented DataFrame warning)
+        # 18. Recompute joint angles
         def calculate_angle(df, a_x, a_y, a_z, b_x, b_y, b_z, c_x, c_y, c_z):
             ab = np.sqrt((df[a_x] - df[b_x])**2 + (df[a_y] - df[b_y])**2 + (df[a_z] - df[b_z])**2)
             bc = np.sqrt((df[c_x] - df[b_x])**2 + (df[c_y] - df[b_y])**2 + (df[c_z] - df[b_z])**2)
@@ -1195,38 +1211,13 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             cos_angle = np.clip(cos_angle, -1, 1)
             return np.degrees(np.arccos(cos_angle))
 
-        # Compute all angles at once and concatenate
         angles = {
-            'elbow_angle': calculate_angle(
-                pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
-                'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
-                'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z'
-            ),
-            'shoulder_angle': calculate_angle(
-                pose_df, 'MIDHIP_X', 'MIDHIP_Y', 'MIDHIP_Z',
-                'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
-                'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z'
-            ),
-            'wrist_angle': calculate_angle(
-                pose_df, 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
-                'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z',
-                'RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z'
-            ),
-            'hip_angle': calculate_angle(
-                pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
-                'RHIP_X', 'RHIP_Y', 'RHIP_Z',
-                'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z'
-            ),
-            'knee_angle': calculate_angle(
-                pose_df, 'RHIP_X', 'RHIP_Y', 'RHIP_Z',
-                'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
-                'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z'
-            ),
-            'ankle_angle': calculate_angle(
-                pose_df, 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
-                'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z',
-                'RBIGTOE_X', 'RBIGTOE_Y', 'RBIGTOE_Z'
-            )
+            'elbow_angle': calculate_angle(pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z', 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z', 'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z'),
+            'shoulder_angle': calculate_angle(pose_df, 'MIDHIP_X', 'MIDHIP_Y', 'MIDHIP_Z', 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z', 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z'),
+            'wrist_angle': calculate_angle(pose_df, 'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z', 'RWRIST_X', 'RWRIST_Y', 'RWRIST_Z', 'RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z'),
+            'hip_angle': calculate_angle(pose_df, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z', 'RHIP_X', 'RHIP_Y', 'RHIP_Z', 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z'),
+            'knee_angle': calculate_angle(pose_df, 'RHIP_X', 'RHIP_Y', 'RHIP_Z', 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z', 'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z'),
+            'ankle_angle': calculate_angle(pose_df, 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z', 'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z', 'RBIGTOE_X', 'RBIGTOE_Y', 'RBIGTOE_Z')
         }
         pose_df = pd.concat([pose_df, pd.DataFrame(angles, index=pose_df.index)], axis=1)
 
@@ -1235,8 +1226,6 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['release_velocity'] = 0.0  # Fallback
 
     return metrics, pose_df, ball_df
-
-
 
 
 def calculate_lateral_deviation(df, release_index, hoop_x=501.0, hoop_y=0.0):
