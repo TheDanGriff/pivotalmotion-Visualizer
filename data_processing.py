@@ -1336,7 +1336,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     total_frames = end_idx - start_idx
 
     if total_frames <= 0:
-        raise ValueError("Invalid indices: end_idx must be greater than start_idx.")
+        raise ValueError("Invalid indices: end_idx must be a greater than start_idx.")
 
     # Time parameterization
     t_fine = np.linspace(0, 1, num_interp)
