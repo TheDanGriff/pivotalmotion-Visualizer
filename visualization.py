@@ -280,30 +280,32 @@ def plot_shot_analysis(df_ball, metrics):
 
     # --- SIDE VIEW PLOT ---
     if len(traj_x) > 0 and len(traj_z) > 0 and len(traj_v) > 0:
-        # Trajectory with velocity-based color
+        # Trajectory with velocity-based color gradient
         fig.add_trace(
             go.Scatter(
                 x=traj_x,
                 y=traj_z,
-                mode='lines',
+                mode='lines+markers',  # Use lines+markers to enable color gradient
                 name='Trajectory',
-                line=dict(width=4),
-                line_color='blue',  # Sequential colorscale
-                cmin=0,  # Min velocity (adjust if needed)
-                cmax=max(traj_v.max(), 40),  # Cap at 40 ft/s or max observed
-                color=traj_v,  # Map velocity to color
-                showscale=True,  # Show colorbar
-                colorbar=dict(
-                    title="Velocity (ft/s)",
-                    titleside="right",
-                    thickness=15,
-                    len=0.5,
-                    x=1.05  # Position to right of plot
+                line=dict(width=2, color='grey'),  # Thin grey line to connect points
+                marker=dict(
+                    size=8,  # Marker size for visibility
+                    color=traj_v,  # Velocity mapped to color
+                    colorscale='Blues',  # Light to dark blue
+                    cmin=0,  # Min velocity
+                    cmax=max(traj_v.max(), 40),  # Max velocity (cap at 40 ft/s or higher)
+                    colorbar=dict(
+                        title="Velocity (ft/s)",
+                        titleside="right",
+                        thickness=15,
+                        len=0.5,
+                        x=1.05  # Position to right of plot
+                    )
                 )
             ),
             row=1, col=1
         )
-        # Markers
+        # Markers for phases
         phase_info = {
             'lift': {'idx': lift_idx, 'color': 'rgba(147, 112, 219, 1)', 'symbol': 'circle'},
             'set': {'idx': set_idx, 'color': 'rgba(255, 182, 193, 1)', 'symbol': 'diamond'},
@@ -345,14 +347,17 @@ def plot_shot_analysis(df_ball, metrics):
             go.Scatter(
                 x=traj_y,
                 y=traj_z,
-                mode='lines',
+                mode='lines+markers',
                 name='Trajectory',
-                line=dict(width=4),
-                line_color='blue',
-                cmin=0,
-                cmax=max(traj_v.max(), 40),
-                color=traj_v,
-                showscale=False  # Only one colorbar needed
+                line=dict(width=2, color='grey'),
+                marker=dict(
+                    size=8,
+                    color=traj_v,
+                    colorscale='Blues',
+                    cmin=0,
+                    cmax=max(traj_v.max(), 40),
+                    showscale=False  # Only one colorbar needed
+                )
             ),
             row=1, col=2
         )
