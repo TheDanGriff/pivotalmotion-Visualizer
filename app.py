@@ -160,6 +160,8 @@ def main():
         <div class='divider-space'></div>
     """, unsafe_allow_html=True)
 
+    st.markdown("<hr class='subtle-divider'>", unsafe_allow_html=True)
+
     if not st.session_state.get('authenticated', False):
         with st.form("login_form"):
             st.header("Login")
@@ -395,7 +397,6 @@ def main():
 def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_type):
     import streamlit as st
 
-    st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
 
     benchmarks = get_kpi_benchmarks()
     player_averages = get_player_kpi_averages(player_name, shot_type)
