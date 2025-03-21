@@ -131,34 +131,59 @@ def format_source_type(source):
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Enhanced CSS for professional design
+    # Enhanced CSS with Ageo font, snow white background, blue outline, and blue sidebar
     st.markdown("""
         <style>
         @import url('https://fonts.cdnfonts.com/css/ageo-personal-use'); /* Ageo from Fontshare */
-        
+
+        /* App-wide blue outline */
+        .stApp {
+            border: 3px solid #4682b4; /* Steel blue outline */
+            border-radius: 10px;
+            padding: 10px;
+            background: #ffffff; /* White background for contrast */
+        }
+
+        /* Sidebar styling */
+        [data-testid="stSidebar"] {
+            background: #4682b4; /* Steel blue */
+            padding: 20px;
+            border-right: 2px solid #87ceeb; /* Lighter blue border */
+        }
+        [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
+        [data-testid="stSidebar"] .css-17eq0hr /* Sidebar text */ {
+            color: #fffafa !important; /* Snow white text */
+            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif;
+        }
+        [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox */ {
+            background: #87ceeb; /* Lighter blue */
+            color: #ffffff;
+            border-radius: 5px;
+        }
+
         /* Header Styling */
         .metallic-header {
             background: #fffafa; /* Snow white */
-            color: transparent; /* For gradient text */
+            color: transparent;
             background-clip: text;
             -webkit-background-clip: text;
-            background-image: linear-gradient(135deg, #4682b4, #87ceeb); /* Gradient text */
+            background-image: linear-gradient(135deg, #4682b4, #87ceeb);
             text-align: center;
             padding: 20px 40px;
             border-radius: 12px;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15), inset 0 1px 3px rgba(255, 255, 255, 0.5); /* Enhanced shadow */
-            border: 2px double #4682b4; /* Double border */
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15), inset 0 1px 3px rgba(255, 255, 255, 0.5);
+            border: 2px double #4682b4;
             font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif;
-            font-size: 42px; /* Slightly larger */
+            font-size: 42px;
             font-weight: 700;
             text-transform: uppercase;
-            -webkit-text-stroke: 0.5px #4682b4; /* Subtle outline */
+            -webkit-text-stroke: 0.5px #4682b4;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             position: relative;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
         .metallic-header:hover {
-            transform: translateY(-2px); /* Subtle lift on hover */
+            transform: translateY(-2px);
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2), inset 0 1px 3px rgba(255, 255, 255, 0.5);
         }
         .metallic-header::before {
@@ -168,7 +193,7 @@ def main():
             left: -20px;
             right: -20px;
             bottom: -20px;
-            background: radial-gradient(circle, rgba(70, 130, 180, 0.1) 0%, rgba(255, 250, 250, 0) 70%); /* Subtle glow */
+            background: radial-gradient(circle, rgba(70, 130, 180, 0.1) 0%, rgba(255, 250, 250, 0) 70%);
             z-index: -1;
         }
 
@@ -179,7 +204,7 @@ def main():
         .subtle-divider {
             border: none;
             height: 2px;
-            background: linear-gradient(to right, transparent, #4682b4, transparent); /* Gradient divider */
+            background: linear-gradient(to right, transparent, #4682b4, transparent);
             margin: 20px 0;
         }
 
@@ -202,7 +227,7 @@ def main():
             transition: transform 0.3s ease;
         }
         .team-name:hover {
-            transform: scale(1.05); /* Slight scale on hover */
+            transform: scale(1.05);
         }
         .player-name {
             font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif;
@@ -239,6 +264,12 @@ def main():
             text-align: center;
             transition: transform 0.3s ease;
         }
+        .job-details span.numeric {
+            font-family: 'Arial', sans-serif; /* Standard font for numbers */
+            -webkit-text-stroke: 0px; /* Remove outline for numbers */
+            background: none; /* Remove gradient for numbers */
+            color: #4682b4; /* Solid steel blue */
+        }
         .job-details:hover {
             transform: scale(1.05);
         }
@@ -249,12 +280,12 @@ def main():
             display: block;
             margin-left: auto;
             margin-right: auto;
-            border-radius: 50%; /* Circular logo */
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Logo shadow */
+            border-radius: 50%;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             transition: transform 0.3s ease;
         }
         .logo-img:hover {
-            transform: scale(1.1); /* Slight enlarge on hover */
+            transform: scale(1.1);
         }
         </style>
         <h1 class='metallic-header'>Pivotal Motion Visualizer</h1>
@@ -347,7 +378,7 @@ def main():
     clock = parts[2].replace("Clock: ", "") if len(parts) > 2 and "Clock: " in parts[2] else "N/A"
     shot_display = parts[3] if len(parts) > 3 else shot_type if shot_type in ["3 Point", "Free Throw", "Mid-Range"] else "Unknown"
 
-    # Display player, team, logo, and job details
+    # Display player, team, logo, and job details with numbers in standard font
     player_name = humanize_label(selected_job.get('PlayerName', 'Unknown'))
     team_name_shorthand = humanize_label(selected_job.get('Team', 'N/A'))
     team_name = next((value for key, value in TEAMS.items() if key.lower() == team_name_shorthand.lower() or value.lower() == team_name_shorthand.lower()), team_name_shorthand)
@@ -369,6 +400,14 @@ def main():
             logo_src = None
             st.warning(f"Default logo not found in {default_logo_path}")
 
+    # Format job details with numbers in Arial
+    job_details_html = ""
+    for char in f"{segment_number} | Period: {period} | Clock: {clock} | {shot_display}":
+        if char.isdigit() or char in ":/":
+            job_details_html += f"<span class='numeric'>{char}</span>"
+        else:
+            job_details_html += char
+
     # Display content without a background box
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -378,7 +417,7 @@ def main():
                 <img src="{logo_src}" class='logo-img'>
                 <p class='team-name'>{team_name}</p>
                 <p class='player-name'>{player_name}</p>
-                <p class='job-details'>{segment_number} | Period: {period} | Clock: {clock} | {shot_display}</p>
+                <p class='job-details'>{job_details_html}</p>
                 """,
                 unsafe_allow_html=True
             )
@@ -388,7 +427,7 @@ def main():
                 <p>No logo available</p>
                 <p class='team-name'>{team_name}</p>
                 <p class='player-name'>{player_name}</p>
-                <p class='job-details'>{segment_number} | Period: {period} | Clock: {clock} | {shot_display}</p>
+                <p class='job-details'>{job_details_html}</p>
                 """,
                 unsafe_allow_html=True
             )
