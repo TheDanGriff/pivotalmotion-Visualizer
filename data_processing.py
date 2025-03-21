@@ -1789,7 +1789,7 @@ def create_alignment_diagram(df, basket_position=(41.75, 0)):
 
 def plot_shot_location(ball_df, metrics, pose_df=None):
     """
-    Create a 2D visualization of the shot location on a half basketball court, zoomed in for better visibility.
+    Create a 2D visualization of the shot location on a half basketball court, slightly less zoomed in.
     
     Parameters:
     - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', and optionally 'OUTCOME'/'IS_MADE' in inches.
@@ -1881,7 +1881,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
 
     logger.debug(f"Marker settings - symbol: {marker_symbol}, color: {marker_color}, name: {marker_name}")
 
-    # Court dimensions in inches (zoomed-in view)
+    # Court dimensions in inches
     court_length = 564  # Half-court length from center to right edge
     court_width = 600   # Full width (-300 to 300)
     hoop_y = 0
@@ -1893,7 +1893,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
     # Create figure
     fig = go.Figure()
 
-    # Court boundary (zoomed-in subset)
+    # Court boundary
     court_x = [-court_length/2, court_length, court_length, -court_length/2, -court_length/2] if not flip_court else [court_length/2, -court_length, -court_length, court_length/2, court_length/2]
     fig.add_trace(
         go.Scatter(
@@ -1911,7 +1911,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             x=[hoop_x],
             y=[hoop_y],
             mode='markers',
-            marker=dict(size=20, color='#FFA07A', symbol='circle-open'),  # Larger hoop for visibility
+            marker=dict(size=10, color='#FFA07A', symbol='circle-open'),  # Original size
             name='Hoop'
         )
     )
@@ -1987,20 +1987,20 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             x=[shot_x],
             y=[shot_y],
             mode='markers',
-            marker=dict(size=25, color=marker_color, symbol=marker_symbol),  # Larger marker
+            marker=dict(size=15, color=marker_color, symbol=marker_symbol),  # Original size
             name=marker_name
         )
     )
 
-    # Zoomed-in axis ranges (centered around shot and hoop, approximately 30 ft wide)
-    zoom_width = 360  # 30 ft = 360 inches
-    zoom_height = 360  # Match height for equal scaling
+    # Adjusted axis ranges (slightly less zoomed in, 40x40 ft view)
+    zoom_width = 480  # 40 ft = 480 inches
+    zoom_height = 480  # Match height for equal scaling
     x_center = (shot_x + hoop_x) / 2  # Midpoint between shot and hoop
     y_center = 0  # Center court width-wise
     x_range = [x_center - zoom_width/2, x_center + zoom_width/2]
     y_range = [y_center - zoom_height/2, y_center + zoom_height/2]
 
-    # Update layout with fixed size and zoomed-in view
+    # Update layout with fixed size and adjusted view
     fig.update_layout(
         title="Shot Location on Half Court",
         xaxis_title="X Position (inches)",
