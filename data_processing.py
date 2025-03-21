@@ -1998,7 +1998,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
     # Adjusted axis ranges (50x50 ft view, shifted 15% right)
     zoom_width = 600  # 50 ft = 600 inches
     zoom_height = 600
-    shift_amount = 90  # 15% of 600 inches
+    shift_amount = 180  # 15% of 600 inches
     x_center_base = hoop_x - 150 if not flip_court else hoop_x + 150  # Base center from previous shift
     x_center = x_center_base - shift_amount if not flip_court else x_center_base + shift_amount  # Shift right
     y_center = 0  # Center court width-wise
