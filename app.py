@@ -131,7 +131,7 @@ def format_source_type(source):
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Custom CSS for metallic styling
+    # Custom CSS for metallic styling (header only)
     st.markdown("""
         <style>
         .metallic-header {
@@ -269,71 +269,75 @@ def main():
             logo_src = None
             st.warning(f"Default logo not found in {default_logo_path}")
 
-    # CSS for the info section matching metallic-header font
+    # CSS for text styling matching metallic-header, no background box
     st.markdown("""
         <style>
-        .info-section {
-            background: linear-gradient(135deg, #e0e0e0, #d0d0d0);
-            border-radius: 10px;
-            padding: 50px;
-            text-align: center;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            border: 3px solid #000000;
-            margin-top: 20px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        .player-team {
+        .team-name {
             font-family: 'Arial', sans-serif;
-            font-size: 180px; /* Larger */
+            font-size: 80px; /* Smaller than player name */
             font-weight: bold;
-            color: #4682b4; /* Steel blue */
+            color: #4682b4;
             text-transform: uppercase;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             margin: 0;
             line-height: 1.2;
             word-wrap: break-word;
+            text-align: center;
+        }
+        .player-name {
+            font-family: 'Arial', sans-serif;
+            font-size: 200px; /* Much larger, like a title */
+            font-weight: bold;
+            color: #4682b4;
+            text-transform: uppercase;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
+            margin: 20px 0;
+            line-height: 1.2;
+            word-wrap: break-word;
+            text-align: center;
         }
         .job-details {
             font-family: 'Arial', sans-serif;
-            font-size: 150px; /* Larger */
-            color: #4682b4; /* Steel blue */
+            font-size: 80px;
+            color: #4682b4;
             text-transform: uppercase;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
-            margin-top: 40px;
+            margin: 0;
             line-height: 1.2;
             word-wrap: break-word;
+            text-align: center;
         }
         .logo-img {
-            width: 180px;
+            width: 150px;
             height: auto;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # Display all content within a single centered box
+    # Display content without a background box
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if logo_src:
             st.markdown(
                 f"""
-                <div class='info-section'>
-                    <img src="{logo_src}" class='logo-img'>
-                    <p class='player-team'>{player_name} - {team_name}</p>
-                    <p class='job-details'>{segment_number} | Period: {period} | Clock: {clock} | {shot_display}</p>
-                </div>
+                <img src="{logo_src}" class='logo-img'>
+                <p class='team-name'>{team_name}</p>
+                <p class='player-name'>{player_name}</p>
+                <p class='job-details'>{segment_number} | Period: {period} | Clock: {clock} | {shot_display}</p>
                 """,
                 unsafe_allow_html=True
             )
         else:
             st.markdown(
                 f"""
-                <div class='info-section'>
-                    <p>No logo available</p>
-                    <p class='player-team'>{player_name} - {team_name}</p>
-                    <p class='job-details'>{segment_number} | Period: {period} | Clock: {clock} | {shot_display}</p>
-                </div>
+                <p>No logo available</p>
+                <p class='team-name'>{team_name}</p>
+                <p class='player-name'>{player_name}</p>
+                <p class='job-details'>{segment_number} | Period: {period} | Clock: {clock} | {shot_display}</p>
                 """,
                 unsafe_allow_html=True
             )
