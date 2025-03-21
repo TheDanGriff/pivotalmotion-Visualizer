@@ -130,7 +130,7 @@ def format_source_type(source):
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Custom CSS for metallic styling
+    # Custom CSS for metallic styling with updated sizes and black outline
     st.markdown("""
         <style>
         .metallic-header {
@@ -149,26 +149,26 @@ def main():
         }
         .info-section {
             background: linear-gradient(135deg, #e0e0e0, #d0d0d0);
-            border-radius: 8px;
-            padding: 20px;
+            border-radius: 10px;
+            padding: 25px;
             text-align: center;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            border: 1px solid #b0b0b0;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border: 3px solid #000000; /* Black outline */
             margin-top: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
         .player-team {
-            font-size: 48px;
+            font-size: 60px; /* Much larger */
             font-weight: bold;
-            color: #4682b4;
+            color: #000000; /* Black */
             margin: 0;
         }
         .job-details {
-            font-size: 36px;
-            color: #4682b4;
-            margin-top: 15px;
+            font-size: 48px; /* Much larger */
+            color: #000000; /* Black */
+            margin-top: 20px;
         }
         .divider-space {
             margin: 40px 0;
@@ -275,16 +275,16 @@ def main():
     logo_path = os.path.join("images", "teams", f"{team_shorthand}_logo.png")
     default_logo_path = os.path.join("images", "teams", "default.png")
 
-    # Use st.image with file bytes, removing 'format' parameter
+    # Use st.image with file bytes
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
             with open(logo_path, "rb") as f:
-                st.image(f.read(), width=80, caption=None, use_container_width=False)
+                st.image(f.read(), width=150, caption=None, use_container_width=False)  # Larger logo
         except FileNotFoundError:
             try:
                 with open(default_logo_path, "rb") as f:
-                    st.image(f.read(), width=80, caption=f"Default Logo ({team_name})", use_container_width=False)
+                    st.image(f.read(), width=150, caption=f"Default Logo ({team_name})", use_container_width=False)  # Larger logo
             except FileNotFoundError:
                 st.warning(f"Default logo not found in {default_logo_path}")
         st.markdown(
