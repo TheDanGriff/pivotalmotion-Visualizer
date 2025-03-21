@@ -276,7 +276,7 @@ def main():
             font-family: 'Arial', sans-serif;
             font-size: 36px !important; /* Larger with override */
             font-weight: bold;
-            color: #d3d3d3;
+            color: #000000;
             text-transform: uppercase;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             margin: 0;
@@ -287,7 +287,7 @@ def main():
         .player-name {
             font-family: 'Arial', sans-serif;
             font-size: 36px !important; /* Much larger, like a title, with override */
-            color: #d3d3d3;
+            color: #000000;
             text-transform: uppercase;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             margin: 20px 0;
@@ -298,7 +298,7 @@ def main():
         .job-details {
             font-family: 'Arial', sans-serif;
             font-size: 18px !important; /* Larger with override */
-            color: #d3d3d3;
+            color: #000000;
             text-transform: uppercase;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             margin: 0;
