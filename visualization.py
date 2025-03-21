@@ -227,7 +227,6 @@ def plot_shot_analysis(df_ball, metrics):
             seg = df[column].iloc[start:end].to_numpy()
             if len(seg) == 0:
                 return np.array([])  # Return empty array if no data
-            # Define window_length with a default value
             window_length = min(11, len(seg) - 1) if len(seg) > 1 else 1
             if len(seg) > 3:  # Only smooth if enough points
                 if window_length % 2 == 0:  # Ensure odd window length
@@ -247,13 +246,13 @@ def plot_shot_analysis(df_ball, metrics):
     lift_idx = clamp_index(metrics.get('lift_idx', start_idx), max_idx)
 
     # Redefine set_idx: minimum X position, at least 10 frames after lift_idx
-    set_window_start = max(lift_idx + 10, start_idx)  # Ensure at least 10 frames after lift
+    set_window_start = max(lift_idx + 10, start_idx)
     set_window_end = release_idx + 1
     candidate_set_window = df_ball.iloc[set_window_start:set_window_end]
     if not candidate_set_window.empty and len(candidate_set_window) >= 1:
-        set_idx = candidate_set_window['Basketball_X_ft'].idxmin()  # Minimum horizontal position
+        set_idx = candidate_set_window['Basketball_X_ft'].idxmin()
     else:
-        set_idx = release_idx  # Fallback to release_idx if no valid range
+        set_idx = release_idx
     logger.debug(f"Set_idx redefined as minimum X position between {set_window_start} and {set_window_end}: {set_idx}")
 
     # --- SIDE VIEW ---
@@ -262,14 +261,12 @@ def plot_shot_analysis(df_ball, metrics):
     traj_v = get_slice(df_ball, 'velocity_magnitude', lift_idx, release_idx + 1)
     release_x = df_ball.at[release_idx, 'Basketball_X_ft']
 
-    # Ensure positive X-axis
     if np.any(traj_x < 0):
         logger.debug(f"Negative X values detected in traj_x (e.g., {traj_x[:5]}), flipping to positive")
         traj_x = -traj_x
         release_x = -release_x if release_x < 0 else release_x
 
-    # Shift range right: Release near left edge (1 ft left, 3 ft right)
-    side_range = [release_x - 1, release_x + 3]  # 4 ft range, shifted right
+    side_range = [release_x - 1, release_x + 3]
     if len(traj_x) > 0 and len(traj_z) > 0 and len(traj_v) > 0:
         min_len = min(len(traj_x), len(traj_z), len(traj_v))
         traj_x = traj_x[:min_len]
@@ -301,15 +298,15 @@ def plot_shot_analysis(df_ball, metrics):
         logger.debug("Projection data empty after slicing")
         proj_x, proj_z = [], []
 
-    tickvals_x = np.linspace(side_range[0], side_range[1], 5)  # Absolute court positions
-    ticktext_x = [f"{val:.1f}" for val in tickvals_x]  # Use actual X_ft values
+    tickvals_x = np.linspace(side_range[0], side_range[1], 5)
+    ticktext_x = [f"{val:.1f}" for val in tickvals_x]
     tickvals_y = np.arange(2, 12, 1)
 
     # --- REAR VIEW ---
     traj_y = get_slice(df_ball, 'Basketball_Y_ft', lift_idx, release_idx + 1)
     traj_z_rear = traj_z
     traj_v_rear = traj_v
-    rear_range = [-2, 2]
+    rear_range = [2, -2]  # Reversed: +2 on left, -2 on right
     if len(traj_y) > 0 and len(traj_z_rear) > 0 and len(traj_v_rear) > 0:
         min_len = min(len(traj_y), len(traj_z_rear), len(traj_v_rear))
         traj_y = traj_y[:min_len]
@@ -359,7 +356,7 @@ def plot_shot_analysis(df_ball, metrics):
                     cmin=0,
                     cmax=max(traj_v.max(), 40),
                     colorbar=dict(
-                        title=dict(text="Velocity (in/s)", side="right"),
+                        title=dict(text="Velocity (ft/s)", side="right"),
                         thickness=15,
                         len=0.5,
                         x=1.05
@@ -405,7 +402,7 @@ def plot_shot_analysis(df_ball, metrics):
     else:
         fig.add_trace(go.Scatter(x=[release_x], y=[2.0], mode='text', text=["No Data"]), row=1, col=1)
 
-    # --- REAR VIEW PLOT ---
+    # --- REAR VIEW PLOT (Reversed) ---
     if len(traj_y) > 0 and len(traj_z_rear) > 0 and len(traj_v_rear) > 0:
         fig.add_trace(
             go.Scatter(
@@ -470,7 +467,8 @@ def plot_shot_analysis(df_ball, metrics):
     )
     fig.update_xaxes(
         title_text="Lateral Position (ft)", row=1, col=2,
-        range=rear_range, tickmode='linear', dtick=1,
+        range=rear_range,  # Reversed: 2 to -2
+        tickmode='array', tickvals=[2, 1, 0, -1, -2], ticktext=["2", "1", "0", "-1", "-2"],  # Explicit ticks
         showgrid=True, gridwidth=1, gridcolor='lightgrey',
         title_font=dict(size=14), tickfont=dict(size=12)
     )

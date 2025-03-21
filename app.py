@@ -129,7 +129,7 @@ def main():
     player_names = sorted({humanize_label(job.get("PlayerName", "Unknown")) for job in jobs})
     sources = sorted({job.get("Source", "Unknown").title() for job in jobs})
     shot_types = ["3 Point", "Free Throw", "Mid-Range"]
-    dates = sorted({pd.to_datetime(int(job['UploadTimestamp']), unit='s').strftime('%Y-%m-%d %H:%M')
+    dates = sorted({pd.to_datetime(int(job['UploadTimestamp']), unit='s').strftime('%Y-%m-%d')
                     for job in jobs if job.get("UploadTimestamp")})
 
     with st.sidebar:
@@ -150,7 +150,7 @@ def main():
     if shot_type_filter != "All":
         filtered_jobs = [j for j in filtered_jobs if get_shot_type(j.get("ShootingType", "Unknown")) == shot_type_filter]
     if date_filter != "All":
-        filtered_jobs = [j for j in filtered_jobs if pd.to_datetime(int(j["UploadTimestamp"]), unit='s').strftime('%Y-%m-%d %H:%M') == date_filter]
+        filtered_jobs = [j for j in filtered_jobs if pd.to_datetime(int(j["UploadTimestamp"]), unit='s').strftime('%Y-%m-%d') == date_filter]
 
     if not filtered_jobs:
         st.info("No jobs match the selected filters.")
@@ -178,17 +178,17 @@ def main():
     selected_segment = segments[0]  # Take the first (and only) segment
     segment_label = humanize_segment_label(get_segment_label(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment, selected_job['Source']))
 
-    # Parse segment label using previous logic (assumes format like "1/1 | Period: 2 | Clock: 07:58 | 3 Point")
+    # Parse segment label
     parts = segment_label.split(" | ")
     segment_number = parts[0] if len(parts) > 0 else "1/1"
     period = parts[1].replace("Period: ", "") if len(parts) > 1 and "Period: " in parts[1] else "N/A"
     clock = parts[2].replace("Clock: ", "") if len(parts) > 2 and "Clock: " in parts[2] else "N/A"
     shot_display = parts[3] if len(parts) > 3 else shot_type if shot_type in ["3 Point", "Free Throw", "Mid-Range"] else "Unknown"
 
-    # Display segment details centered below logo
+    # Display segment details centered below logo with larger text and more spacing
     show_brand_header(selected_job.get('PlayerName', ''), selected_job.get('Team', ''))
     st.markdown(
-        f"<p style='text-align: center;'><strong>{segment_number} | Period: {period} | Clock: {clock} | {shot_display}</strong></p>",
+        f"<p style='text-align: center; font-size: 24px; padding-bottom: 30px;'><strong>{segment_number} | Period: {period} | Clock: {clock} | {shot_display}</strong></p>",
         unsafe_allow_html=True
     )
 
@@ -241,7 +241,6 @@ def main():
         show_biomechanics_page(df_pose, df_ball, df_spin, metrics)
     with tab3:
         show_spin_analysis_page(df_spin)
-
 def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_type):
     import streamlit as st
 
