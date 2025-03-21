@@ -274,7 +274,7 @@ def main():
         <style>
         .team-name {
             font-family: 'Arial', sans-serif;
-            font-size: 200px !important; /* Larger with override */
+            font-size: 100px !important; /* Larger with override */
             font-weight: bold;
             color: #4682b4;
             text-transform: uppercase;
@@ -286,7 +286,7 @@ def main():
         }
         .player-name {
             font-family: 'Arial', sans-serif;
-            font-size: 200px !important; /* Much larger, like a title, with override */
+            font-size: 100px !important; /* Much larger, like a title, with override */
             font-weight: bold;
             color: #4682b4;
             text-transform: uppercase;
@@ -298,7 +298,7 @@ def main():
         }
         .job-details {
             font-family: 'Arial', sans-serif;
-            font-size: 150px !important; /* Larger with override */
+            font-size: 80px !important; /* Larger with override */
             color: #4682b4;
             text-transform: uppercase;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
