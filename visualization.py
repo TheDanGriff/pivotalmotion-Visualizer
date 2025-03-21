@@ -225,10 +225,13 @@ def plot_shot_analysis(df_ball, metrics):
     def get_slice(df, column, start, end, clip_min=None, clip_max=None):
         if column in df.columns and len(df) > 0:
             seg = df[column].iloc[start:end].to_numpy()
-            if len(seg) > 3:
-                win_length = min(11, len(seg) - 1)
-                if win_length % 2 == 0:
-                    win_length += 1
+            if len(seg) == 0:
+                return np.array([])  # Return empty array if no data
+            # Define window_length with a default value
+            window_length = min(11, len(seg) - 1) if len(seg) > 1 else 1
+            if len(seg) > 3:  # Only smooth if enough points
+                if window_length % 2 == 0:  # Ensure odd window length
+                    window_length += 1
                 seg = savgol_filter(seg, window_length=window_length, polyorder=2)
             if clip_min is not None or clip_max is not None:
                 seg = np.clip(seg, clip_min, clip_max)
