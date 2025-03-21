@@ -640,7 +640,7 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
 
     if not df_pose.empty and release_idx < len(df_pose):
         frame_data = df_pose.iloc[release_idx]
-        st.subheader("Body Alignment Visuals")
+        st.subheader("Body Alignment Visual")
         col1, col2 = st.columns(2)
         with col1:
             st.write("Body Alignment (Feet, Hips, Shoulders)")
