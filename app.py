@@ -127,11 +127,10 @@ def format_source_type(source):
         return "Unknown Source"
     return source.replace('_', ' ').title()
 
-
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Custom CSS for metallic styling with larger fonts and logo positioning
+    # Custom CSS for metallic styling with updated sizes and black outline
     st.markdown("""
         <style>
         .metallic-header {
@@ -151,32 +150,25 @@ def main():
         .info-section {
             background: linear-gradient(135deg, #e0e0e0, #d0d0d0);
             border-radius: 10px;
-            padding: 30px; /* Increased padding for larger content */
+            padding: 25px;
             text-align: center;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            border: 3px solid #000000;
+            border: 3px solid #000000; /* Black outline */
             margin-top: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            width: 100%; /* Ensure full width within column */
         }
         .player-team {
-            font-size: 80px; /* Much larger */
+            font-size: 60px; /* Much larger */
             font-weight: bold;
             color: #000000; /* Black */
             margin: 0;
         }
         .job-details {
-            font-size: 60px; /* Much larger */
+            font-size: 48px; /* Much larger */
             color: #000000; /* Black */
-            margin-top: 25px; /* Adjusted for larger text */
-        }
-        .logo-container {
-            display: flex;
-            justify-content: center; /* Center horizontally */
-            margin-right: -75%; /* Shift 75% more to the right */
-            margin-bottom: 20px; /* Space below logo */
+            margin-top: 20px;
         }
         .divider-space {
             margin: 40px 0;
@@ -283,7 +275,42 @@ def main():
     logo_path = os.path.join("images", "teams", f"{team_shorthand}_logo.png")
     default_logo_path = os.path.join("images", "teams", "default.png")
 
-    # Use st.image with file bytes, centered and shifted right
+    # Update CSS for larger fonts and centered logo
+    st.markdown("""
+        <style>
+        .info-section {
+            background: linear-gradient(135deg, #e0e0e0, #d0d0d0);
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border: 3px solid #000000;
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+        .player-team {
+            font-size: 100px; /* Much larger */
+            font-weight: bold;
+            color: #000000;
+            margin: 0;
+        }
+        .job-details {
+            font-size: 80px; /* Much larger */
+            color: #000000;
+            margin-top: 25px;
+        }
+        .logo-container {
+            display: flex;
+            justify-content: center; /* Center horizontally */
+            margin-bottom: 20px; /* Space below logo */
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Use st.image with file bytes, centered
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("<div class='info-section'>", unsafe_allow_html=True)
