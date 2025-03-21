@@ -146,9 +146,9 @@ def main():
 
         /* Sidebar styling with lighter blue */
         [data-testid="stSidebar"] {
-            background: #87ceeb; /* Lighter sky blue */
+            background: #4682b4; /* Lighter sky blue */
             padding: 20px;
-            border-right: 2px solid #b0e0e6; /* Even lighter blue border */
+            border-right: 2px solid #4682b4; /* Even lighter blue border */
         }
         [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
         [data-testid="stSidebar"] .css-17eq0hr /* Sidebar text */ {
@@ -156,7 +156,7 @@ def main():
             font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif !important; /* Consistent font */
         }
         [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox */ {
-            background: #b0e0e6; /* Lightest blue */
+            background: #4682b4; /* Lightest blue */
             color: #ffffff;
             border-radius: 5px;
         }
