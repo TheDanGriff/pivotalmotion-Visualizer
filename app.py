@@ -131,32 +131,40 @@ def format_source_type(source):
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Enhanced CSS with thicker border, professional sidebar, and subtle backgrounds
+    # Enhanced CSS without app border and with neon red/dark orange email
     st.markdown("""
         <style>
         @import url('https://fonts.cdnfonts.com/css/ageo-personal-use'); /* Ageo from Fontshare */
 
-        /* App-wide thicker blue outline */
+        /* No border around the app */
         .stApp {
-            border: 6px solid #4682b4;
-            border-radius: 10px;
             padding: 10px;
             background: #ffffff;
         }
 
         /* Sidebar styling with gradient and shadow */
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #87ceeb 0%, #4682b4 100%); /* Light to dark blue gradient */
+            background: linear-gradient(180deg, #87ceeb 0%, #4682b4 100%);
             padding: 20px;
             border-right: 2px solid #b0e0e6;
-            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1); /* Subtle shadow */
-            border-radius: 0 10px 10px 0; /* Rounded right corners */
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+            border-radius: 0 10px 10px 0;
         }
         [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
-        [data-testid="stSidebar"] .css-17eq0hr /* Sidebar text */ {
+        [data-testid="stSidebar"] .css-17eq0hr:not(:nth-child(3)) /* All text except email */ {
             color: #fffafa !important;
             font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif !important;
-            background: rgba(255, 255, 255, 0.2); /* Subtle white background */
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 12px;
+            border-radius: 5px;
+            margin: 5px 0;
+            display: inline-block;
+            transition: background 0.3s ease;
+        }
+        [data-testid="stSidebar"] .css-17eq0hr:nth-child(3) /* Email text */ {
+            color: #ff4500 !important; /* Neon red/dark orange */
+            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif !important;
+            background: rgba(255, 255, 255, 0.2);
             padding: 8px 12px;
             border-radius: 5px;
             margin: 5px 0;
@@ -165,15 +173,15 @@ def main():
         }
         [data-testid="stSidebar"] .css-1d391kg:hover,
         [data-testid="stSidebar"] .css-17eq0hr:hover {
-            background: rgba(255, 255, 255, 0.3); /* Slightly brighter on hover */
+            background: rgba(255, 255, 255, 0.3);
         }
         [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox */ {
-            background: rgba(176, 224, 230, 0.8); /* Powder blue with transparency */
+            background: rgba(176, 224, 230, 0.8);
             color: #ffffff;
             border-radius: 8px;
             padding: 5px;
             margin: 5px 0;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
         [data-testid="stSidebar"] .css-1v3fvcr:hover {
