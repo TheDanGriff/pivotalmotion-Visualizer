@@ -131,39 +131,59 @@ def format_source_type(source):
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Enhanced CSS with thicker border, lighter blue sidebar, and consistent font
+    # Enhanced CSS with thicker border, professional sidebar, and subtle backgrounds
     st.markdown("""
         <style>
         @import url('https://fonts.cdnfonts.com/css/ageo-personal-use'); /* Ageo from Fontshare */
 
         /* App-wide thicker blue outline */
         .stApp {
-            border: 6px solid #4682b4; /* Thicker steel blue outline */
+            border: 6px solid #4682b4;
             border-radius: 10px;
             padding: 10px;
-            background: #ffffff; /* White background for contrast */
+            background: #ffffff;
         }
 
-        /* Sidebar styling with lighter blue */
+        /* Sidebar styling with gradient and shadow */
         [data-testid="stSidebar"] {
-            background: #4682b4; /* Lighter sky blue */
+            background: linear-gradient(180deg, #87ceeb 0%, #4682b4 100%); /* Light to dark blue gradient */
             padding: 20px;
-            border-right: 2px solid #4682b4; /* Even lighter blue border */
+            border-right: 2px solid #b0e0e6;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+            border-radius: 0 10px 10px 0; /* Rounded right corners */
         }
         [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
         [data-testid="stSidebar"] .css-17eq0hr /* Sidebar text */ {
-            color: #fffafa !important; /* Snow white text */
-            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif !important; /* Consistent font */
+            color: #fffafa !important;
+            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif !important;
+            background: rgba(255, 255, 255, 0.2); /* Subtle white background */
+            padding: 8px 12px;
+            border-radius: 5px;
+            margin: 5px 0;
+            display: inline-block;
+            transition: background 0.3s ease;
+        }
+        [data-testid="stSidebar"] .css-1d391kg:hover,
+        [data-testid="stSidebar"] .css-17eq0hr:hover {
+            background: rgba(255, 255, 255, 0.3); /* Slightly brighter on hover */
         }
         [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox */ {
-            background: #4682b4; /* Lightest blue */
+            background: rgba(176, 224, 230, 0.8); /* Powder blue with transparency */
             color: #ffffff;
-            border-radius: 5px;
+            border-radius: 8px;
+            padding: 5px;
+            margin: 5px 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        [data-testid="stSidebar"] .css-1v3fvcr:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
         }
 
         /* Header Styling */
         .metallic-header {
-            background: #fffafa; /* Snow white */
+            background: #fffafa;
             color: transparent;
             background-clip: text;
             -webkit-background-clip: text;
