@@ -1789,7 +1789,7 @@ def create_alignment_diagram(df, basket_position=(41.75, 0)):
 
 def plot_shot_location(ball_df, metrics, pose_df=None):
     """
-    Create a 2D visualization of the shot location on a half basketball court, without axis lines, labels, or title.
+    Create a 2D visualization of the shot location on a half basketball court, adjusted for size and position.
     
     Parameters:
     - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', and optionally 'OUTCOME'/'IS_MADE' in inches.
@@ -1902,7 +1902,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             mode='lines',
             line=dict(color='black', width=2),
             name='Court Boundary',
-            showlegend=False  # Hide legend
+            showlegend=False  # Hide from legend
         )
     )
 
@@ -1912,9 +1912,8 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             x=[hoop_x],
             y=[hoop_y],
             mode='markers',
-            marker=dict(size=10, color='#FFA07A', symbol='circle-open'),
-            name='Hoop',
-            showlegend=False  # Hide legend
+            marker=dict(size=8, color='#FFA07A', symbol='circle-open'),
+            name='Hoop'
         )
     )
 
@@ -1927,7 +1926,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             mode='lines',
             line=dict(color='black', width=2, dash='dash'),
             name='Paint',
-            showlegend=False  # Hide legend
+            showlegend=False  # Hide from legend
         )
     )
 
@@ -1959,7 +1958,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             mode='lines',
             line=dict(color='black', width=2),
             name='3-Point Line',
-            showlegend=False  # Hide legend
+            showlegend=False  # Hide from legend
         )
     )
 
@@ -1991,28 +1990,35 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             x=[shot_x],
             y=[shot_y],
             mode='markers',
-            marker=dict(size=15, color=marker_color, symbol=marker_symbol),
-            name=marker_name,
-            showlegend=False  # Hide legend
+            marker=dict(size=12, color=marker_color, symbol=marker_symbol),
+            name=marker_name
         )
     )
 
-    # Adjusted axis ranges (40x40 ft view)
-    zoom_width = 480  # 40 ft = 480 inches
-    zoom_height = 480
-    x_center = (shot_x + hoop_x) / 2  # Midpoint between shot and hoop
+    # Adjusted axis ranges (50x50 ft view, shifted right)
+    zoom_width = 600  # 50 ft = 600 inches
+    zoom_height = 600
+    x_center = hoop_x - 150 if not flip_court else hoop_x + 150  # Shift 12.5 ft (150 inches) toward hoop
     y_center = 0  # Center court width-wise
     x_range = [x_center - zoom_width/2, x_center + zoom_width/2]
     y_range = [y_center - zoom_height/2, y_center + zoom_height/2]
 
-    # Update layout with no title, axes, or labels, centered in app
+    # Update layout with no title, axes, or labels, centered with legend
     fig.update_layout(
-        xaxis=dict(range=x_range, showgrid=False, visible=False),  # Hide axis
-        yaxis=dict(range=y_range, showgrid=False, visible=False),  # Hide axis
+        xaxis=dict(range=x_range, showgrid=False, visible=False),
+        yaxis=dict(range=y_range, showgrid=False, visible=False),
         width=500,
         height=500,
         autosize=False,
-        showlegend=False,  # Hide legend entirely
+        showlegend=True,  # Reintroduce legend
+        legend=dict(
+            x=0.5,
+            y=-0.1,
+            xanchor='center',
+            yanchor='top',
+            orientation='h',
+            font=dict(size=12)
+        ),
         template="plotly_white",
         margin=dict(l=0, r=0, t=0, b=0)  # Minimize margins for centering
     )
