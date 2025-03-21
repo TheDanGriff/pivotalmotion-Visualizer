@@ -136,7 +136,7 @@ def main():
         <style>
         .metallic-header {
             background: linear-gradient(135deg, #c0c0c0, #a9a9a9, #d3d3d3, #a9a9a9);
-            color: #4682b4;
+            color: ##f8f8ff;
             text-align: center;
             padding: 20px;
             border-radius: 10px;
