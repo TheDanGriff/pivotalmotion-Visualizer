@@ -274,7 +274,7 @@ def main():
         <style>
         .team-name {
             font-family: 'Arial', sans-serif;
-            font-size: 80px; /* Smaller than player name */
+            font-size: 160px; /* Smaller than player name */
             font-weight: bold;
             color: #4682b4;
             text-transform: uppercase;
@@ -286,7 +286,7 @@ def main():
         }
         .player-name {
             font-family: 'Arial', sans-serif;
-            font-size: 200px; /* Much larger, like a title */
+            font-size: 400px; /* Much larger, like a title */
             font-weight: bold;
             color: #4682b4;
             text-transform: uppercase;
@@ -298,7 +298,7 @@ def main():
         }
         .job-details {
             font-family: 'Arial', sans-serif;
-            font-size: 80px;
+            font-size: 160px;
             color: #4682b4;
             text-transform: uppercase;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
