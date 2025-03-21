@@ -5,7 +5,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import os
-import base64  # Added for base64 encoding
+import base64
 
 from auth import handle_login
 from aws_client import initialize_aws_clients
@@ -248,7 +248,9 @@ def main():
 
     # Display player, team, logo, and job details
     player_name = humanize_label(selected_job.get('PlayerName', 'Unknown'))
-    team_name = humanize_label(selected_job.get('Team', 'N/A'))
+    team_name_shorthand = humanize_label(selected_job.get('Team', 'N/A'))
+    # Get full team name from TEAMS dictionary
+    team_name = next((value for key, value in TEAMS.items() if key.lower() == team_name_shorthand.lower() or value.lower() == team_name_shorthand.lower()), team_name_shorthand)
     team_shorthand = next((key for key, value in TEAMS.items() if value.lower() == team_name.lower()), team_name.lower().replace(' ', '-'))
     logo_path = os.path.join("images", "teams", f"{team_shorthand}_logo.png")
     default_logo_path = os.path.join("images", "teams", "default.png")
@@ -267,13 +269,13 @@ def main():
             logo_src = None
             st.warning(f"Default logo not found in {default_logo_path}")
 
-    # CSS for the info section
+    # CSS for the info section matching metallic-header font
     st.markdown("""
         <style>
         .info-section {
             background: linear-gradient(135deg, #e0e0e0, #d0d0d0);
             border-radius: 10px;
-            padding: 40px;
+            padding: 50px;
             text-align: center;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             border: 3px solid #000000;
@@ -282,24 +284,30 @@ def main():
             box-sizing: border-box;
         }
         .player-team {
-            font-size: 120px;
+            font-family: 'Arial', sans-serif;
+            font-size: 150px; /* Larger */
             font-weight: bold;
-            color: #000000;
+            color: #4682b4; /* Steel blue */
+            text-transform: uppercase;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             margin: 0;
             line-height: 1.2;
             word-wrap: break-word;
         }
         .job-details {
-            font-size: 100px;
-            color: #000000;
-            margin-top: 30px;
+            font-family: 'Arial', sans-serif;
+            font-size: 120px; /* Larger */
+            color: #4682b4; /* Steel blue */
+            text-transform: uppercase;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
+            margin-top: 40px;
             line-height: 1.2;
             word-wrap: break-word;
         }
         .logo-img {
             width: 150px;
             height: auto;
-            margin-bottom: 30px;
+            margin-bottom: 40px;
         }
         </style>
     """, unsafe_allow_html=True)
