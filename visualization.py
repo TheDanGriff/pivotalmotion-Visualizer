@@ -229,7 +229,7 @@ def plot_shot_analysis(df_ball, metrics):
                 win_length = min(11, len(seg) - 1)
                 if win_length % 2 == 0:
                     win_length += 1
-                seg = savgol_filter(seg, window_length=win_length, polyorder=2)
+                seg = savgol_filter(seg, window_length=window_length, polyorder=2)
             if clip_min is not None or clip_max is not None:
                 seg = np.clip(seg, clip_min, clip_max)
             return seg
@@ -242,14 +242,16 @@ def plot_shot_analysis(df_ball, metrics):
     release_idx = clamp_index(metrics.get('release_idx', 0), max_idx)
     start_idx = max(0, release_idx - 32)
     lift_idx = clamp_index(metrics.get('lift_idx', start_idx), max_idx)
-    
-    # Redefine set_idx as minimum X position within visualized range
-    candidate_set_window = df_ball.iloc[lift_idx:release_idx + 1]
-    if not candidate_set_window.empty:
+
+    # Redefine set_idx: minimum X position, at least 10 frames after lift_idx
+    set_window_start = max(lift_idx + 10, start_idx)  # Ensure at least 10 frames after lift
+    set_window_end = release_idx + 1
+    candidate_set_window = df_ball.iloc[set_window_start:set_window_end]
+    if not candidate_set_window.empty and len(candidate_set_window) >= 1:
         set_idx = candidate_set_window['Basketball_X_ft'].idxmin()  # Minimum horizontal position
     else:
-        set_idx = release_idx
-    logger.debug(f"Set_idx redefined as minimum X position: {set_idx}")
+        set_idx = release_idx  # Fallback to release_idx if no valid range
+    logger.debug(f"Set_idx redefined as minimum X position between {set_window_start} and {set_window_end}: {set_idx}")
 
     # --- SIDE VIEW ---
     traj_x = get_slice(df_ball, 'Basketball_X_ft', lift_idx, release_idx + 1)
@@ -274,6 +276,9 @@ def plot_shot_analysis(df_ball, metrics):
         traj_x = traj_x[mask]
         traj_z = traj_z[mask]
         traj_v = traj_v[mask]
+    else:
+        logger.error("Trajectory data empty after slicing")
+        traj_x, traj_z, traj_v = [], [], []
 
     post_release_end = min(max_idx, release_idx + 20)
     proj_x = get_slice(df_ball, 'Basketball_X_ft', release_idx, post_release_end + 1)
@@ -289,6 +294,9 @@ def plot_shot_analysis(df_ball, metrics):
         proj_mask = (proj_x >= side_range[0]) & (proj_x <= side_range[1]) & (proj_z >= 2) & (proj_z <= 11)
         proj_x = proj_x[proj_mask]
         proj_z = proj_z[proj_mask]
+    else:
+        logger.debug("Projection data empty after slicing")
+        proj_x, proj_z = [], []
 
     tickvals_x = np.linspace(side_range[0], side_range[1], 5)  # Absolute court positions
     ticktext_x = [f"{val:.1f}" for val in tickvals_x]  # Use actual X_ft values
@@ -308,6 +316,9 @@ def plot_shot_analysis(df_ball, metrics):
         traj_y = traj_y[rear_mask]
         traj_z_rear = traj_z_rear[rear_mask]
         traj_v_rear = traj_v_rear[rear_mask]
+    else:
+        logger.debug("Rear trajectory data empty after slicing")
+        traj_y, traj_z_rear, traj_v_rear = [], [], []
 
     proj_y = get_slice(df_ball, 'Basketball_Y_ft', release_idx, post_release_end + 1)
     proj_z_rear = proj_z
@@ -318,6 +329,9 @@ def plot_shot_analysis(df_ball, metrics):
         proj_mask = (proj_y >= -2) & (proj_y <= 2) & (proj_z_rear >= 2) & (proj_z_rear <= 11)
         proj_y = proj_y[proj_mask]
         proj_z_rear = proj_z_rear[proj_mask]
+    else:
+        logger.debug("Rear projection data empty after slicing")
+        proj_y, proj_z_rear = [], []
 
     # Create subplots
     fig = make_subplots(
