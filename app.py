@@ -240,6 +240,8 @@ def main():
         show_spin_analysis_page(df_spin)
 
 def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_type):
+    import streamlit as st
+
     st.header("Basketball Shot Analysis")
     benchmarks = get_kpi_benchmarks()
     player_averages = get_player_kpi_averages(player_name, shot_type)
@@ -253,12 +255,24 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         'Release Velocity': {'value': metrics.get('release_velocity', 0), 'min': 0, 'max': 30},
         'Release Time': {'value': metrics.get('release_time', 0), 'min': 0, 'max': 1},
         'Apex Height': {'value': metrics.get('apex_height', 0), 'min': 0, 'max': 20},
-        'Side Curvature': {'value': metrics.get('weighted_curvature_area_side', 0), 'min': 0, 'max': 0.5},  # Updated to weighted area
-        'Rear Curvature': {'value': metrics.get('weighted_curvature_area_rear', 0), 'min': 0, 'max': 0.5},  # Updated to weighted area
+        'Side Curvature': {'value': metrics.get('weighted_curvature_area_side', 0), 'min': 0, 'max': 0.5},
+        'Rear Curvature': {'value': metrics.get('weighted_curvature_area_rear', 0), 'min': 0, 'max': 0.5},
         'Lateral Deviation': {'value': metrics.get('lateral_deviation', 0), 'min': -0.5, 'max': 0.5}
     }
 
-    # KPI Grid (example layout, adjust as needed)
+    # Section 1: Shot Location
+    st.subheader("Shot Location")
+    if not df_ball.empty:
+        shot_location_fig = plot_shot_location(df_ball, metrics)
+        st.plotly_chart(shot_location_fig, use_container_width=True)
+    else:
+        st.error("No ball data available for shot location visualization.")
+
+    # Subtle Divider Line
+    st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
+
+    # Section 2: Main KPIs (7, excluding curvature)
+    st.subheader("Key Performance Indicators")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         animated_flip_kpi_card(
@@ -305,7 +319,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             calculation_info="Speed of the ball at release."
         )
 
-    col5, col6, col7, col8 = st.columns(4)
+    col5, col6, col7 = st.columns([1, 1, 1])
     with col5:
         animated_flip_kpi_card(
             "Release Time",
@@ -330,6 +344,26 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         )
     with col7:
         animated_flip_kpi_card(
+            "Lateral Deviation",
+            kpis['Lateral Deviation']['value'],
+            "ft",
+            player_average=player_averages.get('Lateral Deviation') if player_averages else None,
+            min_value=kpis['Lateral Deviation']['min'],
+            max_value=kpis['Lateral Deviation']['max'],
+            description="Good range: -0.1 to 0.1 ft",
+            calculation_info="Perpendicular distance from shot line to ball at hoop height."
+        )
+
+    # Subtle Divider Line
+    st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
+
+    # Section 3: Curvature Analysis (KPIs above visuals)
+    st.subheader("Curvature Analysis")
+    col_curv_left, col_curv_right = st.columns(2)
+    
+    with col_curv_left:
+        st.markdown("### Side View (XZ Plane)")
+        animated_flip_kpi_card(
             "Side Curvature",
             kpis['Side Curvature']['value'],
             "1/ft",
@@ -339,7 +373,9 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             description="Good range: 0.05-0.15 1/ft",
             calculation_info="Cubic-weighted curvature area in XZ plane."
         )
-    with col8:
+    
+    with col_curv_right:
+        st.markdown("### Rear View (YZ Plane)")
         animated_flip_kpi_card(
             "Rear Curvature",
             kpis['Rear Curvature']['value'],
@@ -350,39 +386,37 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             description="Good range: 0.05-0.15 1/ft",
             calculation_info="Cubic-weighted curvature area in YZ plane."
         )
-    col9 = st.columns(1)[0]  # Single column
-    with col9:
-        animated_flip_kpi_card(
-            "Lateral Deviation",
-            kpis['Lateral Deviation']['value'],
-            "ft",
-            player_average=player_averages.get('Lateral Deviation') if player_averages else None,
-            min_value=kpis['Lateral Deviation']['min'],
-            max_value=kpis['Lateral Deviation']['max'],
-            description="Good range: -0.1 to 0.1 ft. Closer to 0 indicates better aim.",
-            calculation_info="Perpendicular distance from shot line to ball at hoop height, in feet."
-        )
 
-    # Shot Location Visualization (Fixed Size, Proper Scale)
-    if not df_ball.empty:
-        st.subheader("Shot Location")
-        shot_location_fig = plot_shot_location(df_ball, metrics)
-        st.plotly_chart(shot_location_fig, use_container_width=True) 
+    fig_curvature = plot_curvature_analysis(df_ball, metrics, weighting_exponent=3, num_interp=300, curvature_scale=2.3)
+    st.plotly_chart(fig_curvature, use_container_width=True)
 
-    # Existing Visualizations
-    fig = plot_curvature_analysis(df_ball, metrics, weighting_exponent=3, num_interp=300, curvature_scale=2.3)
-    st.plotly_chart(fig, use_container_width=True)
+    # Subtle Divider Line
+    st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
 
+    # Section 4: Ball Path Analysis
+    st.subheader("Ball Path Analysis")
     if not df_ball.empty:
         try:
-            fig2 = plot_shot_analysis(df_ball, metrics)
-            st.plotly_chart(fig2, use_container_width=True, key="overview_shot_analysis")
-            st.subheader("3D Ball Path")
-            fig3 = plot_3d_ball_path(df_ball)
-            st.plotly_chart(fig3, use_container_width=True, key="overview_3d_ball_path")
+            fig_shot = plot_shot_analysis(df_ball, metrics)
+            st.plotly_chart(fig_shot, use_container_width=True, key="overview_shot_analysis")
         except Exception as e:
-            st.error(f"Visualization error: {str(e)}")
+            st.error(f"Shot Path Visualization error: {str(e)}")
+    else:
+        st.error("No ball data available for shot path visualization.")
 
+    # Subtle Divider Line
+    st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
+
+    # Section 5: 3D Ball Path
+    st.subheader("3D Ball Path")
+    if not df_ball.empty:
+        try:
+            fig_3d = plot_3d_ball_path(df_ball)
+            st.plotly_chart(fig_3d, use_container_width=True, key="overview_3d_ball_path")
+        except Exception as e:
+            st.error(f"3D Ball Path Visualization error: {str(e)}")
+    else:
+        st.error("No ball data available for 3D ball path visualization.")
 def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
     import streamlit as st
     import pandas as pd
