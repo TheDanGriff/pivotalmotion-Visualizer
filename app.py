@@ -274,9 +274,9 @@ def main():
         <style>
         .team-name {
             font-family: 'Arial', sans-serif;
-            font-size: 30px !important; /* Larger with override */
+            font-size: 36px !important; /* Larger with override */
             font-weight: bold;
-            color: #4682b4;
+            color: #a9a9a9;
             text-transform: uppercase;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             margin: 0;
@@ -286,9 +286,9 @@ def main():
         }
         .player-name {
             font-family: 'Arial', sans-serif;
-            font-size: 30px !important; /* Much larger, like a title, with override */
+            font-size: 36px !important; /* Much larger, like a title, with override */
             font-weight: bold;
-            color: #4682b4;
+            color: #a9a9a9;
             text-transform: uppercase;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             margin: 20px 0;
@@ -298,8 +298,8 @@ def main():
         }
         .job-details {
             font-family: 'Arial', sans-serif;
-            font-size: 15px !important; /* Larger with override */
-            color: #4682b4;
+            font-size: 18px !important; /* Larger with override */
+            color: #a9a9a9;
             text-transform: uppercase;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             margin: 0;
