@@ -443,6 +443,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             st.error(f"3D Ball Path Visualization error: {str(e)}")
     else:
         st.error("No ball data available for 3D ball path visualization.")
+
         
 def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
     import streamlit as st
