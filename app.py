@@ -125,7 +125,7 @@ def main():
     teams = sorted({humanize_label(job.get("Team", "N/A")) for job in jobs if humanize_label(job.get("Team", "N/A")) != "N/A"})
     player_names = sorted({humanize_label(job.get("PlayerName", "Unknown")) for job in jobs})
     sources = sorted({job.get("Source", "Unknown").title() for job in jobs})
-    shot_types = ["3 Point", "Free Throw", "Mid-Range"]  # Fixed options based on detection
+    shot_types = ["3 Point", "Free Throw", "Mid-Range"]
     dates = sorted({pd.to_datetime(int(job['UploadTimestamp']), unit='s').strftime('%Y-%m-%d %H:%M')
                     for job in jobs if job.get("UploadTimestamp")})
 
@@ -153,11 +153,11 @@ def main():
         st.info("No jobs match the selected filters.")
         return
 
-    selected_job = filtered_jobs[0]  # Take the first job (assuming one shot per job)
+    selected_job = filtered_jobs[0]  # Take the first job (one shot per job)
     selected_job_id = selected_job['JobID']
     shot_type = get_shot_type(selected_job.get("ShootingType", "Unknown"))
 
-    # Get segment details (assuming one segment per job)
+    # Get segment details
     if selected_job['Source'].lower() == 'pose_video':
         segments = list_segments(s3_client, BUCKET_NAME, user_email, selected_job_id)
     elif selected_job['Source'].lower() == 'data_file':
@@ -174,14 +174,22 @@ def main():
 
     selected_segment = segments[0]  # Take the first (and only) segment
     segment_label = get_segment_label(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment, selected_job['Source'])
-    
-    # Extract segment details (assuming segment_label format: "Period: X | Clock: HH:MM | Outcome: Y")
-    period = segment_label.split(" | ")[0].replace("Period: ", "") if "Period: " in segment_label else "N/A"
-    clock = segment_label.split(" | ")[1].replace("Clock: ", "") if "Clock: " in segment_label else "N/A"
+
+    # Parse segment label (assuming format: "Period: X | Clock: HH:MM | Outcome: Y")
+    parts = segment_label.split(" | ")
+    period = parts[0].replace("Period: ", "") if len(parts) > 0 and "Period: " in parts[0] else "N/A"
+    clock = parts[1].replace("Clock: ", "") if len(parts) > 1 and "Clock: " in parts[1] else "N/A"
     shot_display = shot_type if shot_type in ["3 Point", "Free Throw", "Mid-Range"] else "Unknown"
 
-    # Display segment header
-    st.markdown(f"### Select Segment\n**1/1 | Period: {period} | Clock: {clock} | {shot_display}**", unsafe_allow_html=True)
+    # Display team logo
+    show_brand_header(selected_job.get('PlayerName', ''), selected_job.get('Team', ''))
+
+    # Display segment header centered below logo
+    st.markdown(
+        f"<h3 style='text-align: center;'>Select Segment</h3>"
+        f"<p style='text-align: center;'><strong>1/1 | Period: {period} | Clock: {clock} | {shot_display}</strong></p>",
+        unsafe_allow_html=True
+    )
 
     # Load segment data
     if selected_job['Source'].lower() in ['pose_video', 'data_file']:
@@ -224,7 +232,6 @@ def main():
         except Exception as e:
             st.error(f"Error calculating metrics: {str(e)}")
 
-    show_brand_header(selected_job.get('PlayerName', ''), selected_job.get('Team', ''))
     tab1, tab2, tab3 = st.tabs(["Overview", "Biomechanics", "Spin Analysis"])
 
     with tab1:
