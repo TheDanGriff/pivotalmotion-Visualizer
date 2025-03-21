@@ -285,7 +285,7 @@ def main():
         }
         .player-team {
             font-family: 'Arial', sans-serif;
-            font-size: 150px; /* Larger */
+            font-size: 180px; /* Larger */
             font-weight: bold;
             color: #4682b4; /* Steel blue */
             text-transform: uppercase;
@@ -296,7 +296,7 @@ def main():
         }
         .job-details {
             font-family: 'Arial', sans-serif;
-            font-size: 120px; /* Larger */
+            font-size: 150px; /* Larger */
             color: #4682b4; /* Steel blue */
             text-transform: uppercase;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
@@ -305,7 +305,7 @@ def main():
             word-wrap: break-word;
         }
         .logo-img {
-            width: 150px;
+            width: 180px;
             height: auto;
             margin-bottom: 40px;
         }
