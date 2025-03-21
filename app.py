@@ -94,11 +94,27 @@ def format_source_type(source):
 
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
-    st.markdown("<h1 style='text-align: center;'>Pivotal Motion Visualizer</h1>", unsafe_allow_html=True)
-
-    # Subtle Divider Line
-    st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
-
+    
+    # Custom CSS for a metallic silver header with blue text
+    st.markdown("""
+        <style>
+        .metallic-header {
+            background: linear-gradient(135deg, #c0c0c0, #a9a9a9, #d3d3d3, #a9a9a9); /* Metallic silver gradient */
+            color: #1e90ff; /* Dodger Blue text color */
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
+            border: 1px solid #b0b0b0; /* Light gray border for polish */
+            font-family: 'Arial', sans-serif;
+            font-size: 36px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        </style>
+        <h1 class='metallic-header'>Pivotal Motion Visualizer</h1>
+    """, unsafe_allow_html=True)
+    
     if not st.session_state.get('authenticated', False):
         with st.form("login_form"):
             st.header("Login")
@@ -244,20 +260,6 @@ def main():
 
 def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_type):
     import streamlit as st
-
-    # Option 1: Apply a full-page black border using custom CSS
-    st.markdown(
-        """
-        <style>
-        .stApp {
-            border: 2px solid black;
-            padding: 20px;
-            border-radius: 5px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
 
     # Subtle Divider Line after header
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
