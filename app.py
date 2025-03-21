@@ -131,32 +131,32 @@ def format_source_type(source):
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Enhanced CSS with Ageo font, snow white background, blue outline, and blue sidebar
+    # Enhanced CSS with thicker border, lighter blue sidebar, and consistent font
     st.markdown("""
         <style>
         @import url('https://fonts.cdnfonts.com/css/ageo-personal-use'); /* Ageo from Fontshare */
 
-        /* App-wide blue outline */
+        /* App-wide thicker blue outline */
         .stApp {
-            border: 3px solid #4682b4; /* Steel blue outline */
+            border: 6px solid #4682b4; /* Thicker steel blue outline */
             border-radius: 10px;
             padding: 10px;
             background: #ffffff; /* White background for contrast */
         }
 
-        /* Sidebar styling */
+        /* Sidebar styling with lighter blue */
         [data-testid="stSidebar"] {
-            background: #4682b4; /* Steel blue */
+            background: #87ceeb; /* Lighter sky blue */
             padding: 20px;
-            border-right: 2px solid #87ceeb; /* Lighter blue border */
+            border-right: 2px solid #b0e0e6; /* Even lighter blue border */
         }
         [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
         [data-testid="stSidebar"] .css-17eq0hr /* Sidebar text */ {
             color: #fffafa !important; /* Snow white text */
-            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif;
+            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif !important; /* Consistent font */
         }
         [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox */ {
-            background: #87ceeb; /* Lighter blue */
+            background: #b0e0e6; /* Lightest blue */
             color: #ffffff;
             border-radius: 5px;
         }
@@ -265,10 +265,10 @@ def main():
             transition: transform 0.3s ease;
         }
         .job-details span.numeric {
-            font-family: 'Arial', sans-serif; /* Standard font for numbers */
-            -webkit-text-stroke: 0px; /* Remove outline for numbers */
-            background: none; /* Remove gradient for numbers */
-            color: #4682b4; /* Solid steel blue */
+            font-family: 'Arial', sans-serif;
+            -webkit-text-stroke: 0px;
+            background: none;
+            color: #4682b4;
         }
         .job-details:hover {
             transform: scale(1.05);
