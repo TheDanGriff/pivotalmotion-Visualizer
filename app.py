@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import os
 
 from auth import handle_login
 from aws_client import initialize_aws_clients
@@ -95,28 +96,48 @@ def format_source_type(source):
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Custom CSS for a metallic silver header with metallic blue font
+    # Custom CSS for metallic styling
     st.markdown("""
         <style>
         .metallic-header {
-            background: linear-gradient(135deg, #c0c0c0, #a9a9a9, #d3d3d3, #a9a9a9); /* Metallic silver gradient */
-            color: #4682b4; /* Steel Blue base color */
+            background: linear-gradient(135deg, #c0c0c0, #a9a9a9, #d3d3d3, #a9a9a9);
+            color: #4682b4;
             text-align: center;
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow */
-            border: 1px solid #b0b0b0; /* Light gray border */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border: 1px solid #b0b0b0;
             font-family: 'Arial', sans-serif;
             font-size: 36px;
             font-weight: bold;
             text-transform: uppercase;
-            background-clip: text; /* Clip background to text (if supported) */
-            -webkit-background-clip: text; /* For Webkit browsers */
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), /* Subtle shadow for depth */
-                        -1px -1px 2px rgba(255, 255, 255, 0.5); /* Light highlight */
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
+        }
+        .info-section {
+            background: linear-gradient(135deg, #e0e0e0, #d0d0d0);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border: 1px solid #b0b0b0;
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .player-team {
+            font-size: 28px;
+            font-weight: bold;
+            color: #4682b4;
+            margin: 0;
+        }
+        .job-details {
+            font-size: 20px;
+            color: #333333;
+            margin-top: 10px;
         }
         .divider-space {
-            margin: 40px 0; /* Increased space */
+            margin: 40px 0;
         }
         .subtle-divider {
             border: 1px solid #e0e0e0;
@@ -125,7 +146,6 @@ def main():
         </style>
         <h1 class='metallic-header'>Pivotal Motion Visualizer</h1>
         <div class='divider-space'></div>
-        <hr class='subtle-divider'>
     """, unsafe_allow_html=True)
 
     if not st.session_state.get('authenticated', False):
@@ -185,7 +205,7 @@ def main():
         st.info("No jobs match the selected filters.")
         return
 
-    selected_job = filtered_jobs[0]  # Take the first job (one shot per job)
+    selected_job = filtered_jobs[0]
     selected_job_id = selected_job['JobID']
     shot_type = get_shot_type(selected_job.get("ShootingType", "Unknown"))
 
@@ -204,7 +224,7 @@ def main():
         st.error("No segments found for this job.")
         return
 
-    selected_segment = segments[0]  # Take the first (and only) segment
+    selected_segment = segments[0]
     segment_label = humanize_segment_label(get_segment_label(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment, selected_job['Source']))
 
     # Parse segment label
@@ -214,12 +234,29 @@ def main():
     clock = parts[2].replace("Clock: ", "") if len(parts) > 2 and "Clock: " in parts[2] else "N/A"
     shot_display = parts[3] if len(parts) > 3 else shot_type if shot_type in ["3 Point", "Free Throw", "Mid-Range"] else "Unknown"
 
-    # Display segment details centered below logo with larger text and more spacing
-    show_brand_header(selected_job.get('PlayerName', ''), selected_job.get('Team', ''))
-    st.markdown(
-        f"<p style='text-align: center; font-size: 24px; padding-bottom: 30px;'><strong>{segment_number} | Period: {period} | Clock: {clock} | {shot_display}</strong></p>",
-        unsafe_allow_html=True
-    )
+    # Display player, team, logo, and job details
+    player_name = humanize_label(selected_job.get('PlayerName', 'Unknown'))
+    team_name = humanize_label(selected_job.get('Team', 'N/A'))
+    logo_path = os.path.join("logos", f"{team_name.lower().replace(' ', '-')}.png")
+    default_logo_path = os.path.join("logos", "default.png")  # Fallback logo
+
+    # Use st.image for local logo files
+    col1, col2, col3 = st.columns([1, 2, 1])  # Center the content with empty columns
+    with col2:
+        if os.path.exists(logo_path):
+            st.image(logo_path, width=80, caption=None, use_column_width=False)
+        else:
+            st.image(default_logo_path, width=80, caption="Default Logo", use_column_width=False)
+        st.markdown(
+            f"""
+            <div class='info-section'>
+                <p class='player-team'>{player_name} - {team_name}</p>
+                <p class='job-details'>{segment_number} | Period: {period} | Clock: {clock} | {shot_display}</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    st.markdown("<hr class='subtle-divider'>", unsafe_allow_html=True)
 
     # Load segment data
     if selected_job['Source'].lower() in ['pose_video', 'data_file']:
@@ -449,7 +486,6 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
     else:
         st.error("No ball data available for 3D ball path visualization.")
 
-
 def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
     import streamlit as st
     import pandas as pd
@@ -471,7 +507,7 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
         'Max Elbow Flexion': {'min': 0, 'max': 180},
         'Asymmetry Score': {'min': 0, 'max': 180},
         'Shoulder Rotation': {'min': 0, 'max': 180},
-        'COM Acceleration': {'min': -50, 'max': 50}  # Adjusted range for acceleration
+        'COM Acceleration': {'min': -50, 'max': 50}
     }
 
     st.subheader("Biomechanical KPIs")
@@ -521,7 +557,7 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
             calculation_info="Maximum right elbow angle during the shot."
         )
 
-    col5, col6, col7, _ = st.columns(4)  # Reduced to 3 columns since we have 7 KPIs
+    col5, col6, col7, _ = st.columns(4)
     with col5:
         animated_flip_kpi_card(
             "Asymmetry Score",
@@ -584,7 +620,7 @@ def show_spin_analysis_page(df_spin):
     if not df_spin.empty:
         st.header("Spin Analysis")
         plot_spin_analysis(df_spin)
-        plot_spin_bullseye(df_spin)  # Add bulls-eye visualization
+        plot_spin_bullseye(df_spin)
 
 if __name__ == "__main__":
     main()
