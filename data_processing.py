@@ -1789,7 +1789,7 @@ def create_alignment_diagram(df, basket_position=(41.75, 0)):
 
 def plot_shot_location(ball_df, metrics, pose_df=None):
     """
-    Create a 2D visualization of the shot location on a half basketball court.
+    Create a 2D visualization of the shot location on a half basketball court, zoomed in for better visibility.
     
     Parameters:
     - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', and optionally 'OUTCOME'/'IS_MADE' in inches.
@@ -1825,15 +1825,6 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         hoop_x = 501  # Default right side
         logger.debug(f"Court not flipped: shot_x = {shot_x} is positive, hoop_x = {hoop_x}")
 
-    # Debug OUTCOME and IS_MADE presence
-    logger.debug(f"ball_df columns: {ball_df.columns.tolist()}")
-    logger.debug(f"ball_df index: {ball_df.index.tolist()}")
-    logger.debug(f"lift_idx: {lift_idx}")
-    if 'OUTCOME' in ball_df.columns:
-        logger.debug(f"OUTCOME values sample: {ball_df['OUTCOME'].head().tolist()}")
-    if 'IS_MADE' in ball_df.columns:
-        logger.debug(f"IS_MADE values sample: {ball_df['IS_MADE'].head().tolist()}")
-
     # Determine marker based on shot outcome
     if 'OUTCOME' in ball_df.columns:
         try:
@@ -1843,25 +1834,22 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
                 marker_symbol = 'x'
                 marker_color = 'grey'
                 marker_name = f'Shot Location (Unknown Outcome)'
-                logger.warning(f"OUTCOME is NaN at lift_idx {lift_idx}. Using grey 'X'.")
             elif outcome == 'Y':
-                marker_symbol = 'circle'  # Filled circle for make
-                marker_color = '#90EE90'  # Pastel green
+                marker_symbol = 'circle'
+                marker_color = '#90EE90'
                 marker_name = f'Shot Location (Make)'
             elif outcome == 'N':
                 marker_symbol = 'x'
-                marker_color = '#FF9999'  # Pastel red
+                marker_color = '#FF9999'
                 marker_name = f'Shot Location (Miss)'
             else:
                 marker_symbol = 'x'
                 marker_color = 'grey'
                 marker_name = f'Shot Location (Unexpected Outcome: {outcome})'
-                logger.warning(f"Unexpected OUTCOME value '{outcome}' at lift_idx {lift_idx}. Using grey 'X'.")
         except KeyError:
             marker_symbol = 'x'
             marker_color = 'grey'
             marker_name = f'Shot Location (Index Error)'
-            logger.error(f"lift_idx {lift_idx} not in ball_df index for OUTCOME. Using grey 'X'.")
     elif 'IS_MADE' in ball_df.columns:
         try:
             is_made = ball_df.loc[lift_idx, 'IS_MADE']
@@ -1870,47 +1858,42 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
                 marker_symbol = 'x'
                 marker_color = 'grey'
                 marker_name = f'Shot Location (Unknown Outcome)'
-                logger.warning(f"IS_MADE is NaN at lift_idx {lift_idx}. Using grey 'X'.")
             elif is_made in [True, 'TRUE', 1]:
-                marker_symbol = 'circle'  # Filled circle for make
-                marker_color = '#90EE90'  # Pastel green
+                marker_symbol = 'circle'
+                marker_color = '#90EE90'
                 marker_name = f'Shot Location (Make)'
             elif is_made in [False, 'FALSE', 0]:
                 marker_symbol = 'x'
-                marker_color = '#FF9999'  # Pastel red
+                marker_color = '#FF9999'
                 marker_name = f'Shot Location (Miss)'
             else:
                 marker_symbol = 'x'
                 marker_color = 'grey'
                 marker_name = f'Shot Location (Unexpected IS_MADE: {is_made})'
-                logger.warning(f"Unexpected IS_MADE value '{is_made}' at lift_idx {lift_idx}. Using grey 'X'.")
         except KeyError:
             marker_symbol = 'x'
             marker_color = 'grey'
             marker_name = f'Shot Location (Index Error)'
-            logger.error(f"lift_idx {lift_idx} not in ball_df index for IS_MADE. Using grey 'X'.")
     else:
         marker_symbol = 'x'
         marker_color = 'grey'
         marker_name = f'Shot Location (No Outcome Data)'
-        logger.warning(f"Neither OUTCOME nor IS_MADE available at lift_idx {lift_idx}. Using grey 'X'.")
 
-    # Log final marker settings
     logger.debug(f"Marker settings - symbol: {marker_symbol}, color: {marker_color}, name: {marker_name}")
 
-    # Court dimensions in inches (centered at (0, 0) for base layout, flipped if needed)
+    # Court dimensions in inches (zoomed-in view)
     court_length = 564  # Half-court length from center to right edge
     court_width = 600   # Full width (-300 to 300)
     hoop_y = 0
-    free_throw_x = 336 if not flip_court else -336  # Adjust for flip
-    paint_width = 192  # 16 ft = 192 inches, -96 to 96
-    paint_end = 564 if not flip_court else -564  # Extend to court end
-    three_point_radius = 285  # Distance from hoop to peak (501 - 216)
+    free_throw_x = 336 if not flip_court else -336
+    paint_width = 192  # 16 ft = 192 inches
+    paint_end = 564 if not flip_court else -564
+    three_point_radius = 285  # Distance from hoop to peak
 
     # Create figure
     fig = go.Figure()
 
-    # Court boundary (adjusted for flip)
+    # Court boundary (zoomed-in subset)
     court_x = [-court_length/2, court_length, court_length, -court_length/2, -court_length/2] if not flip_court else [court_length/2, -court_length, -court_length, court_length/2, court_length/2]
     fig.add_trace(
         go.Scatter(
@@ -1928,12 +1911,12 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             x=[hoop_x],
             y=[hoop_y],
             mode='markers',
-            marker=dict(size=10, color='#FFA07A', symbol='circle-open'),  # Light orange ring
+            marker=dict(size=20, color='#FFA07A', symbol='circle-open'),  # Larger hoop for visibility
             name='Hoop'
         )
     )
 
-    # Paint outline (rectangle from 336 to 564, y = ±96, flipped if needed)
+    # Paint outline
     paint_x = [free_throw_x, paint_end, paint_end, free_throw_x, free_throw_x]
     fig.add_trace(
         go.Scatter(
@@ -1945,18 +1928,16 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         )
     )
 
-    # 3-point arc (semicircle centered at hoop, trimmed to match endpoints)
-    theta = np.linspace(-np.pi/2, np.pi/2, 100)  # Full semicircle
+    # 3-point arc
+    theta = np.linspace(-np.pi/2, np.pi/2, 100)
     three_x_full = hoop_x - three_point_radius * np.cos(theta) if not flip_court else hoop_x + three_point_radius * np.cos(theta)
     three_y_full = hoop_y + three_point_radius * np.sin(theta)
-
-    # Trim arc to reach exactly (396, ±264) or flipped equivalent
     three_point_end_x = 396 if not flip_court else -396
     mask = (three_y_full >= -264) & (three_y_full <= 264) & (three_x_full >= 216 if not flip_court else three_x_full <= -216)
     three_x = three_x_full[mask]
     three_y = three_y_full[mask]
     
-    # Ensure arc connects to (396, ±264) or (-396, ±264) by forcing endpoints
+    # Force endpoints
     if not flip_court:
         three_x = np.append(three_x, 396)
         three_y = np.append(three_y, 264)
@@ -1978,7 +1959,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         )
     )
 
-    # Extend 3-point line to court end (x = 564 or -564) at y = ±264
+    # Extend 3-point line to court end
     three_ext_start_x = 396 if not flip_court else -396
     three_ext_end_x = court_length if not flip_court else -court_length
     fig.add_trace(
@@ -2000,25 +1981,32 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         )
     )
 
-    # Shot location marker (use original coordinates without flipping sign)
+    # Shot location marker
     fig.add_trace(
         go.Scatter(
             x=[shot_x],
             y=[shot_y],
             mode='markers',
-            marker=dict(size=15, color=marker_color, symbol=marker_symbol),
+            marker=dict(size=25, color=marker_color, symbol=marker_symbol),  # Larger marker
             name=marker_name
         )
     )
 
-    # Update layout with fixed size and equal aspect ratio
-    x_range = [-282, 564] if not flip_court else [-564, 282]
+    # Zoomed-in axis ranges (centered around shot and hoop, approximately 30 ft wide)
+    zoom_width = 360  # 30 ft = 360 inches
+    zoom_height = 360  # Match height for equal scaling
+    x_center = (shot_x + hoop_x) / 2  # Midpoint between shot and hoop
+    y_center = 0  # Center court width-wise
+    x_range = [x_center - zoom_width/2, x_center + zoom_width/2]
+    y_range = [y_center - zoom_height/2, y_center + zoom_height/2]
+
+    # Update layout with fixed size and zoomed-in view
     fig.update_layout(
         title="Shot Location on Half Court",
         xaxis_title="X Position (inches)",
         yaxis_title="Y Position (inches)",
         xaxis=dict(range=x_range, showgrid=False),
-        yaxis=dict(range=[-300, 300], showgrid=False),
+        yaxis=dict(range=y_range, showgrid=False),
         width=500,
         height=500,
         autosize=False,
