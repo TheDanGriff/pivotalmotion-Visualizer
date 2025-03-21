@@ -134,7 +134,6 @@ def main():
     # Import Ageo font from Fontshare CDN and apply styling with snow white background
     st.markdown("""
         <style>
-        @import url('https://fonts.cdnfonts.com/css/ageo-personal-use'); /* Ageo from Fontshare */
         .metallic-header {
             background: #fffafa; /* Snow white */
             color: #4682b4; /* Steel blue */
@@ -143,7 +142,7 @@ def main():
             border-radius: 10px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             border: 1px solid #b0b0b0;
-            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif; /* Ageo with fallbacks */
+            font-family: 'Roboto', 'Arial', sans-serif; /* Ageo with fallbacks */
             font-size: 36px;
             font-weight: bold;
             text-transform: uppercase;
@@ -156,53 +155,12 @@ def main():
             border: 1px solid #e0e0e0;
             margin: 20px 0;
         }
-        .team-name {
-            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif;
-            font-size: 300px !important;
-            font-weight: bold;
-            color: #4682b4;
-            text-transform: uppercase;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
-            margin: 0;
-            line-height: 1.2;
-            word-wrap: break-word;
-            text-align: center;
-        }
-        .player-name {
-            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif;
-            font-size: 500px !important;
-            font-weight: bold;
-            color: #4682b4;
-            text-transform: uppercase;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
-            margin: 20px 0;
-            line-height: 1.2;
-            word-wrap: break-word;
-            text-align: center;
-        }
-        .job-details {
-            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif;
-            font-size: 300px !important;
-            color: #4682b4;
-            text-transform: uppercase;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
-            margin: 0;
-            line-height: 1.2;
-            word-wrap: break-word;
-            text-align: center;
-        }
-        .logo-img {
-            width: 150px;
-            height: auto;
-            margin-bottom: 30px;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-        }
         </style>
         <h1 class='metallic-header'>Pivotal Motion Visualizer</h1>
         <div class='divider-space'></div>
     """, unsafe_allow_html=True)
+
+    st.markdown("<hr class='subtle-divider'>", unsafe_allow_html=True)
 
     if not st.session_state.get('authenticated', False):
         with st.form("login_form"):
@@ -313,6 +271,54 @@ def main():
             logo_src = None
             st.warning(f"Default logo not found in {default_logo_path}")
 
+    # CSS for text styling matching metallic-header, no background box
+    st.markdown("""
+        <style>
+        .team-name {
+            font-family: 'Arial', sans-serif;
+            font-size: 36px !important; /* Larger with override */
+            font-weight: bold;
+            color: #000000;
+            text-transform: uppercase;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
+            margin: 0;
+            line-height: 1.2;
+            word-wrap: break-word;
+            text-align: center;
+        }
+        .player-name {
+            font-family: 'Arial', sans-serif;
+            font-size: 36px !important; /* Much larger, like a title, with override */
+            color: #000000;
+            text-transform: uppercase;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
+            margin: 20px 0;
+            line-height: 1.2;
+            word-wrap: break-word;
+            text-align: center;
+        }
+        .job-details {
+            font-family: 'Arial', sans-serif;
+            font-size: 18px !important; /* Larger with override */
+            color: #000000;
+            text-transform: uppercase;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
+            margin: 0;
+            line-height: 1.2;
+            word-wrap: break-word;
+            text-align: center;
+        }
+        .logo-img {
+            width: 150px;
+            height: auto;
+            margin-bottom: 30px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     # Display content without a background box
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -391,7 +397,6 @@ def main():
 def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_type):
     import streamlit as st
 
-    st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
 
     benchmarks = get_kpi_benchmarks()
     player_averages = get_player_kpi_averages(player_name, shot_type)
