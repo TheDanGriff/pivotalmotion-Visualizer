@@ -150,25 +150,31 @@ def main():
         .info-section {
             background: linear-gradient(135deg, #e0e0e0, #d0d0d0);
             border-radius: 10px;
-            padding: 25px;
+            padding: 40px; /* Increased padding for larger content */
             text-align: center;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            border: 3px solid #000000; /* Black outline */
+            border: 3px solid #000000;
             margin-top: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            width: 100%; /* Full width within column */
+            box-sizing: border-box; /* Include padding/border in width */
         }
         .player-team {
-            font-size: 60px; /* Much larger */
+            font-size: 120px; /* Significantly larger */
             font-weight: bold;
-            color: #000000; /* Black */
+            color: #000000;
             margin: 0;
+            line-height: 1.2; /* Adjust line height for readability */
         }
         .job-details {
-            font-size: 48px; /* Much larger */
-            color: #000000; /* Black */
-            margin-top: 20px;
+            font-size: 100px; /* Significantly larger */
+            color: #000000;
+            margin-top: 30px; /* Increased spacing */
+            line-height: 1.2;
+        }
+        .logo-container {
+            display: flex;
+            justify-content: center; /* Center horizontally */
+            margin-bottom: 30px; /* Increased space below logo */
         }
         .divider-space {
             margin: 40px 0;
@@ -275,45 +281,12 @@ def main():
     logo_path = os.path.join("images", "teams", f"{team_shorthand}_logo.png")
     default_logo_path = os.path.join("images", "teams", "default.png")
 
-    # Update CSS for larger fonts and centered logo
-    st.markdown("""
-        <style>
-        .info-section {
-            background: linear-gradient(135deg, #e0e0e0, #d0d0d0);
-            border-radius: 10px;
-            padding: 30px;
-            text-align: center;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            border: 3px solid #000000;
-            margin-top: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 100%;
-        }
-        .player-team {
-            font-size: 100px; /* Much larger */
-            font-weight: bold;
-            color: #000000;
-            margin: 0;
-        }
-        .job-details {
-            font-size: 80px; /* Much larger */
-            color: #000000;
-            margin-top: 25px;
-        }
-        .logo-container {
-            display: flex;
-            justify-content: center; /* Center horizontally */
-            margin-bottom: 20px; /* Space below logo */
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # Use st.image with file bytes, centered
+    # Use st.image with file bytes, centered within the bordered box
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("<div class='info-section'>", unsafe_allow_html=True)
+        st.markdown("""
+            <div class='info-section'>
+        """, unsafe_allow_html=True)
         st.markdown("<div class='logo-container'>", unsafe_allow_html=True)
         try:
             with open(logo_path, "rb") as f:
@@ -329,10 +302,10 @@ def main():
             f"""
             <p class='player-team'>{player_name} - {team_name}</p>
             <p class='job-details'>{segment_number} | Period: {period} | Clock: {clock} | {shot_display}</p>
+            </div>
             """,
             unsafe_allow_html=True
         )
-        st.markdown("</div>", unsafe_allow_html=True)  # Close info-section
     st.markdown("<hr class='subtle-divider'>", unsafe_allow_html=True)
 
     # Load segment data
