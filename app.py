@@ -95,26 +95,39 @@ def format_source_type(source):
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Custom CSS for a metallic silver header with blue text
+    # Custom CSS for a metallic silver header with metallic blue font
     st.markdown("""
         <style>
         .metallic-header {
             background: linear-gradient(135deg, #c0c0c0, #a9a9a9, #d3d3d3, #a9a9a9); /* Metallic silver gradient */
-            color: #1e90ff; /* Dodger Blue text color */
+            color: #4682b4; /* Steel Blue base color */
             text-align: center;
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
-            border: 1px solid #b0b0b0; /* Light gray border for polish */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+            border: 1px solid #b0b0b0; /* Light gray border */
             font-family: 'Arial', sans-serif;
             font-size: 36px;
             font-weight: bold;
             text-transform: uppercase;
+            background-clip: text; /* Clip background to text (if supported) */
+            -webkit-background-clip: text; /* For Webkit browsers */
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), /* Subtle shadow for depth */
+                        -1px -1px 2px rgba(255, 255, 255, 0.5); /* Light highlight */
+        }
+        .divider-space {
+            margin: 40px 0; /* Increased space */
+        }
+        .subtle-divider {
+            border: 1px solid #e0e0e0;
+            margin: 20px 0;
         }
         </style>
         <h1 class='metallic-header'>Pivotal Motion Visualizer</h1>
+        <div class='divider-space'></div>
+        <hr class='subtle-divider'>
     """, unsafe_allow_html=True)
-    
+
     if not st.session_state.get('authenticated', False):
         with st.form("login_form"):
             st.header("Login")
