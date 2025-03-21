@@ -259,16 +259,6 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         unsafe_allow_html=True
     )
 
-    # Option 2: Style the header section with black background and white text (if full-page border not desired)
-    st.markdown(
-        """
-        <div style='background-color: black; padding: 15px; border-radius: 5px; text-align: center;'>
-            <h1 style='color: white; margin: 0;'>Pivotal Motion Visualizer</h1>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
     # Subtle Divider Line after header
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
 
@@ -444,7 +434,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
     else:
         st.error("No ball data available for 3D ball path visualization.")
 
-        
+
 def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
     import streamlit as st
     import pandas as pd
