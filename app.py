@@ -245,10 +245,35 @@ def main():
 def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_type):
     import streamlit as st
 
-    st.header("Basketball Shot Analysis")
+    # Option 1: Apply a full-page black border using custom CSS
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            border: 2px solid black;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Option 2: Style the header section with black background and white text (if full-page border not desired)
+    st.markdown(
+        """
+        <div style='background-color: black; padding: 15px; border-radius: 5px; text-align: center;'>
+            <h1 style='color: white; margin: 0;'>Pivotal Motion Visualizer</h1>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Subtle Divider Line after header
+    st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
+
     benchmarks = get_kpi_benchmarks()
     player_averages = get_player_kpi_averages(player_name, shot_type)
-
     logger.debug(f"Metrics before KPI rendering: {metrics}")
 
     kpis = {
@@ -263,10 +288,10 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         'Lateral Deviation': {'value': metrics.get('lateral_deviation', 0), 'min': -0.5, 'max': 0.5}
     }
 
-    # Precompute shot analysis to set indices in metrics
+    # Precompute shot analysis to set indices
     if not df_ball.empty:
         try:
-            fig_shot = plot_shot_analysis(df_ball, metrics)  # Run first to populate metrics
+            fig_shot = plot_shot_analysis(df_ball, metrics)
         except Exception as e:
             logger.error(f"Precompute shot analysis error: {str(e)}")
             fig_shot = None
@@ -280,11 +305,9 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         st.plotly_chart(shot_location_fig, use_container_width=True)
     else:
         st.error("No ball data available for shot location visualization.")
-
-    # Subtle Divider Line
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
 
-    # Section 2: Main KPIs (7, excluding curvature)
+    # Section 2: Main KPIs
     st.subheader("Key Performance Indicators")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -366,14 +389,11 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             description="Good range: -0.1 to 0.1 ft",
             calculation_info="Perpendicular distance from shot line to ball at hoop height."
         )
-
-    # Subtle Divider Line
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
 
-    # Section 3: Curvature Analysis (KPIs above visuals)
+    # Section 3: Curvature Analysis
     st.subheader("Curvature Analysis")
     col_curv_left, col_curv_right = st.columns(2)
-    
     with col_curv_left:
         st.markdown("### Side View (XZ Plane)")
         animated_flip_kpi_card(
@@ -386,7 +406,6 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             description="Good range: 0.05-0.15 1/ft",
             calculation_info="Cubic-weighted curvature area in XZ plane."
         )
-    
     with col_curv_right:
         st.markdown("### Rear View (YZ Plane)")
         animated_flip_kpi_card(
@@ -399,11 +418,8 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             description="Good range: 0.05-0.15 1/ft",
             calculation_info="Cubic-weighted curvature area in YZ plane."
         )
-
     fig_curvature = plot_curvature_analysis(df_ball, metrics, weighting_exponent=3, num_interp=300, curvature_scale=2.3)
     st.plotly_chart(fig_curvature, use_container_width=True)
-
-    # Subtle Divider Line
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
 
     # Section 4: Ball Path Analysis
@@ -415,8 +431,6 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             st.error("Failed to precompute shot analysis visualization.")
     else:
         st.error("No ball data available for shot path visualization.")
-
-    # Subtle Divider Line
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
 
     # Section 5: 3D Ball Path
@@ -429,6 +443,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             st.error(f"3D Ball Path Visualization error: {str(e)}")
     else:
         st.error("No ball data available for 3D ball path visualization.")
+        
 def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
     import streamlit as st
     import pandas as pd
