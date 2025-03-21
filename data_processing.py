@@ -1789,7 +1789,7 @@ def create_alignment_diagram(df, basket_position=(41.75, 0)):
 
 def plot_shot_location(ball_df, metrics, pose_df=None):
     """
-    Create a 2D visualization of the shot location on a half basketball court, adjusted for size and position.
+    Create a 2D visualization of the shot location on a half basketball court, shifted 15% to the right.
     
     Parameters:
     - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', and optionally 'OUTCOME'/'IS_MADE' in inches.
@@ -1902,7 +1902,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             mode='lines',
             line=dict(color='black', width=2),
             name='Court Boundary',
-            showlegend=False  # Hide from legend
+            showlegend=False
         )
     )
 
@@ -1926,7 +1926,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             mode='lines',
             line=dict(color='black', width=2, dash='dash'),
             name='Paint',
-            showlegend=False  # Hide from legend
+            showlegend=False
         )
     )
 
@@ -1958,7 +1958,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             mode='lines',
             line=dict(color='black', width=2),
             name='3-Point Line',
-            showlegend=False  # Hide from legend
+            showlegend=False
         )
     )
 
@@ -1995,10 +1995,12 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         )
     )
 
-    # Adjusted axis ranges (50x50 ft view, shifted right)
+    # Adjusted axis ranges (50x50 ft view, shifted 15% right)
     zoom_width = 600  # 50 ft = 600 inches
     zoom_height = 600
-    x_center = hoop_x - 150 if not flip_court else hoop_x + 150  # Shift 12.5 ft (150 inches) toward hoop
+    shift_amount = 90  # 15% of 600 inches
+    x_center_base = hoop_x - 150 if not flip_court else hoop_x + 150  # Base center from previous shift
+    x_center = x_center_base - shift_amount if not flip_court else x_center_base + shift_amount  # Shift right
     y_center = 0  # Center court width-wise
     x_range = [x_center - zoom_width/2, x_center + zoom_width/2]
     y_range = [y_center - zoom_height/2, y_center + zoom_height/2]
@@ -2010,7 +2012,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
         width=500,
         height=500,
         autosize=False,
-        showlegend=True,  # Reintroduce legend
+        showlegend=True,
         legend=dict(
             x=0.5,
             y=-0.1,
@@ -2020,7 +2022,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
             font=dict(size=12)
         ),
         template="plotly_white",
-        margin=dict(l=0, r=0, t=0, b=0)  # Minimize margins for centering
+        margin=dict(l=0, r=0, t=0, b=0)
     )
 
     # Ensure equal aspect ratio
