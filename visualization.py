@@ -359,7 +359,7 @@ def plot_shot_analysis(df_ball, metrics):
                     cmin=0,
                     cmax=max(traj_v.max(), 40),
                     colorbar=dict(
-                        title=dict(text="Velocity (ft/s)", side="right"),
+                        title=dict(text="Velocity (in/s)", side="right"),
                         thickness=15,
                         len=0.5,
                         x=1.05

@@ -124,15 +124,17 @@ def main():
 
     teams = sorted({humanize_label(job.get("Team", "N/A")) for job in jobs if humanize_label(job.get("Team", "N/A")) != "N/A"})
     player_names = sorted({humanize_label(job.get("PlayerName", "Unknown")) for job in jobs})
-    shooting_types = sorted({humanize_label(job.get("ShootingType", "N/A")) for job in jobs if humanize_label(job.get("ShootingType", "N/A")) != "N/A"})
-    dates = sorted({pd.to_datetime(int(job['UploadTimestamp']), unit='s').strftime('%Y-%m-%d')
+    sources = sorted({job.get("Source", "Unknown").title() for job in jobs})
+    shot_types = ["3 Point", "Free Throw", "Mid-Range"]  # Fixed options based on detection
+    dates = sorted({pd.to_datetime(int(job['UploadTimestamp']), unit='s').strftime('%Y-%m-%d %H:%M')
                     for job in jobs if job.get("UploadTimestamp")})
 
     with st.sidebar:
         st.header("Filters")
         team_filter = st.selectbox("Team", ["All"] + teams)
         player_filter = st.selectbox("Player Name", ["All"] + player_names)
-        shooting_filter = st.selectbox("Shot Type", ["All"] + shooting_types)
+        source_filter = st.selectbox("Source", ["All"] + sources)
+        shot_type_filter = st.selectbox("Shot Type", ["All"] + shot_types)
         date_filter = st.selectbox("Upload Date", ["All"] + dates)
 
     filtered_jobs = jobs
@@ -140,30 +142,22 @@ def main():
         filtered_jobs = [j for j in filtered_jobs if humanize_label(j.get("Team", "N/A")) == team_filter]
     if player_filter != "All":
         filtered_jobs = [j for j in filtered_jobs if humanize_label(j.get("PlayerName", "Unknown")) == player_filter]
-    if shooting_filter != "All":
-        filtered_jobs = [j for j in filtered_jobs if humanize_label(j.get("ShootingType", "N/A")) == shooting_filter]
+    if source_filter != "All":
+        filtered_jobs = [j for j in filtered_jobs if j.get("Source", "Unknown").title() == source_filter]
+    if shot_type_filter != "All":
+        filtered_jobs = [j for j in filtered_jobs if get_shot_type(j.get("ShootingType", "Unknown")) == shot_type_filter]
     if date_filter != "All":
-        filtered_jobs = [j for j in filtered_jobs if pd.to_datetime(int(j["UploadTimestamp"]), unit='s').strftime('%Y-%m-%d') == date_filter]
+        filtered_jobs = [j for j in filtered_jobs if pd.to_datetime(int(j["UploadTimestamp"]), unit='s').strftime('%Y-%m-%d %H:%M') == date_filter]
 
-    job_options_dict = {
-        (f"{job['PlayerName']} - {format_source_type(job['Team'])} - {format_source_type(job['Source'])} - "
-         f"{pd.to_datetime(int(job['UploadTimestamp']), unit='s').strftime('%Y-%m-%d %H:%M')}"): job
-        for job in filtered_jobs
-    }
-
-    selected_job_str = st.selectbox("Select a job to view details", options=list(job_options_dict.keys()))
-    selected_job = job_options_dict.get(selected_job_str)
-    if not selected_job:
-        st.error("Selected job not found. Please try again.")
+    if not filtered_jobs:
+        st.info("No jobs match the selected filters.")
         return
 
+    selected_job = filtered_jobs[0]  # Take the first job (assuming one shot per job)
     selected_job_id = selected_job['JobID']
-    shot_type = selected_job.get("ShootingType", "Unknown")
+    shot_type = get_shot_type(selected_job.get("ShootingType", "Unknown"))
 
-    # Get player averages based on shot type
-    player_averages = get_player_kpi_averages(selected_job['PlayerName'], shot_type)
-
-    # After retrieving your segments
+    # Get segment details (assuming one segment per job)
     if selected_job['Source'].lower() == 'pose_video':
         segments = list_segments(s3_client, BUCKET_NAME, user_email, selected_job_id)
     elif selected_job['Source'].lower() == 'data_file':
@@ -175,20 +169,21 @@ def main():
         return
 
     if not segments:
-        st.error("No segments found for this job. Please ensure the data files are properly uploaded.")
+        st.error("No segments found for this job.")
         return
 
-    segment_labels = {
-        seg_id: get_segment_label(s3_client, BUCKET_NAME, user_email, selected_job_id, seg_id, selected_job['Source'])
-        for seg_id in segments
-    }
+    selected_segment = segments[0]  # Take the first (and only) segment
+    segment_label = get_segment_label(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment, selected_job['Source'])
+    
+    # Extract segment details (assuming segment_label format: "Period: X | Clock: HH:MM | Outcome: Y")
+    period = segment_label.split(" | ")[0].replace("Period: ", "") if "Period: " in segment_label else "N/A"
+    clock = segment_label.split(" | ")[1].replace("Clock: ", "") if "Clock: " in segment_label else "N/A"
+    shot_display = shot_type if shot_type in ["3 Point", "Free Throw", "Mid-Range"] else "Unknown"
 
-    selected_segment = st.selectbox(
-        "Select Segment",
-        options=list(segment_labels.keys()),
-        format_func=lambda seg_id: segment_labels[seg_id]
-    )
+    # Display segment header
+    st.markdown(f"### Select Segment\n**1/1 | Period: {period} | Clock: {clock} | {shot_display}**", unsafe_allow_html=True)
 
+    # Load segment data
     if selected_job['Source'].lower() in ['pose_video', 'data_file']:
         if selected_job['Source'].lower() == 'data_file':
             df_segment = load_data_file_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
