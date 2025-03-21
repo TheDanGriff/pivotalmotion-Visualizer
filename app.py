@@ -241,6 +241,7 @@ def main():
         show_biomechanics_page(df_pose, df_ball, df_spin, metrics)
     with tab3:
         show_spin_analysis_page(df_spin)
+
 def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_type):
     import streamlit as st
 
@@ -261,6 +262,16 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         'Rear Curvature': {'value': metrics.get('weighted_curvature_area_rear', 0), 'min': 0, 'max': 0.5},
         'Lateral Deviation': {'value': metrics.get('lateral_deviation', 0), 'min': -0.5, 'max': 0.5}
     }
+
+    # Precompute shot analysis to set indices in metrics
+    if not df_ball.empty:
+        try:
+            fig_shot = plot_shot_analysis(df_ball, metrics)  # Run first to populate metrics
+        except Exception as e:
+            logger.error(f"Precompute shot analysis error: {str(e)}")
+            fig_shot = None
+    else:
+        fig_shot = None
 
     # Section 1: Shot Location
     st.subheader("Shot Location")
@@ -398,11 +409,10 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
     # Section 4: Ball Path Analysis
     st.subheader("Ball Path Analysis")
     if not df_ball.empty:
-        try:
-            fig_shot = plot_shot_analysis(df_ball, metrics)
+        if fig_shot is not None:
             st.plotly_chart(fig_shot, use_container_width=True, key="overview_shot_analysis")
-        except Exception as e:
-            st.error(f"Shot Path Visualization error: {str(e)}")
+        else:
+            st.error("Failed to precompute shot analysis visualization.")
     else:
         st.error("No ball data available for shot path visualization.")
 

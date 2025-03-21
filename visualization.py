@@ -255,8 +255,11 @@ def plot_shot_analysis(df_ball, metrics):
         set_idx = release_idx
     logger.debug(f"Set_idx redefined as minimum X position between {set_window_start} and {set_window_end}: {set_idx}")
 
-    # Store set_idx in metrics for use in other functions
-    metrics['set_idx'] = set_idx
+    # Store all indices in metrics with explicit keys
+    metrics['lift_frame'] = lift_idx
+    metrics['set_frame'] = set_idx
+    metrics['release_frame'] = release_idx
+    logger.debug(f"Stored indices in metrics - lift_frame: {lift_idx}, set_frame: {set_idx}, release_frame: {release_idx}")
 
     # --- SIDE VIEW ---
     traj_x = get_slice(df_ball, 'Basketball_X_ft', lift_idx, release_idx + 1)
@@ -312,7 +315,7 @@ def plot_shot_analysis(df_ball, metrics):
     rear_range = [-2, 2]
     if len(traj_y) > 0 and len(traj_z_rear) > 0 and len(traj_v_rear) > 0:
         min_len = min(len(traj_y), len(traj_z_rear), len(traj_v_rear))
-        traj_y = -traj_y[:min_len]  # Negate to flip direction
+        traj_y = -traj_y[:min_len]
         traj_z_rear = traj_z_rear[:min_len]
         traj_v_rear = traj_v_rear[:min_len]
         rear_mask = (traj_y >= -2) & (traj_y <= 2) & (traj_z_rear >= 2) & (traj_z_rear <= 11)
@@ -327,7 +330,7 @@ def plot_shot_analysis(df_ball, metrics):
     proj_z_rear = proj_z
     if len(proj_y) > 0 and len(proj_z_rear) > 0:
         min_len = min(len(proj_y), len(proj_z_rear))
-        proj_y = -proj_y[:min_len]  # Negate to flip direction
+        proj_y = -proj_y[:min_len]
         proj_z_rear = proj_z_rear[:min_len]
         proj_mask = (proj_y >= -2) & (proj_y <= 2) & (proj_z_rear >= 2) & (proj_z_rear <= 11)
         proj_y = proj_y[proj_mask]
@@ -428,7 +431,7 @@ def plot_shot_analysis(df_ball, metrics):
         for phase, info in phase_info.items():
             idx = info['idx']
             if lift_idx <= idx <= release_idx:
-                marker_y = -df_ball.at[idx, 'Basketball_Y_ft']  # Negate marker position
+                marker_y = -df_ball.at[idx, 'Basketball_Y_ft']
                 marker_z = df_ball.at[idx, 'Basketball_Z_ft']
                 if -2 <= marker_y <= 2 and 2 <= marker_z <= 11:
                     fig.add_trace(
