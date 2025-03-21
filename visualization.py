@@ -302,14 +302,14 @@ def plot_shot_analysis(df_ball, metrics):
     ticktext_x = [f"{val:.1f}" for val in tickvals_x]
     tickvals_y = np.arange(2, 12, 1)
 
-    # --- REAR VIEW ---
+    # --- REAR VIEW (Reversed) ---
     traj_y = get_slice(df_ball, 'Basketball_Y_ft', lift_idx, release_idx + 1)
     traj_z_rear = traj_z
     traj_v_rear = traj_v
-    rear_range = [2, -2]  # Reversed: +2 on left, -2 on right
+    rear_range = [-2, 2]  # Keep standard range for axis
     if len(traj_y) > 0 and len(traj_z_rear) > 0 and len(traj_v_rear) > 0:
         min_len = min(len(traj_y), len(traj_z_rear), len(traj_v_rear))
-        traj_y = traj_y[:min_len]
+        traj_y = -traj_y[:min_len]  # Negate to flip direction
         traj_z_rear = traj_z_rear[:min_len]
         traj_v_rear = traj_v_rear[:min_len]
         rear_mask = (traj_y >= -2) & (traj_y <= 2) & (traj_z_rear >= 2) & (traj_z_rear <= 11)
@@ -324,7 +324,7 @@ def plot_shot_analysis(df_ball, metrics):
     proj_z_rear = proj_z
     if len(proj_y) > 0 and len(proj_z_rear) > 0:
         min_len = min(len(proj_y), len(proj_z_rear))
-        proj_y = proj_y[:min_len]
+        proj_y = -proj_y[:min_len]  # Negate to flip direction
         proj_z_rear = proj_z_rear[:min_len]
         proj_mask = (proj_y >= -2) & (proj_y <= 2) & (proj_z_rear >= 2) & (proj_z_rear <= 11)
         proj_y = proj_y[proj_mask]
@@ -425,7 +425,7 @@ def plot_shot_analysis(df_ball, metrics):
         for phase, info in phase_info.items():
             idx = info['idx']
             if lift_idx <= idx <= release_idx:
-                marker_y = df_ball.at[idx, 'Basketball_Y_ft']
+                marker_y = -df_ball.at[idx, 'Basketball_Y_ft']  # Negate marker position
                 marker_z = df_ball.at[idx, 'Basketball_Z_ft']
                 if -2 <= marker_y <= 2 and 2 <= marker_z <= 11:
                     fig.add_trace(
@@ -467,8 +467,8 @@ def plot_shot_analysis(df_ball, metrics):
     )
     fig.update_xaxes(
         title_text="Lateral Position (ft)", row=1, col=2,
-        range=rear_range,  # Reversed: 2 to -2
-        tickmode='array', tickvals=[2, 1, 0, -1, -2], ticktext=["2", "1", "0", "-1", "-2"],  # Explicit ticks
+        range=rear_range,  # -2 to 2, but data is negated
+        tickmode='array', tickvals=[-2, -1, 0, 1, 2], ticktext=["-2", "-1", "0", "1", "2"],  # Left to right: -2 to 2
         showgrid=True, gridwidth=1, gridcolor='lightgrey',
         title_font=dict(size=14), tickfont=dict(size=12)
     )
