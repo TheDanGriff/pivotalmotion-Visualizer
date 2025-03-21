@@ -160,14 +160,14 @@ def main():
             align-items: center;
         }
         .player-team {
-            font-size: 48px; /* Increased size */
+            font-size: 48px;
             font-weight: bold;
-            color: #4682b4; /* Matches header */
+            color: #4682b4;
             margin: 0;
         }
         .job-details {
-            font-size: 36px; /* Increased size */
-            color: #4682b4; /* Matches header */
+            font-size: 36px;
+            color: #4682b4;
             margin-top: 15px;
         }
         .divider-space {
@@ -271,21 +271,20 @@ def main():
     # Display player, team, logo, and job details
     player_name = humanize_label(selected_job.get('PlayerName', 'Unknown'))
     team_name = humanize_label(selected_job.get('Team', 'N/A'))
-    # Map full team name to shorthand for logo file
     team_shorthand = next((key for key, value in TEAMS.items() if value.lower() == team_name.lower()), team_name.lower().replace(' ', '-'))
     logo_path = os.path.join("images", "teams", f"{team_shorthand}_logo.png")
     default_logo_path = os.path.join("images", "teams", "default.png")
 
-    # Use st.image with file bytes
+    # Use st.image with file bytes, removing 'format' parameter
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
             with open(logo_path, "rb") as f:
-                st.image(f.read(), width=80, caption=None, use_container_width=False, format="PNG")
+                st.image(f.read(), width=80, caption=None, use_container_width=False)
         except FileNotFoundError:
             try:
                 with open(default_logo_path, "rb") as f:
-                    st.image(f.read(), width=80, caption=f"Default Logo ({team_name})", use_container_width=False, format="PNG")
+                    st.image(f.read(), width=80, caption=f"Default Logo ({team_name})", use_container_width=False)
             except FileNotFoundError:
                 st.warning(f"Default logo not found in {default_logo_path}")
         st.markdown(
@@ -352,7 +351,6 @@ def main():
 def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_type):
     import streamlit as st
 
-    # Subtle Divider Line after header
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
 
     benchmarks = get_kpi_benchmarks()
@@ -371,7 +369,6 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         'Lateral Deviation': {'value': metrics.get('lateral_deviation', 0), 'min': -0.5, 'max': 0.5}
     }
 
-    # Precompute shot analysis to set indices
     if not df_ball.empty:
         try:
             fig_shot = plot_shot_analysis(df_ball, metrics)
@@ -381,7 +378,6 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
     else:
         fig_shot = None
 
-    # Section 1: Shot Location
     st.subheader("Shot Location")
     if not df_ball.empty:
         shot_location_fig = plot_shot_location(df_ball, metrics)
@@ -390,7 +386,6 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         st.error("No ball data available for shot location visualization.")
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
 
-    # Section 2: Main KPIs
     st.subheader("Key Performance Indicators")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -474,7 +469,6 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         )
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
 
-    # Section 3: Curvature Analysis
     st.subheader("Curvature Analysis")
     col_curv_left, col_curv_right = st.columns(2)
     with col_curv_left:
@@ -505,7 +499,6 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
     st.plotly_chart(fig_curvature, use_container_width=True)
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
 
-    # Section 4: Ball Path Analysis
     st.subheader("Ball Path Analysis")
     if not df_ball.empty:
         if fig_shot is not None:
@@ -516,7 +509,6 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         st.error("No ball data available for shot path visualization.")
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
 
-    # Section 5: 3D Ball Path
     st.subheader("3D Ball Path")
     if not df_ball.empty:
         try:
