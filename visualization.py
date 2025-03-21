@@ -513,6 +513,7 @@ def plot_shot_analysis(df_ball, metrics):
 
 
 
+
 def plot_foot_alignment(df):
     """Professional foot alignment visualization with error handling"""
     fig = go.Figure()

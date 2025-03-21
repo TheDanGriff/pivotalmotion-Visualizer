@@ -1321,10 +1321,13 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     from scipy.signal import savgol_filter
     from plotly.subplots import make_subplots
 
-    # Use stored indices from metrics
-    lift_idx = int(metrics.get('lift_idx', 0))
-    release_idx = int(metrics.get('release_idx', lift_idx + 1))
-    set_idx = int(metrics.get('set_idx', release_idx))  # Use set_idx from metrics, default to release_idx if missing
+    # Use stored indices from metrics with consistent keys
+    lift_idx = int(metrics.get('lift_frame', 0))
+    set_idx = int(metrics.get('set_frame', 0))  # Use set_frame, no default to release_idx
+    release_idx = int(metrics.get('release_frame', lift_idx + 1))
+
+    # Log indices for debugging
+    logger.debug(f"Curvature indices - lift_frame: {lift_idx}, set_frame: {set_idx}, release_frame: {release_idx}")
 
     # Extend range: 25% before lift and 25% after release
     lift_to_release_frames = release_idx - lift_idx
@@ -1339,7 +1342,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
 
     # Time parameterization
     t_fine = np.linspace(0, 1, num_interp)
-    t_percent = np.linspace(-25, 125, num_interp)  # -25% to 125% relative to lift-to-release
+    t_percent = np.linspace(-25, 125, num_interp)
 
     # Adjust phase positions: Lift at 0%, Release at 100%
     lift_position = 0
@@ -1372,7 +1375,6 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     P_side, _ = fit_bezier_curve(seg_x, seg_z, n=bezier_order)
     side_curve = bezier_curvature(P_side, t_fine, scale=curvature_scale / 12)
     
-    # Remove outliers: Cap at 3x median curvature (excluding first 1%)
     median_curvature = np.median(side_curve[int(num_interp * 0.01):])
     cap_value = min(3 * median_curvature, 0.5)
     side_curve = np.clip(side_curve, 0, cap_value)
@@ -1394,7 +1396,6 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     P_rear, _ = fit_bezier_curve(seg_y, seg_z, n=bezier_order)
     rear_curve = bezier_curvature(P_rear, t_fine, scale=curvature_scale / 12)
     
-    # Remove outliers: Cap at 3x median curvature (excluding first 1%)
     median_curvature = np.median(rear_curve[int(num_interp * 0.01):])
     cap_value = min(3 * median_curvature, 0.5)
     rear_curve = np.clip(rear_curve, 0, cap_value)
@@ -1420,9 +1421,9 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
         'release': 'dashdot'
     }
 
-    dummy_lift = go.Scatter(x=[None], y=[None], mode='lines', line=dict(color=COLOR_PALETTE['lift'], dash=DASH_STYLES['lift'], width=2), name=f"Lift (index: {lift_idx})")
-    dummy_set = go.Scatter(x=[None], y=[None], mode='lines', line=dict(color=COLOR_PALETTE['set'], dash=DASH_STYLES['set'], width=2), name=f"Set (index: {set_idx})")
-    dummy_release = go.Scatter(x=[None], y=[None], mode='lines', line=dict(color=COLOR_PALETTE['release'], dash=DASH_STYLES['release'], width=2), name=f"Release (index: {release_idx})")
+    dummy_lift = go.Scatter(x=[None], y=[None], mode='lines', line=dict(color=COLOR_PALETTE['lift'], dash=DASH_STYLES['lift'], width=2), name=f"Lift (frame: {lift_idx})")
+    dummy_set = go.Scatter(x=[None], y=[None], mode='lines', line=dict(color=COLOR_PALETTE['set'], dash=DASH_STYLES['set'], width=2), name=f"Set (frame: {set_idx})")
+    dummy_release = go.Scatter(x=[None], y=[None], mode='lines', line=dict(color=COLOR_PALETTE['release'], dash=DASH_STYLES['release'], width=2), name=f"Release (frame: {release_idx})")
     dummy_velocity = go.Scatter(x=[None], y=[None], mode='lines', line=dict(color=COLOR_PALETTE['velocity'], width=2), name="Velocity (ft/s)")
 
     fig = make_subplots(
