@@ -65,6 +65,40 @@ logging.basicConfig(level=logging.INFO)
 # Initialize AWS clients
 cognito_client, dynamodb, s3_client = initialize_aws_clients()
 
+# Teams Dictionary
+TEAMS = {
+    'hawks': 'Atlanta Hawks',
+    'nets': 'Brooklyn Nets',
+    'celtics': 'Boston Celtics',
+    'hornets': 'Charlotte Hornets',
+    'bulls': 'Chicago Bulls',
+    'cavaliers': 'Cleveland Cavaliers',
+    'mavericks': 'Dallas Mavericks',
+    'nuggets': 'Denver Nuggets',
+    'pistons': 'Detroit Pistons',
+    'warriors': 'Golden State Warriors',
+    'rockets': 'Houston Rockets',
+    'pacers': 'Indiana Pacers',
+    'clippers': 'Los Angeles Clippers',
+    'lakers': 'Los Angeles Lakers',
+    'grizzlies': 'Memphis Grizzlies',
+    'heat': 'Miami Heat',
+    'bucks': 'Milwaukee Bucks',
+    'timberwolves': 'Minnesota Timberwolves',
+    'pelicans': 'New Orleans Pelicans',
+    'knicks': 'New York Knicks',
+    'thunder': 'Oklahoma City Thunder',
+    'magic': 'Orlando Magic',
+    '76ers': 'Philadelphia 76ers',
+    'suns': 'Phoenix Suns',
+    'blazers': 'Portland Trail Blazers',
+    'kings': 'Sacramento Kings',
+    'spurs': 'San Antonio Spurs',
+    'raptors': 'Toronto Raptors',
+    'jazz': 'Utah Jazz',
+    'wizards': 'Washington Wizards'
+}
+
 def list_segments(s3_client, bucket_name, user_email, job_id):
     prefix = f"processed/{user_email}/{job_id}/"
     segments = set()
@@ -116,7 +150,7 @@ def main():
         .info-section {
             background: linear-gradient(135deg, #e0e0e0, #d0d0d0);
             border-radius: 8px;
-            padding: 15px;
+            padding: 20px;
             text-align: center;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             border: 1px solid #b0b0b0;
@@ -126,15 +160,15 @@ def main():
             align-items: center;
         }
         .player-team {
-            font-size: 28px;
+            font-size: 48px; /* Increased size */
             font-weight: bold;
-            color: #4682b4;
+            color: #4682b4; /* Matches header */
             margin: 0;
         }
         .job-details {
-            font-size: 20px;
-            color: #333333;
-            margin-top: 10px;
+            font-size: 36px; /* Increased size */
+            color: #4682b4; /* Matches header */
+            margin-top: 15px;
         }
         .divider-space {
             margin: 40px 0;
@@ -237,10 +271,12 @@ def main():
     # Display player, team, logo, and job details
     player_name = humanize_label(selected_job.get('PlayerName', 'Unknown'))
     team_name = humanize_label(selected_job.get('Team', 'N/A'))
-    logo_path = os.path.join("logos", f"{team_name.lower().replace(' ', '-')}.png")
-    default_logo_path = os.path.join("logos", "default.png")
+    # Map full team name to shorthand for logo file
+    team_shorthand = next((key for key, value in TEAMS.items() if value.lower() == team_name.lower()), team_name.lower().replace(' ', '-'))
+    logo_path = os.path.join("images", "teams", f"{team_shorthand}_logo.png")
+    default_logo_path = os.path.join("images", "teams", "default.png")
 
-    # Use st.image with file bytes for compatibility
+    # Use st.image with file bytes
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
@@ -249,9 +285,9 @@ def main():
         except FileNotFoundError:
             try:
                 with open(default_logo_path, "rb") as f:
-                    st.image(f.read(), width=80, caption="Default Logo", use_container_width=False, format="PNG")
+                    st.image(f.read(), width=80, caption=f"Default Logo ({team_name})", use_container_width=False, format="PNG")
             except FileNotFoundError:
-                st.warning("Default logo not found in logos/default.png")
+                st.warning(f"Default logo not found in {default_logo_path}")
         st.markdown(
             f"""
             <div class='info-section'>
