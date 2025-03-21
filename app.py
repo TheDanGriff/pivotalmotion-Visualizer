@@ -131,36 +131,135 @@ def format_source_type(source):
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Import Ageo font from Fontshare CDN and apply styling with snow white background
+    # Enhanced CSS for professional design
     st.markdown("""
         <style>
+        @import url('https://fonts.cdnfonts.com/css/ageo-personal-use'); /* Ageo from Fontshare */
+        
+        /* Header Styling */
         .metallic-header {
             background: #fffafa; /* Snow white */
-            color: #4682b4; /* Steel blue */
+            color: transparent; /* For gradient text */
+            background-clip: text;
+            -webkit-background-clip: text;
+            background-image: linear-gradient(135deg, #4682b4, #87ceeb); /* Gradient text */
             text-align: center;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            border: 1px solid #b0b0b0;
-            font-family: 'Roboto', 'Arial', sans-serif; /* Ageo with fallbacks */
-            font-size: 36px;
-            font-weight: bold;
+            padding: 20px 40px;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15), inset 0 1px 3px rgba(255, 255, 255, 0.5); /* Enhanced shadow */
+            border: 2px double #4682b4; /* Double border */
+            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif;
+            font-size: 42px; /* Slightly larger */
+            font-weight: 700;
             text-transform: uppercase;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
+            -webkit-text-stroke: 0.5px #4682b4; /* Subtle outline */
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
+            position: relative;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
+        .metallic-header:hover {
+            transform: translateY(-2px); /* Subtle lift on hover */
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2), inset 0 1px 3px rgba(255, 255, 255, 0.5);
+        }
+        .metallic-header::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: -20px;
+            right: -20px;
+            bottom: -20px;
+            background: radial-gradient(circle, rgba(70, 130, 180, 0.1) 0%, rgba(255, 250, 250, 0) 70%); /* Subtle glow */
+            z-index: -1;
+        }
+
+        /* Divider Styling */
         .divider-space {
             margin: 40px 0;
         }
         .subtle-divider {
-            border: 1px solid #e0e0e0;
+            border: none;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #4682b4, transparent); /* Gradient divider */
             margin: 20px 0;
+        }
+
+        /* Content Styling */
+        .team-name {
+            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif;
+            font-size: 36px !important;
+            font-weight: bold;
+            color: transparent;
+            background-clip: text;
+            -webkit-background-clip: text;
+            background-image: linear-gradient(135deg, #4682b4, #87ceeb);
+            text-transform: uppercase;
+            -webkit-text-stroke: 0.5px #4682b4;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
+            margin: 0;
+            line-height: 1.2;
+            word-wrap: break-word;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        .team-name:hover {
+            transform: scale(1.05); /* Slight scale on hover */
+        }
+        .player-name {
+            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif;
+            font-size: 36px !important;
+            color: transparent;
+            background-clip: text;
+            -webkit-background-clip: text;
+            background-image: linear-gradient(135deg, #4682b4, #87ceeb);
+            text-transform: uppercase;
+            -webkit-text-stroke: 0.5px #4682b4;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
+            margin: 20px 0;
+            line-height: 1.2;
+            word-wrap: break-word;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        .player-name:hover {
+            transform: scale(1.05);
+        }
+        .job-details {
+            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif;
+            font-size: 18px !important;
+            color: transparent;
+            background-clip: text;
+            -webkit-background-clip: text;
+            background-image: linear-gradient(135deg, #4682b4, #87ceeb);
+            text-transform: uppercase;
+            -webkit-text-stroke: 0.5px #4682b4;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
+            margin: 0;
+            line-height: 1.2;
+            word-wrap: break-word;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        .job-details:hover {
+            transform: scale(1.05);
+        }
+        .logo-img {
+            width: 150px;
+            height: auto;
+            margin-bottom: 30px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            border-radius: 50%; /* Circular logo */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Logo shadow */
+            transition: transform 0.3s ease;
+        }
+        .logo-img:hover {
+            transform: scale(1.1); /* Slight enlarge on hover */
         }
         </style>
         <h1 class='metallic-header'>Pivotal Motion Visualizer</h1>
         <div class='divider-space'></div>
     """, unsafe_allow_html=True)
-
-    st.markdown("<hr class='subtle-divider'>", unsafe_allow_html=True)
 
     if not st.session_state.get('authenticated', False):
         with st.form("login_form"):
@@ -251,7 +350,6 @@ def main():
     # Display player, team, logo, and job details
     player_name = humanize_label(selected_job.get('PlayerName', 'Unknown'))
     team_name_shorthand = humanize_label(selected_job.get('Team', 'N/A'))
-    # Get full team name from TEAMS dictionary
     team_name = next((value for key, value in TEAMS.items() if key.lower() == team_name_shorthand.lower() or value.lower() == team_name_shorthand.lower()), team_name_shorthand)
     team_shorthand = next((key for key, value in TEAMS.items() if value.lower() == team_name.lower()), team_name.lower().replace(' ', '-'))
     logo_path = os.path.join("images", "teams", f"{team_shorthand}_logo.png")
@@ -270,54 +368,6 @@ def main():
         except FileNotFoundError:
             logo_src = None
             st.warning(f"Default logo not found in {default_logo_path}")
-
-    # CSS for text styling matching metallic-header, no background box
-    st.markdown("""
-        <style>
-        .team-name {
-            font-family: 'Arial', sans-serif;
-            font-size: 36px !important; /* Larger with override */
-            font-weight: bold;
-            color: #000000;
-            text-transform: uppercase;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
-            margin: 0;
-            line-height: 1.2;
-            word-wrap: break-word;
-            text-align: center;
-        }
-        .player-name {
-            font-family: 'Arial', sans-serif;
-            font-size: 36px !important; /* Much larger, like a title, with override */
-            color: #000000;
-            text-transform: uppercase;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
-            margin: 20px 0;
-            line-height: 1.2;
-            word-wrap: break-word;
-            text-align: center;
-        }
-        .job-details {
-            font-family: 'Arial', sans-serif;
-            font-size: 18px !important; /* Larger with override */
-            color: #000000;
-            text-transform: uppercase;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
-            margin: 0;
-            line-height: 1.2;
-            word-wrap: break-word;
-            text-align: center;
-        }
-        .logo-img {
-            width: 150px;
-            height: auto;
-            margin-bottom: 30px;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        </style>
-    """, unsafe_allow_html=True)
 
     # Display content without a background box
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -397,6 +447,7 @@ def main():
 def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_type):
     import streamlit as st
 
+    st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
 
     benchmarks = get_kpi_benchmarks()
     player_averages = get_player_kpi_averages(player_name, shot_type)
