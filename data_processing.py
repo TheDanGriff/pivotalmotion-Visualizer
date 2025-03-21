@@ -1324,14 +1324,7 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     # Use stored indices from metrics
     lift_idx = int(metrics.get('lift_idx', 0))
     release_idx = int(metrics.get('release_idx', lift_idx + 1))
-
-    # Calculate set_idx as minimum X position, matching plot_shot_analysis
-    candidate_set_window = df_ball.iloc[lift_idx:release_idx + 1]
-    if not candidate_set_window.empty:
-        set_idx = candidate_set_window['Basketball_X_ft'].idxmin()
-    else:
-        set_idx = release_idx
-    logger.debug(f"Set_idx redefined as minimum X position: {set_idx}")
+    set_idx = int(metrics.get('set_idx', release_idx))  # Use set_idx from metrics, default to release_idx if missing
 
     # Extend range: 25% before lift and 25% after release
     lift_to_release_frames = release_idx - lift_idx
@@ -1349,13 +1342,13 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     t_percent = np.linspace(-25, 125, num_interp)  # -25% to 125% relative to lift-to-release
 
     # Adjust phase positions: Lift at 0%, Release at 100%
-    lift_position = 0  # Lift at 0%
-    release_position = 100  # Release at 100%
-    set_position = ((set_idx - lift_idx) / lift_to_release_frames * 100) if lift_to_release_frames > 0 else 50  # Set relative to lift-to-release
-    pre_lift_fraction = extra_frames / total_frames * 150  # Convert pre-lift frames to percentage of total range
-    lift_t = -25 + pre_lift_fraction  # Adjust lift position to 0%
-    set_t = lift_t + set_position  # Scale set position
-    release_t = lift_t + release_position  # Release at 100%
+    lift_position = 0
+    release_position = 100
+    set_position = ((set_idx - lift_idx) / lift_to_release_frames * 100) if lift_to_release_frames > 0 else 50
+    pre_lift_fraction = extra_frames / total_frames * 150
+    lift_t = -25 + pre_lift_fraction
+    set_t = lift_t + set_position
+    release_t = lift_t + release_position
 
     # Velocity
     velocity_segment = df_ball['velocity_magnitude'].iloc[start_idx:end_idx].to_numpy() * INCHES_TO_FEET

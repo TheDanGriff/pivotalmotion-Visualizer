@@ -255,6 +255,9 @@ def plot_shot_analysis(df_ball, metrics):
         set_idx = release_idx
     logger.debug(f"Set_idx redefined as minimum X position between {set_window_start} and {set_window_end}: {set_idx}")
 
+    # Store set_idx in metrics for use in other functions
+    metrics['set_idx'] = set_idx
+
     # --- SIDE VIEW ---
     traj_x = get_slice(df_ball, 'Basketball_X_ft', lift_idx, release_idx + 1)
     traj_z = get_slice(df_ball, 'Basketball_Z_ft', lift_idx, release_idx + 1, clip_min=2, clip_max=11)
@@ -306,7 +309,7 @@ def plot_shot_analysis(df_ball, metrics):
     traj_y = get_slice(df_ball, 'Basketball_Y_ft', lift_idx, release_idx + 1)
     traj_z_rear = traj_z
     traj_v_rear = traj_v
-    rear_range = [-2, 2]  # Keep standard range for axis
+    rear_range = [-2, 2]
     if len(traj_y) > 0 and len(traj_z_rear) > 0 and len(traj_v_rear) > 0:
         min_len = min(len(traj_y), len(traj_z_rear), len(traj_v_rear))
         traj_y = -traj_y[:min_len]  # Negate to flip direction
@@ -467,8 +470,8 @@ def plot_shot_analysis(df_ball, metrics):
     )
     fig.update_xaxes(
         title_text="Lateral Position (ft)", row=1, col=2,
-        range=rear_range,  # -2 to 2, but data is negated
-        tickmode='array', tickvals=[-2, -1, 0, 1, 2], ticktext=["-2", "-1", "0", "1", "2"],  # Left to right: -2 to 2
+        range=rear_range,
+        tickmode='array', tickvals=[-2, -1, 0, 1, 2], ticktext=["-2", "-1", "0", "1", "2"],
         showgrid=True, gridwidth=1, gridcolor='lightgrey',
         title_font=dict(size=14), tickfont=dict(size=12)
     )
