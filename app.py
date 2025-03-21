@@ -238,15 +238,20 @@ def main():
     player_name = humanize_label(selected_job.get('PlayerName', 'Unknown'))
     team_name = humanize_label(selected_job.get('Team', 'N/A'))
     logo_path = os.path.join("logos", f"{team_name.lower().replace(' ', '-')}.png")
-    default_logo_path = os.path.join("logos", "default.png")  # Fallback logo
+    default_logo_path = os.path.join("logos", "default.png")
 
-    # Use st.image for local logo files
-    col1, col2, col3 = st.columns([1, 2, 1])  # Center the content with empty columns
+    # Use st.image with file bytes for compatibility
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if os.path.exists(logo_path):
-            st.image(logo_path, width=80, caption=None, use_column_width=False)
-        else:
-            st.image(default_logo_path, width=80, caption="Default Logo", use_column_width=False)
+        try:
+            with open(logo_path, "rb") as f:
+                st.image(f.read(), width=80, caption=None, use_container_width=False, format="PNG")
+        except FileNotFoundError:
+            try:
+                with open(default_logo_path, "rb") as f:
+                    st.image(f.read(), width=80, caption="Default Logo", use_container_width=False, format="PNG")
+            except FileNotFoundError:
+                st.warning("Default logo not found in logos/default.png")
         st.markdown(
             f"""
             <div class='info-section'>
