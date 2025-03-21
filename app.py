@@ -5,6 +5,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import os
+import base64  # Added for base64 encoding
 
 from auth import handle_login
 from aws_client import initialize_aws_clients
@@ -130,7 +131,7 @@ def format_source_type(source):
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Custom CSS for metallic styling with updated sizes and black outline
+    # Custom CSS for metallic styling
     st.markdown("""
         <style>
         .metallic-header {
@@ -146,35 +147,6 @@ def main():
             font-weight: bold;
             text-transform: uppercase;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
-        }
-        .info-section {
-            background: linear-gradient(135deg, #e0e0e0, #d0d0d0);
-            border-radius: 10px;
-            padding: 40px; /* Increased padding for larger content */
-            text-align: center;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            border: 3px solid #000000;
-            margin-top: 20px;
-            width: 100%; /* Full width within column */
-            box-sizing: border-box; /* Include padding/border in width */
-        }
-        .player-team {
-            font-size: 120px; /* Significantly larger */
-            font-weight: bold;
-            color: #000000;
-            margin: 0;
-            line-height: 1.2; /* Adjust line height for readability */
-        }
-        .job-details {
-            font-size: 100px; /* Significantly larger */
-            color: #000000;
-            margin-top: 30px; /* Increased spacing */
-            line-height: 1.2;
-        }
-        .logo-container {
-            display: flex;
-            justify-content: center; /* Center horizontally */
-            margin-bottom: 30px; /* Increased space below logo */
         }
         .divider-space {
             margin: 40px 0;
@@ -281,31 +253,82 @@ def main():
     logo_path = os.path.join("images", "teams", f"{team_shorthand}_logo.png")
     default_logo_path = os.path.join("images", "teams", "default.png")
 
-    # Use st.image with file bytes, centered within the bordered box
+    # Load and encode logo as base64
+    try:
+        with open(logo_path, "rb") as f:
+            logo_data = base64.b64encode(f.read()).decode("utf-8")
+        logo_src = f"data:image/png;base64,{logo_data}"
+    except FileNotFoundError:
+        try:
+            with open(default_logo_path, "rb") as f:
+                logo_data = base64.b64encode(f.read()).decode("utf-8")
+            logo_src = f"data:image/png;base64,{logo_data}"
+        except FileNotFoundError:
+            logo_src = None
+            st.warning(f"Default logo not found in {default_logo_path}")
+
+    # CSS for the info section
+    st.markdown("""
+        <style>
+        .info-section {
+            background: linear-gradient(135deg, #e0e0e0, #d0d0d0);
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border: 3px solid #000000;
+            margin-top: 20px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .player-team {
+            font-size: 120px;
+            font-weight: bold;
+            color: #000000;
+            margin: 0;
+            line-height: 1.2;
+            word-wrap: break-word;
+        }
+        .job-details {
+            font-size: 100px;
+            color: #000000;
+            margin-top: 30px;
+            line-height: 1.2;
+            word-wrap: break-word;
+        }
+        .logo-img {
+            width: 150px;
+            height: auto;
+            margin-bottom: 30px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Display all content within a single centered box
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("""
-            <div class='info-section'>
-        """, unsafe_allow_html=True)
-        st.markdown("<div class='logo-container'>", unsafe_allow_html=True)
-        try:
-            with open(logo_path, "rb") as f:
-                st.image(f.read(), width=150, caption=None, use_container_width=False)
-        except FileNotFoundError:
-            try:
-                with open(default_logo_path, "rb") as f:
-                    st.image(f.read(), width=150, caption=f"Default Logo ({team_name})", use_container_width=False)
-            except FileNotFoundError:
-                st.warning(f"Default logo not found in {default_logo_path}")
-        st.markdown("</div>", unsafe_allow_html=True)  # Close logo-container
-        st.markdown(
-            f"""
-            <p class='player-team'>{player_name} - {team_name}</p>
-            <p class='job-details'>{segment_number} | Period: {period} | Clock: {clock} | {shot_display}</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+        if logo_src:
+            st.markdown(
+                f"""
+                <div class='info-section'>
+                    <img src="{logo_src}" class='logo-img'>
+                    <p class='player-team'>{player_name} - {team_name}</p>
+                    <p class='job-details'>{segment_number} | Period: {period} | Clock: {clock} | {shot_display}</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                f"""
+                <div class='info-section'>
+                    <p>No logo available</p>
+                    <p class='player-team'>{player_name} - {team_name}</p>
+                    <p class='job-details'>{segment_number} | Period: {period} | Clock: {clock} | {shot_display}</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
     st.markdown("<hr class='subtle-divider'>", unsafe_allow_html=True)
 
     # Load segment data
@@ -640,7 +663,7 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
 
     if not df_pose.empty and release_idx < len(df_pose):
         frame_data = df_pose.iloc[release_idx]
-        st.subheader("Body Alignment Visual")
+        st.subheader("Body Alignment Visuals")
         col1, col2 = st.columns(2)
         with col1:
             st.write("Body Alignment (Feet, Hips, Shoulders)")
