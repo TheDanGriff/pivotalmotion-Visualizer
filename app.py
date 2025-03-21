@@ -96,6 +96,9 @@ def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     st.markdown("<h1 style='text-align: center;'>Pivotal Motion Visualizer</h1>", unsafe_allow_html=True)
 
+    # Subtle Divider Line
+    st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
+
     if not st.session_state.get('authenticated', False):
         with st.form("login_form"):
             st.header("Login")
@@ -173,21 +176,19 @@ def main():
         return
 
     selected_segment = segments[0]  # Take the first (and only) segment
-    segment_label = get_segment_label(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment, selected_job['Source'])
+    segment_label = humanize_segment_label(get_segment_label(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment, selected_job['Source']))
 
-    # Parse segment label (assuming format: "Period: X | Clock: HH:MM | Outcome: Y")
+    # Parse segment label using previous logic (assumes format like "1/1 | Period: 2 | Clock: 07:58 | 3 Point")
     parts = segment_label.split(" | ")
-    period = parts[0].replace("Period: ", "") if len(parts) > 0 and "Period: " in parts[0] else "N/A"
-    clock = parts[1].replace("Clock: ", "") if len(parts) > 1 and "Clock: " in parts[1] else "N/A"
-    shot_display = shot_type if shot_type in ["3 Point", "Free Throw", "Mid-Range"] else "Unknown"
+    segment_number = parts[0] if len(parts) > 0 else "1/1"
+    period = parts[1].replace("Period: ", "") if len(parts) > 1 and "Period: " in parts[1] else "N/A"
+    clock = parts[2].replace("Clock: ", "") if len(parts) > 2 and "Clock: " in parts[2] else "N/A"
+    shot_display = parts[3] if len(parts) > 3 else shot_type if shot_type in ["3 Point", "Free Throw", "Mid-Range"] else "Unknown"
 
-    # Display team logo
+    # Display segment details centered below logo
     show_brand_header(selected_job.get('PlayerName', ''), selected_job.get('Team', ''))
-
-    # Display segment header centered below logo
     st.markdown(
-        f"<h3 style='text-align: center;'>Select Segment</h3>"
-        f"<p style='text-align: center;'><strong>1/1 | Period: {period} | Clock: {clock} | {shot_display}</strong></p>",
+        f"<p style='text-align: center;'><strong>{segment_number} | Period: {period} | Clock: {clock} | {shot_display}</strong></p>",
         unsafe_allow_html=True
     )
 
