@@ -129,10 +129,10 @@ def format_source_type(source):
     return source.replace('_', ' ').title()
 
 def main():
-    st.set_page_config(page_title="ShotMetrics", layout="wide")
+    st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Load and encode logo for sidebar and login page
-    logo_path = os.path.join("pivotalmotion-Visualizer", "images", "HeartLogoBorder.jpeg")
+    # Load and encode logo
+    logo_path = os.path.join("images", "HeartLogoBorder.jpeg")  # Corrected path
     try:
         with open(logo_path, "rb") as f:
             logo_data = base64.b64encode(f.read()).decode("utf-8")
@@ -141,10 +141,10 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with red (#D12026), dark grey (#2E3E4F), and Oswald font
+    # Enhanced CSS with red-to-grey gradient sidebar, updated title, and Oswald font
     st.markdown("""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap'); /* Oswald from Google Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
 
         /* No border around the app */
         .stApp {
@@ -152,19 +152,19 @@ def main():
             background: #ffffff;
         }
 
-        /* Sidebar styling with red gradient and dark grey accent */
+        /* Sidebar styling with red-to-grey gradient */
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #D12026 0%, #A6191F 100%); /* Red gradient */
+            background: linear-gradient(180deg, #D12026 0%, #2E3E4F 100%); /* Red to dark grey */
             padding: 20px;
-            border-right: 2px solid #2E3E4F; /* Dark grey accent */
+            border-right: 2px solid #2E3E4F;
             box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
             border-radius: 0 10px 10px 0;
         }
         [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
         [data-testid="stSidebar"] .css-17eq0hr:not(:nth-child(3)) /* All text except email */ {
-            color: #fffafa !important;
+            color: #ffffff !important; /* White for better contrast */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.3); /* Darker background for contrast */
             padding: 8px 12px;
             border-radius: 5px;
             margin: 5px 0;
@@ -174,7 +174,7 @@ def main():
         [data-testid="stSidebar"] .css-17eq0hr:nth-child(3) /* Email text */ {
             color: #ff4500 !important; /* Neon red/dark orange */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.3);
             padding: 8px 12px;
             border-radius: 5px;
             margin: 5px 0;
@@ -183,10 +183,10 @@ def main():
         }
         [data-testid="stSidebar"] .css-1d391kg:hover,
         [data-testid="stSidebar"] .css-17eq0hr:hover {
-            background: rgba(255, 255, 255, 0.3);
+            background: rgba(0, 0, 0, 0.4);
         }
         [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox */ {
-            background: rgba(209, 32, 38, 0.8); /* Slightly darker red */
+            background: rgba(209, 32, 38, 0.8);
             color: #ffffff;
             border-radius: 8px;
             padding: 5px;
@@ -199,13 +199,10 @@ def main():
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
         }
 
-        /* Header Styling */
+        /* Header Styling with red background */
         .metallic-header {
-            background: #fffafa;
-            color: transparent;
-            background-clip: text;
-            -webkit-background-clip: text;
-            background-image: linear-gradient(135deg, #D12026, #FF4047); /* Red gradient */
+            background: #D12026; /* Red background */
+            color: #FFFFFF; /* White lettering */
             text-align: center;
             padding: 20px 40px;
             border-radius: 12px;
@@ -214,9 +211,6 @@ def main():
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
             font-size: 42px;
             font-weight: 700;
-            text-transform: uppercase;
-            -webkit-text-stroke: 0.5px #D12026;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             position: relative;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
@@ -242,7 +236,7 @@ def main():
         .subtle-divider {
             border: none;
             height: 2px;
-            background: linear-gradient(to right, transparent, #D12026, transparent); /* Red */
+            background: linear-gradient(to right, transparent, #D12026, transparent);
             margin: 20px 0;
         }
 
@@ -254,7 +248,7 @@ def main():
             color: transparent;
             background-clip: text;
             -webkit-background-clip: text;
-            background-image: linear-gradient(135deg, #D12026, #FF4047); /* Red gradient */
+            background-image: linear-gradient(135deg, #D12026, #FF4047);
             text-transform: uppercase;
             -webkit-text-stroke: 0.5px #D12026;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
@@ -273,7 +267,7 @@ def main():
             color: transparent;
             background-clip: text;
             -webkit-background-clip: text;
-            background-image: linear-gradient(135deg, #D12026, #FF4047); /* Red gradient */
+            background-image: linear-gradient(135deg, #D12026, #FF4047);
             text-transform: uppercase;
             -webkit-text-stroke: 0.5px #D12026;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
@@ -292,7 +286,7 @@ def main():
             color: transparent;
             background-clip: text;
             -webkit-background-clip: text;
-            background-image: linear-gradient(135deg, #D12026, #FF4047); /* Red gradient */
+            background-image: linear-gradient(135deg, #D12026, #FF4047);
             text-transform: uppercase;
             -webkit-text-stroke: 0.5px #D12026;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
@@ -306,7 +300,7 @@ def main():
             font-family: 'Arial', sans-serif;
             -webkit-text-stroke: 0px;
             background: none;
-            color: #D12026; /* Red for numbers */
+            color: #D12026;
         }
         .job-details:hover {
             transform: scale(1.05);
