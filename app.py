@@ -129,12 +129,22 @@ def format_source_type(source):
     return source.replace('_', ' ').title()
 
 def main():
-    st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
+    st.set_page_config(page_title="ShotMetrics", layout="wide")
     
-    # Enhanced CSS without app border and with neon red/dark orange email
+    # Load and encode logo for sidebar and login page
+    logo_path = os.path.join("pivotalmotion-Visualizer", "images", "HeartLogoBorder.jpeg")
+    try:
+        with open(logo_path, "rb") as f:
+            logo_data = base64.b64encode(f.read()).decode("utf-8")
+        logo_src = f"data:image/jpeg;base64,{logo_data}"
+    except FileNotFoundError:
+        logo_src = None
+        st.warning(f"Logo not found at {logo_path}")
+
+    # Enhanced CSS with red (#D12026), dark grey (#2E3E4F), and Oswald font
     st.markdown("""
         <style>
-        @import url('https://fonts.cdnfonts.com/css/ageo-personal-use'); /* Ageo from Fontshare */
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap'); /* Oswald from Google Fonts */
 
         /* No border around the app */
         .stApp {
@@ -142,18 +152,18 @@ def main():
             background: #ffffff;
         }
 
-        /* Sidebar styling with gradient and shadow */
+        /* Sidebar styling with red gradient and dark grey accent */
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #87ceeb 0%, #4682b4 100%);
+            background: linear-gradient(180deg, #D12026 0%, #A6191F 100%); /* Red gradient */
             padding: 20px;
-            border-right: 2px solid #b0e0e6;
+            border-right: 2px solid #2E3E4F; /* Dark grey accent */
             box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
             border-radius: 0 10px 10px 0;
         }
         [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
         [data-testid="stSidebar"] .css-17eq0hr:not(:nth-child(3)) /* All text except email */ {
             color: #fffafa !important;
-            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif !important;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             background: rgba(255, 255, 255, 0.2);
             padding: 8px 12px;
             border-radius: 5px;
@@ -163,7 +173,7 @@ def main():
         }
         [data-testid="stSidebar"] .css-17eq0hr:nth-child(3) /* Email text */ {
             color: #ff4500 !important; /* Neon red/dark orange */
-            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif !important;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             background: rgba(255, 255, 255, 0.2);
             padding: 8px 12px;
             border-radius: 5px;
@@ -176,7 +186,7 @@ def main():
             background: rgba(255, 255, 255, 0.3);
         }
         [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox */ {
-            background: rgba(176, 224, 230, 0.8);
+            background: rgba(209, 32, 38, 0.8); /* Slightly darker red */
             color: #ffffff;
             border-radius: 8px;
             padding: 5px;
@@ -195,17 +205,17 @@ def main():
             color: transparent;
             background-clip: text;
             -webkit-background-clip: text;
-            background-image: linear-gradient(135deg, #4682b4, #87ceeb);
+            background-image: linear-gradient(135deg, #D12026, #FF4047); /* Red gradient */
             text-align: center;
             padding: 20px 40px;
             border-radius: 12px;
             box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15), inset 0 1px 3px rgba(255, 255, 255, 0.5);
-            border: 2px double #4682b4;
-            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif;
+            border: 2px double #2E3E4F; /* Dark grey accent */
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
             font-size: 42px;
             font-weight: 700;
             text-transform: uppercase;
-            -webkit-text-stroke: 0.5px #4682b4;
+            -webkit-text-stroke: 0.5px #D12026;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             position: relative;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -221,7 +231,7 @@ def main():
             left: -20px;
             right: -20px;
             bottom: -20px;
-            background: radial-gradient(circle, rgba(70, 130, 180, 0.1) 0%, rgba(255, 250, 250, 0) 70%);
+            background: radial-gradient(circle, rgba(209, 32, 38, 0.1) 0%, rgba(255, 250, 250, 0) 70%);
             z-index: -1;
         }
 
@@ -232,21 +242,21 @@ def main():
         .subtle-divider {
             border: none;
             height: 2px;
-            background: linear-gradient(to right, transparent, #4682b4, transparent);
+            background: linear-gradient(to right, transparent, #D12026, transparent); /* Red */
             margin: 20px 0;
         }
 
         /* Content Styling */
         .team-name {
-            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
             font-size: 36px !important;
             font-weight: bold;
             color: transparent;
             background-clip: text;
             -webkit-background-clip: text;
-            background-image: linear-gradient(135deg, #4682b4, #87ceeb);
+            background-image: linear-gradient(135deg, #D12026, #FF4047); /* Red gradient */
             text-transform: uppercase;
-            -webkit-text-stroke: 0.5px #4682b4;
+            -webkit-text-stroke: 0.5px #D12026;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             margin: 0;
             line-height: 1.2;
@@ -258,14 +268,14 @@ def main():
             transform: scale(1.05);
         }
         .player-name {
-            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
             font-size: 36px !important;
             color: transparent;
             background-clip: text;
             -webkit-background-clip: text;
-            background-image: linear-gradient(135deg, #4682b4, #87ceeb);
+            background-image: linear-gradient(135deg, #D12026, #FF4047); /* Red gradient */
             text-transform: uppercase;
-            -webkit-text-stroke: 0.5px #4682b4;
+            -webkit-text-stroke: 0.5px #D12026;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             margin: 20px 0;
             line-height: 1.2;
@@ -277,14 +287,14 @@ def main():
             transform: scale(1.05);
         }
         .job-details {
-            font-family: 'Ageo Personal Use', 'Roboto', 'Arial', sans-serif;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
             font-size: 18px !important;
             color: transparent;
             background-clip: text;
             -webkit-background-clip: text;
-            background-image: linear-gradient(135deg, #4682b4, #87ceeb);
+            background-image: linear-gradient(135deg, #D12026, #FF4047); /* Red gradient */
             text-transform: uppercase;
-            -webkit-text-stroke: 0.5px #4682b4;
+            -webkit-text-stroke: 0.5px #D12026;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             margin: 0;
             line-height: 1.2;
@@ -296,7 +306,7 @@ def main():
             font-family: 'Arial', sans-serif;
             -webkit-text-stroke: 0px;
             background: none;
-            color: #4682b4;
+            color: #D12026; /* Red for numbers */
         }
         .job-details:hover {
             transform: scale(1.05);
@@ -316,12 +326,33 @@ def main():
             transform: scale(1.1);
         }
         </style>
-        <h1 class='metallic-header'>Pivotal Motion Visualizer</h1>
-        <div class='divider-space'></div>
     """, unsafe_allow_html=True)
+
+    # Display logo at the top of the page
+    if logo_src:
+        st.markdown(
+            f"""
+            <div style='text-align: center; margin-bottom: 20px;'>
+                <img src="{logo_src}" style='width: 100px; height: auto;'>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    st.markdown("<h1 class='metallic-header'>ShotMetrics</h1>", unsafe_allow_html=True)
+    st.markdown("<div class='divider-space'></div>", unsafe_allow_html=True)
 
     if not st.session_state.get('authenticated', False):
         with st.form("login_form"):
+            # Display logo on login page
+            if logo_src:
+                st.markdown(
+                    f"""
+                    <div style='text-align: center; margin-bottom: 20px;'>
+                        <img src="{logo_src}" style='width: 100px; height: auto;'>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
             st.header("Login")
             email = st.text_input("Email")
             password = st.text_input("Password", type="password")
@@ -330,6 +361,16 @@ def main():
             handle_login(cognito_client, get_username_by_email, email, password)
         return
     else:
+        # Add logo to sidebar
+        if logo_src:
+            st.sidebar.markdown(
+                f"""
+                <div style='text-align: center; margin-bottom: 20px;'>
+                    <img src="{logo_src}" style='width: 80px; height: auto;'>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
         st.sidebar.header("User Information")
         st.sidebar.write(f"**Username:** {st.session_state['username']}")
         st.sidebar.write(f"**Email:** {st.session_state['user_email']}")
@@ -414,19 +455,19 @@ def main():
     logo_path = os.path.join("images", "teams", f"{team_shorthand}_logo.png")
     default_logo_path = os.path.join("images", "teams", "default.png")
 
-    # Load and encode logo as base64
+    # Load and encode team logo as base64
     try:
         with open(logo_path, "rb") as f:
             logo_data = base64.b64encode(f.read()).decode("utf-8")
-        logo_src = f"data:image/png;base64,{logo_data}"
+        team_logo_src = f"data:image/png;base64,{logo_data}"
     except FileNotFoundError:
         try:
             with open(default_logo_path, "rb") as f:
                 logo_data = base64.b64encode(f.read()).decode("utf-8")
-            logo_src = f"data:image/png;base64,{logo_data}"
+            team_logo_src = f"data:image/png;base64,{logo_data}"
         except FileNotFoundError:
-            logo_src = None
-            st.warning(f"Default logo not found in {default_logo_path}")
+            team_logo_src = None
+            st.warning(f"Team logo not found in {default_logo_path}")
 
     # Format job details with numbers in Arial
     job_details_html = ""
@@ -439,10 +480,10 @@ def main():
     # Display content without a background box
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if logo_src:
+        if team_logo_src:
             st.markdown(
                 f"""
-                <img src="{logo_src}" class='logo-img'>
+                <img src="{team_logo_src}" class='logo-img'>
                 <p class='team-name'>{team_name}</p>
                 <p class='player-name'>{player_name}</p>
                 <p class='job-details'>{job_details_html}</p>
