@@ -131,17 +131,17 @@ def format_source_type(source):
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Load and encode logo
-    logo_path = os.path.join("images", "HeartLogoBorder.jpeg")  # Corrected path
+    # Load and encode new logo
+    logo_path = os.path.join("images", "redheart.png")  # Updated to redheart.png
     try:
         with open(logo_path, "rb") as f:
             logo_data = base64.b64encode(f.read()).decode("utf-8")
-        logo_src = f"data:image/jpeg;base64,{logo_data}"
+        logo_src = f"data:image/png;base64,{logo_data}"
     except FileNotFoundError:
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with red-to-grey gradient sidebar, updated title, and Oswald font
+    # Enhanced CSS with updated sidebar and header
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -154,7 +154,7 @@ def main():
 
         /* Sidebar styling with red-to-grey gradient */
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #D12026 0%, #2E3E4F 100%); /* Red to dark grey */
+            background: linear-gradient(180deg, #D12026 0%, #2E3E4F 100%);
             padding: 20px;
             border-right: 2px solid #2E3E4F;
             box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
@@ -162,10 +162,11 @@ def main():
         }
         [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
         [data-testid="stSidebar"] .css-17eq0hr:not(:nth-child(3)) /* All text except email */ {
-            color: #ffffff !important; /* White for better contrast */
+            color: #FFFFFF !important; /* White for contrast */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            background: rgba(0, 0, 0, 0.3); /* Darker background for contrast */
-            padding: 8px 12px;
+            font-size: 24px !important; /* Larger font size */
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px 14px; /* Larger padding */
             border-radius: 5px;
             margin: 5px 0;
             display: inline-block;
@@ -174,8 +175,9 @@ def main():
         [data-testid="stSidebar"] .css-17eq0hr:nth-child(3) /* Email text */ {
             color: #ff4500 !important; /* Neon red/dark orange */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 24px !important; /* Larger font size */
             background: rgba(0, 0, 0, 0.3);
-            padding: 8px 12px;
+            padding: 10px 14px;
             border-radius: 5px;
             margin: 5px 0;
             display: inline-block;
@@ -187,9 +189,11 @@ def main():
         }
         [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox */ {
             background: rgba(209, 32, 38, 0.8);
-            color: #ffffff;
+            color: #FFFFFF;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 20px !important; /* Larger font size */
             border-radius: 8px;
-            padding: 5px;
+            padding: 8px;
             margin: 5px 0;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -199,24 +203,30 @@ def main():
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
         }
 
-        /* Header Styling with red background */
+        /* Header Styling with larger red box */
         .metallic-header {
-            background: #D12026; /* Red background */
-            color: #FFFFFF; /* White lettering */
+            background: #D12026;
+            color: #FFFFFF;
             text-align: center;
-            padding: 20px 40px;
-            border-radius: 12px;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15), inset 0 1px 3px rgba(255, 255, 255, 0.5);
-            border: 2px double #2E3E4F; /* Dark grey accent */
+            padding: 30px 50px; /* Larger padding */
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.5);
+            border: 2px double #2E3E4F;
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
-            font-size: 42px;
+            font-size: 48px; /* Larger font size */
             font-weight: 700;
             position: relative;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 1200px; /* Wider box */
+            margin: 0 auto;
         }
         .metallic-header:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2), inset 0 1px 3px rgba(255, 255, 255, 0.5);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25), inset 0 2px 4px rgba(255, 255, 255, 0.5);
         }
         .metallic-header::before {
             content: '';
@@ -322,17 +332,19 @@ def main():
         </style>
     """, unsafe_allow_html=True)
 
-    # Display logo at the top of the page
+    # Display logo and title in a professional header on main page
     if logo_src:
         st.markdown(
             f"""
-            <div style='text-align: center; margin-bottom: 20px;'>
-                <img src="{logo_src}" style='width: 100px; height: auto;'>
+            <div style='display: flex; align-items: center; justify-content: center; width: 100%; max-width: 1200px; margin: 0 auto;'>
+                <img src="{logo_src}" style='width: 150px; height: auto; margin-right: 20px;'>
+                <h1 class='metallic-header' style='flex-grow: 1; margin: 0;'>ShotMetrics</h1>
             </div>
             """,
             unsafe_allow_html=True
         )
-    st.markdown("<h1 class='metallic-header'>ShotMetrics</h1>", unsafe_allow_html=True)
+    else:
+        st.markdown("<h1 class='metallic-header'>ShotMetrics</h1>", unsafe_allow_html=True)
     st.markdown("<div class='divider-space'></div>", unsafe_allow_html=True)
 
     if not st.session_state.get('authenticated', False):
@@ -355,12 +367,12 @@ def main():
             handle_login(cognito_client, get_username_by_email, email, password)
         return
     else:
-        # Add logo to sidebar
+        # Add larger logo to sidebar
         if logo_src:
             st.sidebar.markdown(
                 f"""
                 <div style='text-align: center; margin-bottom: 20px;'>
-                    <img src="{logo_src}" style='width: 80px; height: auto;'>
+                    <img src="{logo_src}" style='width: 120px; height: auto;'>
                 </div>
                 """,
                 unsafe_allow_html=True
