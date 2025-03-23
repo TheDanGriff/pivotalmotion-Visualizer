@@ -132,7 +132,7 @@ def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
     # Load and encode new logo
-    logo_path = os.path.join("images", "redheart.png")  # Updated to redheart.png
+    logo_path = os.path.join("images", "redheart.png")
     try:
         with open(logo_path, "rb") as f:
             logo_data = base64.b64encode(f.read()).decode("utf-8")
@@ -141,7 +141,7 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with updated sidebar and header
+    # Enhanced CSS with updated sidebar and full-width metallic header
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -164,9 +164,9 @@ def main():
         [data-testid="stSidebar"] .css-17eq0hr:not(:nth-child(3)) /* All text except email */ {
             color: #FFFFFF !important; /* White for contrast */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            font-size: 24px !important; /* Larger font size */
+            font-size: 24px !important;
             background: rgba(0, 0, 0, 0.3);
-            padding: 10px 14px; /* Larger padding */
+            padding: 10px 14px;
             border-radius: 5px;
             margin: 5px 0;
             display: inline-block;
@@ -175,7 +175,7 @@ def main():
         [data-testid="stSidebar"] .css-17eq0hr:nth-child(3) /* Email text */ {
             color: #ff4500 !important; /* Neon red/dark orange */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            font-size: 24px !important; /* Larger font size */
+            font-size: 24px !important;
             background: rgba(0, 0, 0, 0.3);
             padding: 10px 14px;
             border-radius: 5px;
@@ -189,9 +189,9 @@ def main():
         }
         [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox */ {
             background: rgba(209, 32, 38, 0.8);
-            color: #FFFFFF;
+            color: #FFFFFF !important; /* White text */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            font-size: 20px !important; /* Larger font size */
+            font-size: 20px !important;
             border-radius: 8px;
             padding: 8px;
             margin: 5px 0;
@@ -203,26 +203,32 @@ def main():
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
         }
 
-        /* Header Styling with larger red box */
+        /* Full-width header with red-to-grey gradient and metallic text */
         .metallic-header {
-            background: #D12026;
-            color: #FFFFFF;
+            background: linear-gradient(135deg, #D12026 0%, #2E3E4F 100%); /* Red-to-dark-grey gradient */
+            color: transparent;
+            background-clip: text;
+            -webkit-background-clip: text;
+            background-image: linear-gradient(135deg, #FFFFFF, #D3D3D3); /* Metallic gradient text */
             text-align: center;
-            padding: 30px 50px; /* Larger padding */
-            border-radius: 15px;
+            padding: 30px 50px;
+            border-radius: 0; /* No rounding for full width */
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.5);
-            border: 2px double #2E3E4F;
+            border-bottom: 2px solid #2E3E4F; /* Dark grey bottom border */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
-            font-size: 48px; /* Larger font size */
+            font-size: 48px;
             font-weight: 700;
+            -webkit-text-stroke: 0.5px #FFFFFF; /* White stroke for metallic effect */
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             position: relative;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
             width: 100%;
-            max-width: 1200px; /* Wider box */
-            margin: 0 auto;
+            margin: 0;
+            top: 0;
+            left: 0;
+            z-index: 1;
         }
         .metallic-header:hover {
             transform: translateY(-2px);
@@ -332,11 +338,11 @@ def main():
         </style>
     """, unsafe_allow_html=True)
 
-    # Display logo and title in a professional header on main page
+    # Display logo and title in a full-width professional header
     if logo_src:
         st.markdown(
             f"""
-            <div style='display: flex; align-items: center; justify-content: center; width: 100%; max-width: 1200px; margin: 0 auto;'>
+            <div style='display: flex; align-items: center; justify-content: center; width: 100%; margin: 0;'>
                 <img src="{logo_src}" style='width: 150px; height: auto; margin-right: 20px;'>
                 <h1 class='metallic-header' style='flex-grow: 1; margin: 0;'>ShotMetrics</h1>
             </div>
