@@ -141,7 +141,7 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with dark grey metallic boxes and white text
+    # Enhanced CSS with corrected sidebar styling
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -183,15 +183,23 @@ def main():
             margin-bottom: 10px;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
         }
-        .sidebar-box p, .sidebar-box label {
-            color: #FFFFFF !important; /* White for text and labels */
+        .sidebar-box p {
+            color: #FFFFFF !important; /* White for text */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 16px !important;
             margin: 5px 0;
         }
+        /* Ensure dropdown titles (labels) are white */
+        .sidebar-box label, .sidebar-box .stSelectbox label {
+            color: #FFFFFF !important; /* White for dropdown titles */
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 16px !important;
+            margin-bottom: 5px;
+        }
+        /* Dropdown options and selected text are grey */
         .sidebar-box select {
-            color: #FFFFFF !important; /* White for dropdown options */
-            background: linear-gradient(135deg, #3A506B 0%, #2E3E4F 100%);
+            color: #2E3E4F !important; /* Grey for dropdown options */
+            background: #FFFFFF;
             border: 1px solid #FFFFFF;
             border-radius: 5px;
             padding: 6px;
@@ -365,7 +373,7 @@ def main():
             transition: transform 0.3s ease;
         }
         .logo-img:hover {
-            transform: scale(1.1);
+            transform: scale(1.05);
         }
         </style>
     """, unsafe_allow_html=True)
