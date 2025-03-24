@@ -132,7 +132,7 @@ def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
     # Load and encode logo
-    logo_path = os.path.join("images", "whiteoutline.jpeg")
+    logo_path = os.path.join("images", "redheart.jpeg")
     try:
         with open(logo_path, "rb") as f:
             logo_data = base64.b64encode(f.read()).decode("utf-8")
@@ -141,7 +141,7 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with updated colors, fonts, and animations
+    # Enhanced CSS with updated spacing and sidebar font color
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -162,7 +162,7 @@ def main():
             border-radius: 0 10px 10px 0;
         }
         [data-testid="stSidebar"] * {
-            color: #FFFFFF !important; /* White text in sidebar */
+            color: #2E3E4F !important; /* Grey text in sidebar */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
         }
         [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
@@ -176,7 +176,7 @@ def main():
             transition: background 0.3s ease;
         }
         [data-testid="stSidebar"] .css-17eq0hr:nth-child(3) /* Email text */ {
-            color: #ff4500 !important; /* Keep email orange as per original */
+            color: #ff4500 !important; /* Keep email orange */
             font-size: 24px !important;
             background: rgba(255, 255, 255, 0.1);
             padding: 10px 14px;
@@ -198,7 +198,7 @@ def main():
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
         [data-testid="stSidebar"] select /* Dropdown text */ {
-            color: #2E3E4F !important; /* Dark grey for dropdown options */
+            color: #FFFFFF !important; /* White for dropdown options for contrast */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 20px !important;
         }
@@ -212,7 +212,7 @@ def main():
             border-radius: 5px;
         }
 
-        /* ShotMetrics header with animations */
+        /* ShotMetrics header with animations and spacing */
         .shotmetrics-header {
             background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%);
             padding: 50px 20px;
@@ -226,6 +226,9 @@ def main():
             left: 0;
             z-index: 1;
             overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .shotmetrics-header::before {
             content: '';
@@ -266,6 +269,14 @@ def main():
             width: 100%;
             height: 2px;
             background: linear-gradient(to right, transparent, #FFFFFF, transparent);
+        }
+
+        /* Logo and title container */
+        .header-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px; /* Increased gap between logo and title */
         }
 
         /* Divider Styling */
@@ -354,12 +365,28 @@ def main():
         </style>
     """, unsafe_allow_html=True)
 
-    # Display the ShotMetrics header
-    st.markdown("""
-        <div class='shotmetrics-header'>
-            <h1 class='shotmetrics-title'>ShotMetrics</h1>
-        </div>
-    """, unsafe_allow_html=True)
+    # Display the ShotMetrics header with logo and title spaced apart
+    if logo_src:
+        st.markdown(
+            f"""
+            <div class='shotmetrics-header'>
+                <div class='header-container'>
+                    <img src="{logo_src}" style='width: 150px; height: auto;'>
+                    <h1 class='shotmetrics-title'>ShotMetrics</h1>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(
+            """
+            <div class='shotmetrics-header'>
+                <h1 class='shotmetrics-title'>ShotMetrics</h1>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
     if not st.session_state.get('authenticated', False):
         with st.form("login_form"):
