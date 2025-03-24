@@ -132,7 +132,7 @@ def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
     # Load and encode logo
-    logo_path = os.path.join("images", "whiteoutline.jpeg")
+    logo_path = os.path.join("images", "redheart.png")
     try:
         with open(logo_path, "rb") as f:
             logo_data = base64.b64encode(f.read()).decode("utf-8")
