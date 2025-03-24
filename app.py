@@ -165,7 +165,7 @@ def main():
             color: #FFFFFF !important; /* White for contrast */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 24px !important;
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(255, 255, 255, 0.1); /* Light white background */
             padding: 10px 14px;
             border-radius: 5px;
             margin: 5px 0;
@@ -176,7 +176,7 @@ def main():
             color: #ff4500 !important; /* Neon red/dark orange */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 24px !important;
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(255, 255, 255, 0.1); /* Light white background */
             padding: 10px 14px;
             border-radius: 5px;
             margin: 5px 0;
@@ -185,7 +185,7 @@ def main():
         }
         [data-testid="stSidebar"] .css-1d391kg:hover,
         [data-testid="stSidebar"] .css-17eq0hr:hover {
-            background: rgba(0, 0, 0, 0.4);
+            background: rgba(255, 255, 255, 0.3); /* Lighter on hover */
         }
         [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox */ {
             background: rgba(209, 32, 38, 0.8);
@@ -205,20 +205,20 @@ def main():
 
         /* Full-width header with red-to-grey gradient and metallic text */
         .metallic-header {
-            background: linear-gradient(135deg, #D12026 0%, #2E3E4F 100%); /* Red-to-dark-grey gradient */
+            background: linear-gradient(135deg, #D12026 0%, #2E3E4F 100%);
             color: transparent;
             background-clip: text;
             -webkit-background-clip: text;
-            background-image: linear-gradient(135deg, #FFFFFF, #D3D3D3); /* Metallic gradient text */
+            background-image: linear-gradient(135deg, #FFFFFF, #D3D3D3);
             text-align: center;
             padding: 30px 50px;
-            border-radius: 0; /* No rounding for full width */
+            border-radius: 0;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.5);
-            border-bottom: 2px solid #2E3E4F; /* Dark grey bottom border */
+            border-bottom: 2px solid #2E3E4F;
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
             font-size: 48px;
             font-weight: 700;
-            -webkit-text-stroke: 0.5px #FFFFFF; /* White stroke for metallic effect */
+            -webkit-text-stroke: 0.5px #FFFFFF;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
             position: relative;
             display: flex;
@@ -245,13 +245,13 @@ def main():
             z-index: -1;
         }
 
-        /* Divider Styling */
+        /* Divider Styling for Clear Separation */
         .divider-space {
-            margin: 40px 0;
+            margin: 60px 0; /* Increased for clearer separation */
         }
         .subtle-divider {
             border: none;
-            height: 2px;
+            height: 4px; /* Thicker for emphasis */
             background: linear-gradient(to right, transparent, #D12026, transparent);
             margin: 20px 0;
         }
@@ -355,7 +355,6 @@ def main():
 
     if not st.session_state.get('authenticated', False):
         with st.form("login_form"):
-            # Display logo on login page
             if logo_src:
                 st.markdown(
                     f"""
