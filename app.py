@@ -141,7 +141,7 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with creative dropdown styling
+    # Enhanced CSS with aggressive overrides for dropdowns
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -150,150 +150,153 @@ def main():
         .stApp {
             padding: 10px;
             background: #FFFFFF;
-            color: #333333 !important; /* Dark grey text on white background */
+            color: #333333 !important;
         }
 
         /* Sidebar styling with dark grey-to-blue gradient */
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #2E3E4F 0%, #3A506B 100%);
-            padding: 20px;
-            border-right: 2px solid #2E3E4F;
-            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
-            border-radius: 0 10px 10px 0;
+            background: linear-gradient(180deg, #2E3E4F 0%, #3A506B 100%) !important;
+            padding: 20px !important;
+            border-right: 2px solid #2E3E4F !important;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1) !important;
+            border-radius: 0 10px 10px 0 !important;
         }
 
         /* Sidebar box for Filters header */
         .sidebar-box {
-            background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%);
-            border: 2px solid #FFFFFF;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%) !important;
+            border: 2px solid #FFFFFF !important;
+            border-radius: 10px !important;
+            padding: 15px !important;
+            margin-bottom: 20px !important;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1) !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
         }
         .sidebar-box h2 {
-            color: #FFFFFF !important; /* White for Filters header */
+            color: #FFFFFF !important;
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 22px !important;
-            margin: 0;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
-            text-align: center;
+            margin: 0 !important;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2) !important;
+            text-align: center !important;
         }
 
         /* User info text */
         [data-testid="stSidebar"] .css-17eq0hr:not(:nth-child(3)) {
-            color: #FFFFFF !important; /* White for username */
+            color: #FFFFFF !important;
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 18px !important;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 10px 14px;
-            border-radius: 5px;
-            margin: 5px 0;
-            transition: background 0.3s ease;
+            background: rgba(255, 255, 255, 0.1) !important;
+            padding: 10px 14px !important;
+            border-radius: 5px !important;
+            margin: 5px 0 !important;
+            transition: background 0.3s ease !important;
         }
         [data-testid="stSidebar"] .css-17eq0hr:nth-child(3) {
-            color: #ff4500 !important; /* Orange for email */
+            color: #FF4500 !important; /* Orange for email */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 18px !important;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 10px 14px;
-            border-radius: 5px;
-            margin: 5px 0;
-            transition: background 0.3s ease;
+            background: rgba(255, 255, 255, 0.1) !important;
+            padding: 10px 14px !important;
+            border-radius: 5px !important;
+            margin: 5px 0 !important;
+            transition: background 0.3s ease !important;
         }
         [data-testid="stSidebar"] .css-17eq0hr:hover {
-            background: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.3) !important;
         }
 
         /* Creative dropdown styling */
-        [data-testid="stSidebar"] .css-1v3fvcr {
-            background-color: #FFFFFF; /* White background */
+        [data-testid="stSidebar"] .stSelectbox {
+            margin: 10px 0 !important;
+        }
+        [data-testid="stSidebar"] .stSelectbox > div > div > div {
+            background-color: #FFFFFF !important; /* White background for dropdown */
             color: #2E3E4F !important; /* Grey text for options */
-            border: 1px solid #3A506B; /* Dark grey border */
-            border-radius: 8px;
-            padding: 10px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
-            margin: 5px 0;
+            border: 2px solid #3A506B !important; /* Dark grey border */
+            border-radius: 8px !important;
+            padding: 10px !important;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2) !important;
+            transition: all 0.3s ease !important;
         }
-        [data-testid="stSidebar"] .css-1v3fvcr:hover {
-            background-color: rgba(255, 255, 255, 0.9); /* Slight hover effect */
-            transform: translateY(-2px);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        [data-testid="stSidebar"] .stSelectbox > div > div > div:hover {
+            background-color: #F0F0F0 !important; /* Light grey hover */
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25) !important;
         }
-        [data-testid="stSidebar"] .css-1v3fvcr:focus {
-            border-color: #FF4500; /* Orange focus border */
-            box-shadow: 0 0 5px rgba(255, 69, 0, 0.4);
+        [data-testid="stSidebar"] .stSelectbox > div > div > div:focus {
+            border-color: #FF4500 !important; /* Orange focus border */
+            box-shadow: 0 0 5px rgba(255, 69, 0, 0.4) !important;
         }
 
         /* Dropdown titles */
-        [data-testid="stSidebar"] .css-145kmo2 {
-            color: #FFFFFF !important; /* White for dropdown titles */
+        [data-testid="stSidebar"] .stSelectbox > label {
+            color: #FFFFFF !important; /* White for titles */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 18px !important;
-            margin-bottom: 5px;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+            font-weight: bold !important;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2) !important;
+            margin-bottom: 5px !important;
         }
 
         /* Sidebar button styling */
         [data-testid="stSidebar"] .stButton > button {
-            color: #2E3E4F !important; /* Grey text for button */
-            background: linear-gradient(135deg, #FFFFFF 0%, #E0E0E0 100%);
-            border: 1px solid #FFFFFF;
-            border-radius: 5px;
-            padding: 8px 16px;
+            color: #2E3E4F !important;
+            background: linear-gradient(135deg, #FFFFFF 0%, #E0E0E0 100%) !important;
+            border: 1px solid #FFFFFF !important;
+            border-radius: 5px !important;
+            padding: 8px 16px !important;
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            transition: background 0.3s ease, transform 0.3s ease;
+            transition: background 0.3s ease, transform 0.3s ease !important;
         }
         [data-testid="stSidebar"] .stButton > button:hover {
-            background: linear-gradient(135deg, #E0E0E0 0%, #FFFFFF 100%);
-            transform: scale(1.05);
+            background: linear-gradient(135deg, #E0E0E0 0%, #FFFFFF 100%) !important;
+            transform: scale(1.05) !important;
         }
 
         /* ShotMetrics header with animations and spacing */
         .shotmetrics-header {
-            background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%);
-            padding: 50px 20px;
-            text-align: center;
-            border-bottom: 6px solid #FFFFFF;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-            position: relative;
-            width: 100%;
-            margin: 0;
-            top: 0;
-            left: 0;
-            z-index: 1;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%) !important;
+            padding: 50px 20px !important;
+            text-align: center !important;
+            border-bottom: 6px solid #FFFFFF !important;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4) !important;
+            position: relative !important;
+            width: 100% !important;
+            margin: 0 !important;
+            top: 0 !important;
+            left: 0 !important;
+            z-index: 1 !important;
+            overflow: hidden !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
         }
         .shotmetrics-header::before {
             content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 10%, transparent 60%);
-            animation: rotateGlow 15s linear infinite;
-            z-index: -1;
+            position: absolute !important;
+            top: -50% !important;
+            left: -50% !important;
+            width: 200% !important;
+            height: 200% !important;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 10%, transparent 60%) !important;
+            animation: rotateGlow 15s linear infinite !important;
+            z-index: -1 !important;
         }
         .shotmetrics-title {
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 85px !important;
-            font-weight: 400;
-            color: #FFFFFF;
+            font-weight: 400 !important;
+            color: #FFFFFF !important;
             text-shadow: 
                 0 0 15px #FFFFFF,
                 0 0 30px #2E3E4F,
-                2px 2px 8px rgba(0, 0, 0, 0.6);
-            margin: 0;
-            animation: metallicShine 3s infinite alternate;
+                2px 2px 8px rgba(0, 0, 0, 0.6) !important;
+            margin: 0 !important;
+            animation: metallicShine 3s infinite alternate !important;
         }
         @keyframes rotateGlow {
             0% { transform: rotate(0deg); }
@@ -305,104 +308,104 @@ def main():
         }
         .shotmetrics-header::after {
             content: '';
-            position: absolute;
-            bottom: 10px;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: linear-gradient(to right, transparent, #FFFFFF, transparent);
+            position: absolute !important;
+            bottom: 10px !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 2px !important;
+            background: linear-gradient(to right, transparent, #FFFFFF, transparent) !important;
         }
 
         /* Logo and title container */
         .header-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 30px; /* Space between logo and title */
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 30px !important; /* Space between logo and title */
         }
 
         /* Divider Styling with increased spacing */
         .divider-space {
-            margin: 60px 0; /* Increased spacing between header and team logo */
+            margin: 60px 0 !important;
         }
         .subtle-divider {
-            border: none;
-            height: 4px;
-            background: linear-gradient(to right, transparent, #2E3E4F, transparent);
-            margin: 20px 0;
+            border: none !important;
+            height: 4px !important;
+            background: linear-gradient(to right, transparent, #2E3E4F, transparent) !important;
+            margin: 20px 0 !important;
         }
 
         /* Content Styling */
         .team-name {
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 36px !important;
-            font-weight: bold;
-            color: transparent;
-            background-clip: text;
-            -webkit-background-clip: text;
-            background-image: linear-gradient(135deg, #2E3E4F, #3A506B);
-            text-transform: uppercase;
-            -webkit-text-stroke: 0.5px #2E3E4F;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
-            margin: 0;
-            line-height: 1.2;
-            word-wrap: break-word;
-            text-align: center;
-            transition: transform 0.3s ease;
+            font-weight: bold !important;
+            color: transparent !important;
+            background-clip: text !important;
+            -webkit-background-clip: text !important;
+            background-image: linear-gradient(135deg, #2E3E4F, #3A506B) !important;
+            text-transform: uppercase !important;
+            -webkit-text-stroke: 0.5px #2E3E4F !important;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5) !important;
+            margin: 0 !important;
+            line-height: 1.2 !important;
+            word-wrap: break-word !important;
+            text-align: center !important;
+            transition: transform 0.3s ease !important;
         }
         .team-name:hover {
-            transform: scale(1.05);
+            transform: scale(1.05) !important;
         }
         .player-name {
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 36px !important;
-            color: transparent;
-            background-clip: text;
-            -webkit-background-clip: text;
-            background-image: linear-gradient(135deg, #2E3E4F, #3A506B);
-            text-transform: uppercase;
-            -webkit-text-stroke: 0.5px #2E3E4F;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
-            margin: 20px 0;
-            line-height: 1.2;
-            word-wrap: break-word;
-            text-align: center;
-            transition: transform 0.3s ease;
+            color: transparent !important;
+            background-clip: text !important;
+            -webkit-background-clip: text !important;
+            background-image: linear-gradient(135deg, #2E3E4F, #3A506B) !important;
+            text-transform: uppercase !important;
+            -webkit-text-stroke: 0.5px #2E3E4F !important;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5) !important;
+            margin: 20px 0 !important;
+            line-height: 1.2 !important;
+            word-wrap: break-word !important;
+            text-align: center !important;
+            transition: transform 0.3s ease !important;
         }
         .player-name:hover {
-            transform: scale(1.05);
+            transform: scale(1.05) !important;
         }
         .job-details {
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 18px !important;
-            color: #333333 !important; /* Dark grey on white background */
-            text-transform: uppercase;
-            margin: 0;
-            line-height: 1.2;
-            word-wrap: break-word;
-            text-align: center;
-            transition: transform 0.3s ease;
+            color: #333333 !important;
+            text-transform: uppercase !important;
+            margin: 0 !important;
+            line-height: 1.2 !important;
+            word-wrap: break-word !important;
+            text-align: center !important;
+            transition: transform 0.3s ease !important;
         }
         .job-details span.numeric {
-            font-family: 'Arial', sans-serif;
-            color: #2E3E4F;
+            font-family: 'Arial', sans-serif !important;
+            color: #2E3E4F !important;
         }
         .job-details:hover {
-            transform: scale(1.05);
+            transform: scale(1.05) !important;
         }
         .logo-img {
-            width: 150px;
-            height: auto;
-            margin-bottom: 30px;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-            border-radius: 50%;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            transition: transform 0.3s ease;
+            width: 150px !important;
+            height: auto !important;
+            margin-bottom: 30px !important;
+            display: block !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            border-radius: 50% !important;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+            transition: transform 0.3s ease !important;
         }
         .logo-img:hover {
-            transform: scale(1.1);
+            transform: scale(1.1) !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -493,7 +496,7 @@ def main():
 
     with st.sidebar:
         st.markdown("<div class='sidebar-box'><h2>Filters</h2></div>", unsafe_allow_html=True)
-        # Creative dropdowns
+        # Creative dropdowns with custom labels
         team_filter = st.selectbox("Select Team", ["All"] + teams, key="team_filter")
         player_filter = st.selectbox("Select Player", ["All"] + player_names, key="player_filter")
         source_filter = st.selectbox("Select Source", ["All"] + sources, key="source_filter")
@@ -948,9 +951,9 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
 
 def show_spin_analysis_page(df_spin):
     if not df_spin.empty:
-        st.header("Spin Analysis")
-        plot_spin_analysis(df_spin)
-        plot_spin_bullseye(df_spin)
+        st HALL:
+            plot_spin_analysis(df_spin)
+            plot_spin_bullseye(df_spin)
 
 if __name__ == "__main__":
     main()
