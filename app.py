@@ -141,7 +141,7 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with updated sidebar styling
+    # Enhanced CSS with creative dropdown styling
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -162,47 +162,14 @@ def main():
             border-radius: 0 10px 10px 0;
         }
 
-        /* All sidebar items */
-        [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
-        [data-testid="stSidebar"] .css-17eq0hr:not(:nth-child(3)) /* All text except email */ {
-            color: #FFFFFF !important; /* White for contrast */
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            font-size: 24px !important;
-            background: rgba(255, 255, 255, 0.1); /* Light background for items */
-            padding: 10px 14px;
-            border-radius: 5px;
-            margin: 5px 0;
-            display: inline-block;
-            transition: background 0.3s ease;
-        }
-
-        /* Email text */
-        [data-testid="stSidebar"] .css-17eq0hr:nth-child(3) {
-            color: #ff4500 !important; /* Orange for email */
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            font-size: 24px !important;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 10px 14px;
-            border-radius: 5px;
-            margin: 5px 0;
-            display: inline-block;
-            transition: background 0.3s ease;
-        }
-
-        /* Hover effect for sidebar items */
-        [data-testid="stSidebar"] .css-1d391kg:hover,
-        [data-testid="stSidebar"] .css-17eq0hr:hover {
-            background: rgba(255, 255, 255, 0.3); /* Lighter on hover */
-        }
-
         /* Sidebar box for Filters header */
         .sidebar-box {
             background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%);
             border: 2px solid #FFFFFF;
             border-radius: 10px;
             padding: 15px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.2);
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -217,31 +184,59 @@ def main():
             text-align: center;
         }
 
-        /* Styling for select boxes in sidebar */
-        [data-testid="stSidebar"] .css-1v3fvcr {
-            background: rgba(255, 255, 255, 0.8); /* White box for dropdowns */
-            color: #2E3E4F !important; /* Grey text for options */
+        /* User info text */
+        [data-testid="stSidebar"] .css-17eq0hr:not(:nth-child(3)) {
+            color: #FFFFFF !important; /* White for username */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            font-size: 20px !important;
-            border-radius: 8px;
-            padding: 8px;
+            font-size: 18px !important;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 14px;
+            border-radius: 5px;
             margin: 5px 0;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            transition: background 0.3s ease;
+        }
+        [data-testid="stSidebar"] .css-17eq0hr:nth-child(3) {
+            color: #ff4500 !important; /* Orange for email */
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 18px !important;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 14px;
+            border-radius: 5px;
+            margin: 5px 0;
+            transition: background 0.3s ease;
+        }
+        [data-testid="stSidebar"] .css-17eq0hr:hover {
+            background: rgba(255, 255, 255, 0.3);
         }
 
-        /* Ensure dropdown titles are white */
+        /* Creative dropdown styling */
+        [data-testid="stSidebar"] .css-1v3fvcr {
+            background-color: #FFFFFF; /* White background */
+            color: #2E3E4F !important; /* Grey text for options */
+            border: 1px solid #3A506B; /* Dark grey border */
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            margin: 5px 0;
+        }
+        [data-testid="stSidebar"] .css-1v3fvcr:hover {
+            background-color: rgba(255, 255, 255, 0.9); /* Slight hover effect */
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        }
+        [data-testid="stSidebar"] .css-1v3fvcr:focus {
+            border-color: #FF4500; /* Orange focus border */
+            box-shadow: 0 0 5px rgba(255, 69, 0, 0.4);
+        }
+
+        /* Dropdown titles */
         [data-testid="stSidebar"] .css-145kmo2 {
             color: #FFFFFF !important; /* White for dropdown titles */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            font-size: 20px !important;
+            font-size: 18px !important;
             margin-bottom: 5px;
-        }
-
-        /* Hover effect for select boxes */
-        [data-testid="stSidebar"] .css-1v3fvcr:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
         }
 
         /* Sidebar button styling */
@@ -498,11 +493,12 @@ def main():
 
     with st.sidebar:
         st.markdown("<div class='sidebar-box'><h2>Filters</h2></div>", unsafe_allow_html=True)
-        team_filter = st.selectbox("Team", ["All"] + teams, key="team_filter")
-        player_filter = st.selectbox("Player Name", ["All"] + player_names, key="player_filter")
-        source_filter = st.selectbox("Source", ["All"] + sources, key="source_filter")
-        shot_type_filter = st.selectbox("Shot Type", ["All"] + shot_types, key="shot_type_filter")
-        date_filter = st.selectbox("Upload Date", ["All"] + dates, key="date_filter")
+        # Creative dropdowns
+        team_filter = st.selectbox("Select Team", ["All"] + teams, key="team_filter")
+        player_filter = st.selectbox("Select Player", ["All"] + player_names, key="player_filter")
+        source_filter = st.selectbox("Select Source", ["All"] + sources, key="source_filter")
+        shot_type_filter = st.selectbox("Select Shot Type", ["All"] + shot_types, key="shot_type_filter")
+        date_filter = st.selectbox("Select Upload Date", ["All"] + dates, key="date_filter")
 
     filtered_jobs = jobs
     if team_filter != "All":
