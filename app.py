@@ -132,7 +132,7 @@ def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
     # Load and encode logo
-    logo_path = os.path.join("images", "redheart.png")
+    logo_path = os.path.join("images", "whiteoutline.jpeg")
     try:
         with open(logo_path, "rb") as f:
             logo_data = base64.b64encode(f.read()).decode("utf-8")
@@ -141,7 +141,7 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with fixes for font color and spacing
+    # Enhanced CSS with creative sidebar boxes
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -161,58 +161,55 @@ def main():
             box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
             border-radius: 0 10px 10px 0;
         }
-        [data-testid="stSidebar"] * {
-            color: #FFFFFF !important; /* White text in sidebar by default */
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-        }
-        [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
-        [data-testid="stSidebar"] .css-17eq0hr:not(:nth-child(3)) /* All text except email */ {
-            font-size: 24px !important;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 10px 14px;
-            border-radius: 5px;
-            margin: 5px 0;
-            display: inline-block;
-            transition: background 0.3s ease;
-        }
-        [data-testid="stSidebar"] .css-17eq0hr:nth-child(3) /* Email text */ {
-            color: #ff4500 !important; /* Keep email orange */
-            font-size: 24px !important;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 10px 14px;
-            border-radius: 5px;
-            margin: 5px 0;
-            display: inline-block;
-            transition: background 0.3s ease;
-        }
-        [data-testid="stSidebar"] .css-1d391kg:hover,
-        [data-testid="stSidebar"] .css-17eq0hr:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-        [data-testid="stSidebar"] .stSelectbox label /* Selectbox labels */ {
-            color: #FFFFFF !important; /* White labels for dropdowns */
-        }
-        [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox container */ {
-            background: rgba(209, 32, 38, 0.8);
-            border-radius: 8px;
-            padding: 8px;
-            margin: 5px 0;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+        /* Creative sidebar box styling */
+        .sidebar-box {
+            background: linear-gradient(135deg, #FFFFFF 0%, #F0F0F0 100%);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 1px 3px rgba(255, 255, 255, 0.5);
+            border: 1px solid #D12026;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
-        [data-testid="stSidebar"] select /* Dropdown text */ {
-            color: #FFFFFF !important; /* White for dropdown options */
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            font-size: 20px !important;
+        .sidebar-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), inset 0 1px 3px rgba(255, 255, 255, 0.7);
         }
-        [data-testid="stSidebar"] .css-1v3fvcr:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        .sidebar-box h2 {
+            color: #2E3E4F !important; /* Grey for headers */
+            font-size: 24px !important;
+            margin-bottom: 15px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
         }
-        [data-testid="stSidebar"] .stButton > button {
-            color: #2E3E4F !important; /* Dark grey for logout button text */
-            background-color: #FFFFFF;
+        .sidebar-box p, .sidebar-box label {
+            color: #2E3E4F !important; /* Grey for text and labels */
+            font-size: 18px !important;
+        }
+        .sidebar-box select {
+            color: #2E3E4F !important; /* Grey for dropdown options */
+            background: #FFFFFF;
+            border: 1px solid #D12026;
             border-radius: 5px;
+            padding: 8px;
+            width: 100%;
+            font-size: 16px !important;
+            transition: border-color 0.3s ease;
+        }
+        .sidebar-box select:hover {
+            border-color: #FF4047;
+        }
+        .sidebar-box .stButton > button {
+            color: #FFFFFF !important;
+            background: linear-gradient(135deg, #D12026 0%, #FF4047 100%);
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            transition: background 0.3s ease, transform 0.3s ease;
+        }
+        .sidebar-box .stButton > button:hover {
+            background: linear-gradient(135deg, #FF4047 0%, #D12026 100%);
+            transform: scale(1.05);
         }
 
         /* ShotMetrics header with animations and spacing */
@@ -420,9 +417,18 @@ def main():
                 """,
                 unsafe_allow_html=True
             )
-        st.sidebar.header("User Information")
-        st.sidebar.write(f"**Username:** {st.session_state['username']}")
-        st.sidebar.write(f"**Email:** {st.session_state['user_email']}")
+        
+        # Sidebar content in creative boxes
+        st.sidebar.markdown(
+            """
+            <div class='sidebar-box'>
+                <h2>User Information</h2>
+                <p><b>Username:</b> {}</p>
+                <p><b>Email:</b> {}</p>
+            </div>
+            """.format(st.session_state['username'], st.session_state['user_email']),
+            unsafe_allow_html=True
+        )
         if st.sidebar.button("Logout"):
             st.session_state['authenticated'] = False
             st.experimental_rerun()
@@ -444,12 +450,19 @@ def main():
                     for job in jobs if job.get("UploadTimestamp")})
 
     with st.sidebar:
-        st.header("Filters")
+        st.markdown(
+            """
+            <div class='sidebar-box'>
+                <h2>Filters</h2>
+            """,
+            unsafe_allow_html=True
+        )
         team_filter = st.selectbox("Team", ["All"] + teams)
         player_filter = st.selectbox("Player Name", ["All"] + player_names)
         source_filter = st.selectbox("Source", ["All"] + sources)
         shot_type_filter = st.selectbox("Shot Type", ["All"] + shot_types)
         date_filter = st.selectbox("Upload Date", ["All"] + dates)
+        st.markdown("</div>", unsafe_allow_html=True)
 
     filtered_jobs = jobs
     if team_filter != "All":
