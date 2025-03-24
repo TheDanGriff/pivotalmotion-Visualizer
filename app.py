@@ -239,7 +239,7 @@ def main():
         .shotmetrics-title {
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important; /* Ensure Oswald font */
             font-size: 85px !important; /* Increased font size */
-            font-weight: 600;
+            font-weight: 400;
             color: #FFFFFF;
             text-shadow: 
                 0 0 15px #FFFFFF,
