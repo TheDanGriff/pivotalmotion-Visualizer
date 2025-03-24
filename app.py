@@ -160,17 +160,10 @@ def main():
             box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
             border-radius: 0 10px 10px 0;
         }
-
-        /* All text in sidebar to white, including headers and labels */
-        [data-testid="stSidebar"] * {
-            color: #FFFFFF !important;
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-        }
-
-        /* Specific sidebar elements */
         [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
         [data-testid="stSidebar"] .css-17eq0hr:not(:nth-child(3)) /* All text except email */ {
             color: #FFFFFF !important;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 24px !important;
             background: rgba(255, 255, 255, 0.1);
             padding: 10px 14px;
@@ -180,7 +173,7 @@ def main():
             transition: background 0.3s ease;
         }
         [data-testid="stSidebar"] .css-17eq0hr:nth-child(3) /* Email text */ {
-            color: #ff4500 !important; /* Keeping email orange as in original */
+            color: #ff4500 !important;
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 24px !important;
             background: rgba(255, 255, 255, 0.1);
@@ -194,8 +187,6 @@ def main():
         [data-testid="stSidebar"] .css-17eq0hr:hover {
             background: rgba(255, 255, 255, 0.3);
         }
-
-        /* Selectbox (dropdown) text remains dark grey */
         [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox */ {
             background: rgba(209, 32, 38, 0.8);
             color: #2E3E4F !important; /* Dark grey for dropdown text */
@@ -215,8 +206,11 @@ def main():
             color: #2E3E4F !important; /* Dark grey for logout button text */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
         }
+        [data-testid="stSidebar"] * {
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+        }
 
-        /* Creatively redesigned ShotMetrics header with 50% larger font */
+        /* Creatively redesigned ShotMetrics header */
         .shotmetrics-header {
             background: linear-gradient(135deg, #D12026 0%, #2E3E4F 70%, #1A252F 100%);
             padding: 50px 20px;
@@ -243,10 +237,10 @@ def main():
             z-index: -1;
         }
         .shotmetrics-title {
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
-            font-size: 120px; /* Increased by 50% from 80px */
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important; /* Ensure Oswald font */
+            font-size: 150px !important; /* Increased font size */
             font-weight: 700;
-            color: #FFFFFF; /* White font color */
+            color: #FFFFFF;
             text-shadow: 
                 0 0 15px #FFFFFF,
                 0 0 30px #D12026,
