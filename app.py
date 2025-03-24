@@ -131,7 +131,7 @@ def format_source_type(source):
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Load and encode logo for sidebar
+    # Load and encode logo
     logo_path = os.path.join("images", "whiteoutline.jpeg")
     try:
         with open(logo_path, "rb") as f:
@@ -141,23 +141,23 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Updated CSS with requested changes
+    # Enhanced CSS with updated colors, fonts, and animations
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
 
-        /* Gradient background for the entire app */
+        /* Main app background remains white */
         .stApp {
-            background: linear-gradient(to bottom, #333333, #555555);
-            color: #FFFFFF !important; /* White text on dark grey */
             padding: 10px;
+            background: #FFFFFF;
+            color: #333333 !important; /* Dark grey text on white background */
         }
 
-        /* Sidebar styling with matching gradient */
+        /* Sidebar styling with updated gradient */
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #333333, #555555);
+            background: linear-gradient(180deg, #2E3E4F 0%, #3A506B 100%);
             padding: 20px;
-            border-right: 2px solid #555555;
+            border-right: 2px solid #2E3E4F;
             box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
             border-radius: 0 10px 10px 0;
         }
@@ -165,81 +165,191 @@ def main():
             color: #FFFFFF !important; /* White text in sidebar */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
         }
-        [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox */ {
+        [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
+        [data-testid="stSidebar"] .css-17eq0hr:not(:nth-child(3)) /* All text except email */ {
+            font-size: 24px !important;
             background: rgba(255, 255, 255, 0.1);
+            padding: 10px 14px;
+            border-radius: 5px;
+            margin: 5px 0;
+            display: inline-block;
+            transition: background 0.3s ease;
+        }
+        [data-testid="stSidebar"] .css-17eq0hr:nth-child(3) /* Email text */ {
+            color: #ff4500 !important; /* Keep email orange as per original */
+            font-size: 24px !important;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 14px;
+            border-radius: 5px;
+            margin: 5px 0;
+            display: inline-block;
+            transition: background 0.3s ease;
+        }
+        [data-testid="stSidebar"] .css-1d391kg:hover,
+        [data-testid="stSidebar"] .css-17eq0hr:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox container */ {
+            background: rgba(209, 32, 38, 0.8);
             border-radius: 8px;
             padding: 8px;
             margin: 5px 0;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        [data-testid="stSidebar"] select /* Dropdown text */ {
+            color: #2E3E4F !important; /* Dark grey for dropdown options */
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 20px !important;
+        }
+        [data-testid="stSidebar"] .css-1v3fvcr:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
         }
         [data-testid="stSidebar"] .stButton > button {
-            color: #FFFFFF !important; /* White for logout button text */
-            background-color: #555555;
+            color: #2E3E4F !important; /* Dark grey for logout button text */
+            background-color: #FFFFFF;
             border-radius: 5px;
         }
 
-        /* Player and Team container with white background */
-        .player-team-container {
-            background: #FFFFFF;
-            color: #000000 !important; /* Black text inside white container */
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            text-align: center;
-        }
-
-        /* Ensure player and team names are black */
-        .team-name, .player-name {
-            color: #000000 !important;
-            font-size: 36px !important;
-            font-weight: bold;
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
-            margin: 0;
-            line-height: 1.2;
-            text-transform: uppercase;
-        }
-
-        /* Job details in black */
-        .job-details {
-            color: #000000 !important;
-            font-size: 18px !important;
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
-            margin: 0;
-            line-height: 1.2;
-        }
-
-        /* Logo styling */
-        .logo-img {
-            width: 150px;
-            height: auto;
-            margin-bottom: 20px;
-            border-radius: 50%;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        /* ShotMetrics header */
+        /* ShotMetrics header with animations */
         .shotmetrics-header {
-            background: linear-gradient(135deg, #333333, #555555);
+            background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%);
             padding: 50px 20px;
             text-align: center;
             border-bottom: 6px solid #FFFFFF;
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+            position: relative;
+            width: 100%;
+            margin: 0;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            overflow: hidden;
+        }
+        .shotmetrics-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 10%, transparent 60%);
+            animation: rotateGlow 15s linear infinite;
+            z-index: -1;
         }
         .shotmetrics-title {
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 85px !important;
             font-weight: 400;
             color: #FFFFFF;
-            text-shadow: 0 0 15px #FFFFFF, 0 0 30px #555555;
+            text-shadow: 
+                0 0 15px #FFFFFF,
+                0 0 30px #2E3E4F,
+                2px 2px 8px rgba(0, 0, 0, 0.6);
             margin: 0;
+            animation: metallicShine 3s infinite alternate;
+        }
+        @keyframes rotateGlow {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes metallicShine {
+            0% { text-shadow: 0 0 10px #FFFFFF, 2px 2px 8px rgba(46, 62, 79, 0.6), -2px -2px 8px rgba(46, 62, 79, 0.6); }
+            100% { text-shadow: 0 0 20px #FFFFFF, 3px 3px 12px rgba(46, 62, 79, 0.8), -3px -3px 12px rgba(46, 62, 79, 0.8); }
+        }
+        .shotmetrics-header::after {
+            content: '';
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #FFFFFF, transparent);
         }
 
         /* Divider Styling */
+        .divider-space {
+            margin: 60px 0;
+        }
         .subtle-divider {
             border: none;
             height: 4px;
-            background: linear-gradient(to right, transparent, #FFFFFF, transparent);
+            background: linear-gradient(to right, transparent, #2E3E4F, transparent);
             margin: 20px 0;
+        }
+
+        /* Content Styling */
+        .team-name {
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
+            font-size: 36px !important;
+            font-weight: bold;
+            color: transparent;
+            background-clip: text;
+            -webkit-background-clip: text;
+            background-image: linear-gradient(135deg, #2E3E4F, #3A506B);
+            text-transform: uppercase;
+            -webkit-text-stroke: 0.5px #2E3E4F;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
+            margin: 0;
+            line-height: 1.2;
+            word-wrap: break-word;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        .team-name:hover {
+            transform: scale(1.05);
+        }
+        .player-name {
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
+            font-size: 36px !important;
+            color: transparent;
+            background-clip: text;
+            -webkit-background-clip: text;
+            background-image: linear-gradient(135deg, #2E3E4F, #3A506B);
+            text-transform: uppercase;
+            -webkit-text-stroke: 0.5px #2E3E4F;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
+            margin: 20px 0;
+            line-height: 1.2;
+            word-wrap: break-word;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        .player-name:hover {
+            transform: scale(1.05);
+        }
+        .job-details {
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
+            font-size: 18px !important;
+            color: #333333 !important; /* Dark grey on white background */
+            text-transform: uppercase;
+            margin: 0;
+            line-height: 1.2;
+            word-wrap: break-word;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        .job-details span.numeric {
+            font-family: 'Arial', sans-serif;
+            color: #2E3E4F;
+        }
+        .job-details:hover {
+            transform: scale(1.05);
+        }
+        .logo-img {
+            width: 150px;
+            height: auto;
+            margin-bottom: 30px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            border-radius: 50%;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease;
+        }
+        .logo-img:hover {
+            transform: scale(1.1);
         }
         </style>
     """, unsafe_allow_html=True)
@@ -249,7 +359,6 @@ def main():
         <div class='shotmetrics-header'>
             <h1 class='shotmetrics-title'>ShotMetrics</h1>
         </div>
-        <div class='divider-space'></div>
     """, unsafe_allow_html=True)
 
     if not st.session_state.get('authenticated', False):
@@ -379,33 +488,34 @@ def main():
             team_logo_src = None
             st.warning(f"Team logo not found in {default_logo_path}")
 
-    # Format job details
-    job_details_html = f"{segment_number} | Period: {period} | Clock: {clock} | {shot_display}"
+    # Format job details with numbers in Arial
+    job_details_html = ""
+    for char in f"{segment_number} | Period: {period} | Clock: {clock} | {shot_display}":
+        if char.isdigit() or char in ":/":
+            job_details_html += f"<span class='numeric'>{char}</span>"
+        else:
+            job_details_html += char
 
-    # Display content with the logo in a white container
+    # Display content with the logo
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if team_logo_src:
             st.markdown(
                 f"""
-                <div class='player-team-container'>
-                    <img src="{team_logo_src}" class='logo-img'>
-                    <p class='team-name'>{team_name}</p>
-                    <p class='player-name'>{player_name}</p>
-                    <p class='job-details'>{job_details_html}</p>
-                </div>
+                <img src="{team_logo_src}" class='logo-img'>
+                <p class='team-name'>{team_name}</p>
+                <p class='player-name'>{player_name}</p>
+                <p class='job-details'>{job_details_html}</p>
                 """,
                 unsafe_allow_html=True
             )
         else:
             st.markdown(
                 f"""
-                <div class='player-team-container'>
-                    <p>No logo available</p>
-                    <p class='team-name'>{team_name}</p>
-                    <p class='player-name'>{player_name}</p>
-                    <p class='job-details'>{job_details_html}</p>
-                </div>
+                <p>No logo available</p>
+                <p class='team-name'>{team_name}</p>
+                <p class='player-name'>{player_name}</p>
+                <p class='job-details'>{job_details_html}</p>
                 """,
                 unsafe_allow_html=True
             )
