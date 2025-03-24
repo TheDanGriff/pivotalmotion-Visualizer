@@ -141,7 +141,7 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with creative metallic sidebar boxes
+    # Enhanced CSS with dark grey metallic boxes and white text
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -162,36 +162,37 @@ def main():
             border-radius: 0 10px 10px 0;
         }
 
-        /* Creative metallic sidebar box styling */
+        /* Creative metallic dark grey sidebar box styling */
         .sidebar-box {
-            background: linear-gradient(135deg, #E0E0E0 0%, #FFFFFF 100%);
+            background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%);
+            border: 2px solid #FFFFFF;
             border-radius: 10px;
             padding: 15px;
             margin-bottom: 15px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15), inset 0 1px 2px rgba(255, 255, 255, 0.8);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.2);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
         .sidebar-box:hover {
             transform: translateY(-3px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(255, 255, 255, 0.9);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.3);
         }
         .sidebar-box h2 {
-            color: #2E3E4F !important; /* Grey for headers */
+            color: #FFFFFF !important; /* White for headers */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 22px !important;
             margin-bottom: 10px;
-            text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1);
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
         }
         .sidebar-box p, .sidebar-box label {
-            color: #2E3E4F !important; /* Grey for text and labels */
+            color: #FFFFFF !important; /* White for text and labels */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 16px !important;
             margin: 5px 0;
         }
         .sidebar-box select {
-            color: #2E3E4F !important; /* Grey for dropdown options */
-            background: #FFFFFF;
-            border: 1px solid #A0A0A0;
+            color: #FFFFFF !important; /* White for dropdown options */
+            background: linear-gradient(135deg, #3A506B 0%, #2E3E4F 100%);
+            border: 1px solid #FFFFFF;
             border-radius: 5px;
             padding: 6px;
             width: 100%;
@@ -200,19 +201,19 @@ def main():
             transition: border-color 0.3s ease;
         }
         .sidebar-box select:hover {
-            border-color: #3A506B;
+            border-color: #E0E0E0;
         }
         .sidebar-box .stButton > button {
-            color: #FFFFFF !important;
-            background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%);
-            border: none;
+            color: #2E3E4F !important; /* Grey text for button */
+            background: linear-gradient(135deg, #FFFFFF 0%, #E0E0E0 100%);
+            border: 1px solid #FFFFFF;
             border-radius: 5px;
             padding: 8px 16px;
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             transition: background 0.3s ease, transform 0.3s ease;
         }
         .sidebar-box .stButton > button:hover {
-            background: linear-gradient(135deg, #3A506B 0%, #2E3E4F 100%);
+            background: linear-gradient(135deg, #E0E0E0 0%, #FFFFFF 100%);
             transform: scale(1.05);
         }
 
@@ -422,7 +423,7 @@ def main():
                 unsafe_allow_html=True
             )
         
-        # Sidebar content in creative metallic boxes
+        # Sidebar content in dark grey metallic boxes with white text
         st.sidebar.markdown(
             """
             <div class='sidebar-box'>
