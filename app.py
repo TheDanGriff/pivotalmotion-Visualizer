@@ -131,12 +131,22 @@ def format_source_type(source):
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Enhanced CSS with a creative, polished ShotMetrics header
+    # Load and encode Redheart logo for sidebar
+    logo_path = os.path.join("images", "redheart.png")
+    try:
+        with open(logo_path, "rb") as f:
+            logo_data = base64.b64encode(f.read()).decode("utf-8")
+        logo_src = f"data:image/png;base64,{logo_data}"
+    except FileNotFoundError:
+        logo_src = None
+        st.warning(f"Logo not found at {logo_path}")
+
+    # Enhanced CSS with all requested changes
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
 
-        /* Remove border around the app */
+        /* No border around the app */
         .stApp {
             padding: 10px;
             background: #ffffff;
@@ -179,7 +189,7 @@ def main():
         }
         [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox */ {
             background: rgba(209, 32, 38, 0.8);
-            color: #FFFFFF !important;
+            color: #2E3E4F !important; /* Dark grey for dropdown text */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 20px !important;
             border-radius: 8px;
@@ -192,8 +202,12 @@ def main():
             transform: translateY(-2px);
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
         }
+        [data-testid="stSidebar"] .stButton > button {
+            color: #2E3E4F !important; /* Dark grey for logout button text */
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+        }
         [data-testid="stSidebar"] * {
-            color: #FFFFFF !important;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
         }
 
         /* Creatively redesigned ShotMetrics header */
@@ -224,23 +238,14 @@ def main():
         }
         .shotmetrics-title {
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
-            font-size: 72px;
+            font-size: 80px; /* Larger font size */
             font-weight: 700;
-            color: transparent;
-            background: linear-gradient(135deg, #E6E6E6, #A9A9A9, #FFFFFF);
-            background-clip: text;
-            -webkit-background-clip: text;
-            -webkit-text-stroke: 2px #D12026;
+            color: #FFFFFF; /* White font color */
             text-shadow: 
-                0 0 10px rgba(255, 255, 255, 0.8),
-                2px 2px 8px rgba(209, 32, 38, 0.6),
-                -2px -2px 8px rgba(46, 62, 79, 0.6);
+                0 0 15px #FFFFFF,
+                0 0 30px #D12026,
+                2px 2px 8px rgba(0, 0, 0, 0.6);
             margin: 0;
-            animation: metallicShine 3s infinite alternate;
-        }
-        @keyframes metallicShine {
-            0% { text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 2px 2px 8px rgba(209, 32, 38, 0.6), -2px -2px 8px rgba(46, 62, 79, 0.6); }
-            100% { text-shadow: 0 0 20px rgba(255, 255, 255, 1), 3px 3px 12px rgba(209, 32, 38, 0.8), -3px -3px 12px rgba(46, 62, 79, 0.8); }
         }
         @keyframes rotateGlow {
             0% { transform: rotate(0deg); }
@@ -359,6 +364,15 @@ def main():
 
     if not st.session_state.get('authenticated', False):
         with st.form("login_form"):
+            if logo_src:
+                st.markdown(
+                    f"""
+                    <div style='text-align: center; margin-bottom: 20px;'>
+                        <img src="{logo_src}" style='width: 100px; height: auto;'>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
             st.header("Login")
             email = st.text_input("Email")
             password = st.text_input("Password", type="password")
@@ -367,6 +381,16 @@ def main():
             handle_login(cognito_client, get_username_by_email, email, password)
         return
     else:
+        # Add Redheart logo to the top of the sidebar
+        if logo_src:
+            st.sidebar.markdown(
+                f"""
+                <div style='text-align: center; margin-bottom: 20px;'>
+                    <img src="{logo_src}" style='width: 120px; height: auto;'>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
         st.sidebar.header("User Information")
         st.sidebar.write(f"**Username:** {st.session_state['username']}")
         st.sidebar.write(f"**Email:** {st.session_state['user_email']}")
@@ -443,7 +467,7 @@ def main():
     clock = parts[2].replace("Clock: ", "") if len(parts) > 2 and "Clock: " in parts[2] else "N/A"
     shot_display = parts[3] if len(parts) > 3 else shot_type if shot_type in ["3 Point", "Free Throw", "Mid-Range"] else "Unknown"
 
-    # Display player, team, and job details (no logo in the middle)
+    # Display player, team, logo, and job details
     player_name = humanize_label(selected_job.get('PlayerName', 'Unknown'))
     team_name_shorthand = humanize_label(selected_job.get('Team', 'N/A'))
     team_name = next((value for key, value in TEAMS.items() if key.lower() == team_name_shorthand.lower() or value.lower() == team_name_shorthand.lower()), team_name_shorthand)
@@ -451,7 +475,7 @@ def main():
     logo_path = os.path.join("images", "teams", f"{team_shorthand}_logo.png")
     default_logo_path = os.path.join("images", "teams", "default.png")
 
-    # Load and encode team logo as base64 (only for display if needed later, not used in middle)
+    # Load and encode team logo as base64
     try:
         with open(logo_path, "rb") as f:
             logo_data = base64.b64encode(f.read()).decode("utf-8")
@@ -473,17 +497,29 @@ def main():
         else:
             job_details_html += char
 
-    # Display content without the logo in the middle
+    # Display content with the logo
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown(
-            f"""
-            <p class='team-name'>{team_name}</p>
-            <p class='player-name'>{player_name}</p>
-            <p class='job-details'>{job_details_html}</p>
-            """,
-            unsafe_allow_html=True
-        )
+        if team_logo_src:
+            st.markdown(
+                f"""
+                <img src="{team_logo_src}" class='logo-img'>
+                <p class='team-name'>{team_name}</p>
+                <p class='player-name'>{player_name}</p>
+                <p class='job-details'>{job_details_html}</p>
+                """,
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                f"""
+                <p>No logo available</p>
+                <p class='team-name'>{team_name}</p>
+                <p class='player-name'>{player_name}</p>
+                <p class='job-details'>{job_details_html}</p>
+                """,
+                unsafe_allow_html=True
+            )
     st.markdown("<hr class='subtle-divider'>", unsafe_allow_html=True)
 
     # Load segment data
