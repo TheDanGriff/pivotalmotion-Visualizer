@@ -131,22 +131,12 @@ def format_source_type(source):
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Load and encode new logo
-    logo_path = os.path.join("images", "redheart.png")
-    try:
-        with open(logo_path, "rb") as f:
-            logo_data = base64.b64encode(f.read()).decode("utf-8")
-        logo_src = f"data:image/png;base64,{logo_data}"
-    except FileNotFoundError:
-        logo_src = None
-        st.warning(f"Logo not found at {logo_path}")
-
-    # Enhanced CSS with updated sidebar and full-width metallic header
+    # Enhanced CSS with a creative, polished ShotMetrics header
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
 
-        /* No border around the app */
+        /* Remove border around the app */
         .stApp {
             padding: 10px;
             background: #ffffff;
@@ -162,10 +152,10 @@ def main():
         }
         [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
         [data-testid="stSidebar"] .css-17eq0hr:not(:nth-child(3)) /* All text except email */ {
-            color: #FFFFFF !important; /* White for contrast */
+            color: #FFFFFF !important;
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 24px !important;
-            background: rgba(255, 255, 255, 0.1); /* Light white background */
+            background: rgba(255, 255, 255, 0.1);
             padding: 10px 14px;
             border-radius: 5px;
             margin: 5px 0;
@@ -173,10 +163,10 @@ def main():
             transition: background 0.3s ease;
         }
         [data-testid="stSidebar"] .css-17eq0hr:nth-child(3) /* Email text */ {
-            color: #ff4500 !important; /* Neon red/dark orange */
+            color: #ff4500 !important;
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 24px !important;
-            background: rgba(255, 255, 255, 0.1); /* Light white background */
+            background: rgba(255, 255, 255, 0.1);
             padding: 10px 14px;
             border-radius: 5px;
             margin: 5px 0;
@@ -185,11 +175,11 @@ def main():
         }
         [data-testid="stSidebar"] .css-1d391kg:hover,
         [data-testid="stSidebar"] .css-17eq0hr:hover {
-            background: rgba(255, 255, 255, 0.3); /* Lighter on hover */
+            background: rgba(255, 255, 255, 0.3);
         }
         [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox */ {
             background: rgba(209, 32, 38, 0.8);
-            color: #FFFFFF !important; /* White text */
+            color: #FFFFFF !important;
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 20px !important;
             border-radius: 8px;
@@ -202,56 +192,77 @@ def main():
             transform: translateY(-2px);
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
         }
+        [data-testid="stSidebar"] * {
+            color: #FFFFFF !important;
+        }
 
-        /* Full-width header with red-to-grey gradient and metallic text */
-        .metallic-header {
-            background: linear-gradient(135deg, #D12026 0%, #2E3E4F 100%);
-            color: transparent;
-            background-clip: text;
-            -webkit-background-clip: text;
-            background-image: linear-gradient(135deg, #FFFFFF, #D3D3D3);
+        /* Creatively redesigned ShotMetrics header */
+        .shotmetrics-header {
+            background: linear-gradient(135deg, #D12026 0%, #2E3E4F 70%, #1A252F 100%);
+            padding: 50px 20px;
             text-align: center;
-            padding: 30px 50px;
-            border-radius: 0;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.5);
-            border-bottom: 2px solid #2E3E4F;
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
-            font-size: 48px;
-            font-weight: 700;
-            -webkit-text-stroke: 0.5px #FFFFFF;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3), -1px -1px 2px rgba(255, 255, 255, 0.5);
+            border-bottom: 6px solid #FFFFFF;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
             position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             width: 100%;
             margin: 0;
             top: 0;
             left: 0;
             z-index: 1;
+            overflow: hidden;
         }
-        .metallic-header:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25), inset 0 2px 4px rgba(255, 255, 255, 0.5);
-        }
-        .metallic-header::before {
+        .shotmetrics-header::before {
             content: '';
             position: absolute;
-            top: -20px;
-            left: -20px;
-            right: -20px;
-            bottom: -20px;
-            background: radial-gradient(circle, rgba(209, 32, 38, 0.1) 0%, rgba(255, 250, 250, 0) 70%);
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 10%, transparent 60%);
+            animation: rotateGlow 15s linear infinite;
             z-index: -1;
         }
+        .shotmetrics-title {
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif;
+            font-size: 72px;
+            font-weight: 700;
+            color: transparent;
+            background: linear-gradient(135deg, #E6E6E6, #A9A9A9, #FFFFFF);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-stroke: 2px #D12026;
+            text-shadow: 
+                0 0 10px rgba(255, 255, 255, 0.8),
+                2px 2px 8px rgba(209, 32, 38, 0.6),
+                -2px -2px 8px rgba(46, 62, 79, 0.6);
+            margin: 0;
+            animation: metallicShine 3s infinite alternate;
+        }
+        @keyframes metallicShine {
+            0% { text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 2px 2px 8px rgba(209, 32, 38, 0.6), -2px -2px 8px rgba(46, 62, 79, 0.6); }
+            100% { text-shadow: 0 0 20px rgba(255, 255, 255, 1), 3px 3px 12px rgba(209, 32, 38, 0.8), -3px -3px 12px rgba(46, 62, 79, 0.8); }
+        }
+        @keyframes rotateGlow {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .shotmetrics-header::after {
+            content: '';
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #FFFFFF, transparent);
+        }
 
-        /* Divider Styling for Clear Separation */
+        /* Divider Styling */
         .divider-space {
-            margin: 60px 0; /* Increased for clearer separation */
+            margin: 60px 0;
         }
         .subtle-divider {
             border: none;
-            height: 4px; /* Thicker for emphasis */
+            height: 4px;
             background: linear-gradient(to right, transparent, #D12026, transparent);
             margin: 20px 0;
         }
@@ -338,32 +349,16 @@ def main():
         </style>
     """, unsafe_allow_html=True)
 
-    # Display logo and title in a full-width professional header
-    if logo_src:
-        st.markdown(
-            f"""
-            <div style='display: flex; align-items: center; justify-content: center; width: 100%; margin: 0;'>
-                <img src="{logo_src}" style='width: 150px; height: auto; margin-right: 20px;'>
-                <h1 class='metallic-header' style='flex-grow: 1; margin: 0;'>ShotMetrics</h1>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    else:
-        st.markdown("<h1 class='metallic-header'>ShotMetrics</h1>", unsafe_allow_html=True)
-    st.markdown("<div class='divider-space'></div>", unsafe_allow_html=True)
+    # Display the creatively redesigned ShotMetrics header
+    st.markdown("""
+        <div class='shotmetrics-header'>
+            <h1 class='shotmetrics-title'>ShotMetrics</h1>
+        </div>
+        <div class='divider-space'></div>
+    """, unsafe_allow_html=True)
 
     if not st.session_state.get('authenticated', False):
         with st.form("login_form"):
-            if logo_src:
-                st.markdown(
-                    f"""
-                    <div style='text-align: center; margin-bottom: 20px;'>
-                        <img src="{logo_src}" style='width: 100px; height: auto;'>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
             st.header("Login")
             email = st.text_input("Email")
             password = st.text_input("Password", type="password")
@@ -372,16 +367,6 @@ def main():
             handle_login(cognito_client, get_username_by_email, email, password)
         return
     else:
-        # Add larger logo to sidebar
-        if logo_src:
-            st.sidebar.markdown(
-                f"""
-                <div style='text-align: center; margin-bottom: 20px;'>
-                    <img src="{logo_src}" style='width: 120px; height: auto;'>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
         st.sidebar.header("User Information")
         st.sidebar.write(f"**Username:** {st.session_state['username']}")
         st.sidebar.write(f"**Email:** {st.session_state['user_email']}")
@@ -458,7 +443,7 @@ def main():
     clock = parts[2].replace("Clock: ", "") if len(parts) > 2 and "Clock: " in parts[2] else "N/A"
     shot_display = parts[3] if len(parts) > 3 else shot_type if shot_type in ["3 Point", "Free Throw", "Mid-Range"] else "Unknown"
 
-    # Display player, team, logo, and job details with numbers in standard font
+    # Display player, team, and job details (no logo in the middle)
     player_name = humanize_label(selected_job.get('PlayerName', 'Unknown'))
     team_name_shorthand = humanize_label(selected_job.get('Team', 'N/A'))
     team_name = next((value for key, value in TEAMS.items() if key.lower() == team_name_shorthand.lower() or value.lower() == team_name_shorthand.lower()), team_name_shorthand)
@@ -466,7 +451,7 @@ def main():
     logo_path = os.path.join("images", "teams", f"{team_shorthand}_logo.png")
     default_logo_path = os.path.join("images", "teams", "default.png")
 
-    # Load and encode team logo as base64
+    # Load and encode team logo as base64 (only for display if needed later, not used in middle)
     try:
         with open(logo_path, "rb") as f:
             logo_data = base64.b64encode(f.read()).decode("utf-8")
@@ -488,29 +473,17 @@ def main():
         else:
             job_details_html += char
 
-    # Display content without a background box
+    # Display content without the logo in the middle
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if team_logo_src:
-            st.markdown(
-                f"""
-                <img src="{team_logo_src}" class='logo-img'>
-                <p class='team-name'>{team_name}</p>
-                <p class='player-name'>{player_name}</p>
-                <p class='job-details'>{job_details_html}</p>
-                """,
-                unsafe_allow_html=True
-            )
-        else:
-            st.markdown(
-                f"""
-                <p>No logo available</p>
-                <p class='team-name'>{team_name}</p>
-                <p class='player-name'>{player_name}</p>
-                <p class='job-details'>{job_details_html}</p>
-                """,
-                unsafe_allow_html=True
-            )
+        st.markdown(
+            f"""
+            <p class='team-name'>{team_name}</p>
+            <p class='player-name'>{player_name}</p>
+            <p class='job-details'>{job_details_html}</p>
+            """,
+            unsafe_allow_html=True
+        )
     st.markdown("<hr class='subtle-divider'>", unsafe_allow_html=True)
 
     # Load segment data
