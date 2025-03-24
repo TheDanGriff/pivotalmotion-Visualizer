@@ -132,7 +132,7 @@ def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
     # Load and encode logo
-    logo_path = os.path.join("images", "whiteoutline.png")
+    logo_path = os.path.join("images", "whiteoutline.jpeg")
     try:
         with open(logo_path, "rb") as f:
             logo_data = base64.b64encode(f.read()).decode("utf-8")
@@ -141,7 +141,7 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with corrected sidebar styling
+    # Enhanced CSS with creative custom dropdowns
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -171,6 +171,10 @@ def main():
             margin-bottom: 15px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.2);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
         .sidebar-box:hover {
             transform: translateY(-3px);
@@ -180,8 +184,9 @@ def main():
             color: #FFFFFF !important; /* White for headers */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 22px !important;
-            margin-bottom: 10px;
+            margin: 0;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+            text-align: center;
         }
         .sidebar-box p {
             color: #FFFFFF !important; /* White for text */
@@ -189,28 +194,46 @@ def main():
             font-size: 16px !important;
             margin: 5px 0;
         }
-        /* Ensure dropdown titles (labels) are white */
-        .sidebar-box label, .sidebar-box .stSelectbox label {
+
+        /* Custom dropdown container */
+        .custom-dropdown {
+            margin: 10px 0;
+            width: 100%;
+        }
+        .custom-dropdown label {
             color: #FFFFFF !important; /* White for dropdown titles */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 16px !important;
             margin-bottom: 5px;
+            display: block;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
         }
-        /* Dropdown options and selected text are grey */
-        .sidebar-box select {
+        .custom-dropdown select {
+            background: linear-gradient(135deg, #FFFFFF 0%, #E0E0E0 100%);
             color: #2E3E4F !important; /* Grey for dropdown options */
-            background: #FFFFFF;
             border: 1px solid #FFFFFF;
-            border-radius: 5px;
-            padding: 6px;
+            border-radius: 8px;
+            padding: 8px 12px;
             width: 100%;
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 16px !important;
-            transition: border-color 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(255, 255, 255, 0.8);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            appearance: none; /* Remove default arrow */
+            background-image: url('data:image/svg+xml;utf8,<svg fill="#2E3E4F" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 10px center;
         }
-        .sidebar-box select:hover {
+        .custom-dropdown select:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.9);
+        }
+        .custom-dropdown select:focus {
+            outline: none;
             border-color: #E0E0E0;
         }
+
+        /* Sidebar button styling */
         .sidebar-box .stButton > button {
             color: #2E3E4F !important; /* Grey text for button */
             background: linear-gradient(135deg, #FFFFFF 0%, #E0E0E0 100%);
@@ -373,7 +396,7 @@ def main():
             transition: transform 0.3s ease;
         }
         .logo-img:hover {
-            transform: scale(1.05);
+            transform: scale(1.1);
         }
         </style>
     """, unsafe_allow_html=True)
@@ -463,13 +486,13 @@ def main():
                     for job in jobs if job.get("UploadTimestamp")})
 
     with st.sidebar:
-        st.markdown("<div class='sidebar-box'><h2>Filters</h2>", unsafe_allow_html=True)
-        team_filter = st.selectbox("Team", ["All"] + teams)
-        player_filter = st.selectbox("Player Name", ["All"] + player_names)
-        source_filter = st.selectbox("Source", ["All"] + sources)
-        shot_type_filter = st.selectbox("Shot Type", ["All"] + shot_types)
-        date_filter = st.selectbox("Upload Date", ["All"] + dates)
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<div class='sidebar-box'><h2>Filters</h2></div>", unsafe_allow_html=True)
+        # Custom dropdowns
+        team_filter = st.selectbox("Team", ["All"] + teams, key="team_filter")
+        player_filter = st.selectbox("Player Name", ["All"] + player_names, key="player_filter")
+        source_filter = st.selectbox("Source", ["All"] + sources, key="source_filter")
+        shot_type_filter = st.selectbox("Shot Type", ["All"] + shot_types, key="shot_type_filter")
+        date_filter = st.selectbox("Upload Date", ["All"] + dates, key="date_filter")
 
     filtered_jobs = jobs
     if team_filter != "All":
@@ -565,7 +588,7 @@ def main():
                 f"""
                 <p>No logo available</p>
                 <p class='team-name'>{team_name}</p>
-                <p class='player-name'>{player_name}</p>
+                <p class='player-name'>{team_name}</p>
                 <p class='job-details'>{job_details_html}</p>
                 """,
                 unsafe_allow_html=True
