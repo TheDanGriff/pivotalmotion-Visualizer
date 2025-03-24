@@ -951,9 +951,8 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
 
 def show_spin_analysis_page(df_spin):
     if not df_spin.empty:
-        st HALL:
-            plot_spin_analysis(df_spin)
-            plot_spin_bullseye(df_spin)
-
+        st.header("Spin Analysis")
+        plot_spin_analysis(df_spin)
+        plot_spin_bullseye(df_spin)
 if __name__ == "__main__":
     main()
