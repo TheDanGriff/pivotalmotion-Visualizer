@@ -132,7 +132,7 @@ def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
     # Load and encode logo
-    logo_path = os.path.join("images", "redheart.jpeg")
+    logo_path = os.path.join("images", "whiteoutline.jpeg")
     try:
         with open(logo_path, "rb") as f:
             logo_data = base64.b64encode(f.read()).decode("utf-8")
@@ -141,7 +141,7 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with updated spacing and sidebar font color
+    # Enhanced CSS with fixes for font color and spacing
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -162,7 +162,7 @@ def main():
             border-radius: 0 10px 10px 0;
         }
         [data-testid="stSidebar"] * {
-            color: #2E3E4F !important; /* Grey text in sidebar */
+            color: #FFFFFF !important; /* White text in sidebar by default */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
         }
         [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
@@ -189,6 +189,9 @@ def main():
         [data-testid="stSidebar"] .css-17eq0hr:hover {
             background: rgba(255, 255, 255, 0.3);
         }
+        [data-testid="stSidebar"] .stSelectbox label /* Selectbox labels */ {
+            color: #FFFFFF !important; /* White labels for dropdowns */
+        }
         [data-testid="stSidebar"] .css-1v3fvcr /* Sidebar selectbox container */ {
             background: rgba(209, 32, 38, 0.8);
             border-radius: 8px;
@@ -198,7 +201,7 @@ def main():
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
         [data-testid="stSidebar"] select /* Dropdown text */ {
-            color: #FFFFFF !important; /* White for dropdown options for contrast */
+            color: #FFFFFF !important; /* White for dropdown options */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 20px !important;
         }
@@ -276,12 +279,12 @@ def main():
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 30px; /* Increased gap between logo and title */
+            gap: 30px; /* Space between logo and title */
         }
 
-        /* Divider Styling */
+        /* Divider Styling with increased spacing */
         .divider-space {
-            margin: 60px 0;
+            margin: 60px 0; /* Increased spacing between header and team logo */
         }
         .subtle-divider {
             border: none;
@@ -523,7 +526,8 @@ def main():
         else:
             job_details_html += char
 
-    # Display content with the logo
+    # Display content with the logo and increased spacing
+    st.markdown("<div class='divider-space'></div>", unsafe_allow_html=True)  # Increased spacing before team logo
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if team_logo_src:
