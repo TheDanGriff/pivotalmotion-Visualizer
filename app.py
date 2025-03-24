@@ -191,7 +191,7 @@ def main():
             background: rgba(209, 32, 38, 0.8);
             color: #2E3E4F !important; /* Dark grey for dropdown text */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            font-size: 25px !important;
+            font-size: 24px !important;
             border-radius: 8px;
             padding: 8px;
             margin: 5px 0;
