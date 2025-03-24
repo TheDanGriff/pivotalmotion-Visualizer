@@ -131,17 +131,17 @@ def format_source_type(source):
 def main():
     st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
     
-    # Load and encode logo
-    logo_path = os.path.join("images", "whiteoutline.jpeg")
+    # Load and encode logo with updated path
+    logo_path = os.path.join("images", "whiteoutline.png")
     try:
         with open(logo_path, "rb") as f:
             logo_data = base64.b64encode(f.read()).decode("utf-8")
-        logo_src = f"data:image/jpeg;base64,{logo_data}"
+        logo_src = f"data:image/png;base64,{logo_data}"
     except FileNotFoundError:
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with aggressive overrides for dropdowns
+    # Enhanced CSS with fixes for user info and dropdown cropping
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -162,7 +162,7 @@ def main():
             border-radius: 0 10px 10px 0 !important;
         }
 
-        /* Sidebar box for Filters header */
+        /* Sidebar box for headers and user info */
         .sidebar-box {
             background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%) !important;
             border: 2px solid #FFFFFF !important;
@@ -183,30 +183,17 @@ def main():
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2) !important;
             text-align: center !important;
         }
+        .sidebar-box p {
+            color: #FFFFFF !important; /* White for user info text */
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 18px !important;
+            margin: 5px 0 !important;
+            text-align: center !important;
+        }
 
-        /* User info text */
-        [data-testid="stSidebar"] .css-17eq0hr:not(:nth-child(3)) {
-            color: #FFFFFF !important;
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            font-size: 18px !important;
-            background: rgba(255, 255, 255, 0.1) !important;
-            padding: 10px 14px !important;
-            border-radius: 5px !important;
-            margin: 5px 0 !important;
-            transition: background 0.3s ease !important;
-        }
-        [data-testid="stSidebar"] .css-17eq0hr:nth-child(3) {
-            color: #FF4500 !important; /* Orange for email */
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            font-size: 18px !important;
-            background: rgba(255, 255, 255, 0.1) !important;
-            padding: 10px 14px !important;
-            border-radius: 5px !important;
-            margin: 5px 0 !important;
-            transition: background 0.3s ease !important;
-        }
-        [data-testid="stSidebar"] .css-17eq0hr:hover {
-            background: rgba(255, 255, 255, 0.3) !important;
+        /* Remove conflicting user info styles */
+        [data-testid="stSidebar"] .css-17eq0hr {
+            display: none !important; /* Hide default Streamlit text to use our custom HTML */
         }
 
         /* Creative dropdown styling */
@@ -214,27 +201,28 @@ def main():
             margin: 10px 0 !important;
         }
         [data-testid="stSidebar"] .stSelectbox > div > div > div {
-            background-color: #FFFFFF !important; /* White background for dropdown */
-            color: #2E3E4F !important; /* Grey text for options */
-            border: 2px solid #3A506B !important; /* Dark grey border */
+            background-color: #FFFFFF !important;
+            color: #2E3E4F !important;
+            border: 2px solid #3A506B !important;
             border-radius: 8px !important;
-            padding: 10px !important;
+            padding: 12px !important; /* Increased padding to prevent cropping */
+            min-height: 40px !important; /* Ensure enough height for text */
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2) !important;
             transition: all 0.3s ease !important;
         }
         [data-testid="stSidebar"] .stSelectbox > div > div > div:hover {
-            background-color: #F0F0F0 !important; /* Light grey hover */
+            background-color: #F0F0F0 !important;
             transform: translateY(-2px) !important;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25) !important;
         }
         [data-testid="stSidebar"] .stSelectbox > div > div > div:focus {
-            border-color: #FF4500 !important; /* Orange focus border */
+            border-color: #FF4500 !important;
             box-shadow: 0 0 5px rgba(255, 69, 0, 0.4) !important;
         }
 
         /* Dropdown titles */
         [data-testid="stSidebar"] .stSelectbox > label {
-            color: #FFFFFF !important; /* White for titles */
+            color: #FFFFFF !important;
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 18px !important;
             font-weight: bold !important;
@@ -321,7 +309,7 @@ def main():
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
-            gap: 30px !important; /* Space between logo and title */
+            gap: 30px !important;
         }
 
         /* Divider Styling with increased spacing */
@@ -463,7 +451,7 @@ def main():
                 unsafe_allow_html=True
             )
         
-        # Sidebar content
+        # Sidebar content with white user info
         st.sidebar.markdown(
             """
             <div class='sidebar-box'>
@@ -496,7 +484,6 @@ def main():
 
     with st.sidebar:
         st.markdown("<div class='sidebar-box'><h2>Filters</h2></div>", unsafe_allow_html=True)
-        # Creative dropdowns with custom labels
         team_filter = st.selectbox("Select Team", ["All"] + teams, key="team_filter")
         player_filter = st.selectbox("Select Player", ["All"] + player_names, key="player_filter")
         source_filter = st.selectbox("Select Source", ["All"] + sources, key="source_filter")
@@ -954,5 +941,6 @@ def show_spin_analysis_page(df_spin):
         st.header("Spin Analysis")
         plot_spin_analysis(df_spin)
         plot_spin_bullseye(df_spin)
+
 if __name__ == "__main__":
     main()
