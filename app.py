@@ -141,7 +141,7 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with creative custom dropdowns
+    # Enhanced CSS with adjusted dropdown titles
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -200,13 +200,16 @@ def main():
             margin: 10px 0;
             width: 100%;
         }
-        .custom-dropdown label {
-            color: #FFFFFF !important; /* White for dropdown titles */
+        /* Adjusted dropdown titles */
+        .sidebar-box .stSelectbox label {
+            color: #2E3E4F !important; /* Grey for dropdown titles */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            font-size: 16px !important;
+            font-size: 20px !important; /* Bigger font */
+            font-weight: bold !important; /* Bolded */
+            -webkit-text-stroke: 1px #FFFFFF !important; /* White outline */
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
             margin-bottom: 5px;
             display: block;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
         }
         .custom-dropdown select {
             background: linear-gradient(135deg, #FFFFFF 0%, #E0E0E0 100%);
@@ -219,7 +222,7 @@ def main():
             font-size: 16px !important;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(255, 255, 255, 0.8);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
-            appearance: none; /* Remove default arrow */
+            appearance: none;
             background-image: url('data:image/svg+xml;utf8,<svg fill="#2E3E4F" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
             background-repeat: no-repeat;
             background-position: right 10px center;
@@ -487,7 +490,7 @@ def main():
 
     with st.sidebar:
         st.markdown("<div class='sidebar-box'><h2>Filters</h2></div>", unsafe_allow_html=True)
-        # Custom dropdowns
+        # Custom dropdowns (still using st.selectbox for now due to functionality)
         team_filter = st.selectbox("Team", ["All"] + teams, key="team_filter")
         player_filter = st.selectbox("Player Name", ["All"] + player_names, key="player_filter")
         source_filter = st.selectbox("Source", ["All"] + sources, key="source_filter")
@@ -588,7 +591,7 @@ def main():
                 f"""
                 <p>No logo available</p>
                 <p class='team-name'>{team_name}</p>
-                <p class='player-name'>{team_name}</p>
+                <p class='player-name'>{player_name}</p>
                 <p class='job-details'>{job_details_html}</p>
                 """,
                 unsafe_allow_html=True
