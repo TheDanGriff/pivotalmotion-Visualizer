@@ -141,7 +141,7 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with creative sidebar boxes
+    # Enhanced CSS with creative metallic sidebar boxes
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -162,53 +162,57 @@ def main():
             border-radius: 0 10px 10px 0;
         }
 
-        /* Creative sidebar box styling */
+        /* Creative metallic sidebar box styling */
         .sidebar-box {
-            background: linear-gradient(135deg, #FFFFFF 0%, #F0F0F0 100%);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 1px 3px rgba(255, 255, 255, 0.5);
-            border: 1px solid #D12026;
+            background: linear-gradient(135deg, #E0E0E0 0%, #FFFFFF 100%);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15), inset 0 1px 2px rgba(255, 255, 255, 0.8);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
         .sidebar-box:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), inset 0 1px 3px rgba(255, 255, 255, 0.7);
+            transform: translateY(-3px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(255, 255, 255, 0.9);
         }
         .sidebar-box h2 {
             color: #2E3E4F !important; /* Grey for headers */
-            font-size: 24px !important;
-            margin-bottom: 15px;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 22px !important;
+            margin-bottom: 10px;
+            text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1);
         }
         .sidebar-box p, .sidebar-box label {
             color: #2E3E4F !important; /* Grey for text and labels */
-            font-size: 18px !important;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 16px !important;
+            margin: 5px 0;
         }
         .sidebar-box select {
             color: #2E3E4F !important; /* Grey for dropdown options */
             background: #FFFFFF;
-            border: 1px solid #D12026;
+            border: 1px solid #A0A0A0;
             border-radius: 5px;
-            padding: 8px;
+            padding: 6px;
             width: 100%;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 16px !important;
             transition: border-color 0.3s ease;
         }
         .sidebar-box select:hover {
-            border-color: #FF4047;
+            border-color: #3A506B;
         }
         .sidebar-box .stButton > button {
             color: #FFFFFF !important;
-            background: linear-gradient(135deg, #D12026 0%, #FF4047 100%);
+            background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%);
             border: none;
             border-radius: 5px;
-            padding: 10px 20px;
+            padding: 8px 16px;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             transition: background 0.3s ease, transform 0.3s ease;
         }
         .sidebar-box .stButton > button:hover {
-            background: linear-gradient(135deg, #FF4047 0%, #D12026 100%);
+            background: linear-gradient(135deg, #3A506B 0%, #2E3E4F 100%);
             transform: scale(1.05);
         }
 
@@ -418,7 +422,7 @@ def main():
                 unsafe_allow_html=True
             )
         
-        # Sidebar content in creative boxes
+        # Sidebar content in creative metallic boxes
         st.sidebar.markdown(
             """
             <div class='sidebar-box'>
@@ -450,13 +454,7 @@ def main():
                     for job in jobs if job.get("UploadTimestamp")})
 
     with st.sidebar:
-        st.markdown(
-            """
-            <div class='sidebar-box'>
-                <h2>Filters</h2>
-            """,
-            unsafe_allow_html=True
-        )
+        st.markdown("<div class='sidebar-box'><h2>Filters</h2>", unsafe_allow_html=True)
         team_filter = st.selectbox("Team", ["All"] + teams)
         player_filter = st.selectbox("Player Name", ["All"] + player_names)
         source_filter = st.selectbox("Source", ["All"] + sources)
