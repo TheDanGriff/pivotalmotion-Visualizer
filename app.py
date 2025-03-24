@@ -141,7 +141,7 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with adjusted dropdown titles
+    # Enhanced CSS with updated sidebar styling
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -153,7 +153,7 @@ def main():
             color: #333333 !important; /* Dark grey text on white background */
         }
 
-        /* Sidebar styling with updated gradient */
+        /* Sidebar styling with dark grey-to-blue gradient */
         [data-testid="stSidebar"] {
             background: linear-gradient(180deg, #2E3E4F 0%, #3A506B 100%);
             padding: 20px;
@@ -162,7 +162,40 @@ def main():
             border-radius: 0 10px 10px 0;
         }
 
-        /* Creative metallic dark grey sidebar box styling */
+        /* All sidebar items */
+        [data-testid="stSidebar"] .css-1d391kg, /* Sidebar header */
+        [data-testid="stSidebar"] .css-17eq0hr:not(:nth-child(3)) /* All text except email */ {
+            color: #FFFFFF !important; /* White for contrast */
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 24px !important;
+            background: rgba(255, 255, 255, 0.1); /* Light background for items */
+            padding: 10px 14px;
+            border-radius: 5px;
+            margin: 5px 0;
+            display: inline-block;
+            transition: background 0.3s ease;
+        }
+
+        /* Email text */
+        [data-testid="stSidebar"] .css-17eq0hr:nth-child(3) {
+            color: #ff4500 !important; /* Orange for email */
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 24px !important;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 14px;
+            border-radius: 5px;
+            margin: 5px 0;
+            display: inline-block;
+            transition: background 0.3s ease;
+        }
+
+        /* Hover effect for sidebar items */
+        [data-testid="stSidebar"] .css-1d391kg:hover,
+        [data-testid="stSidebar"] .css-17eq0hr:hover {
+            background: rgba(255, 255, 255, 0.3); /* Lighter on hover */
+        }
+
+        /* Sidebar box for Filters header */
         .sidebar-box {
             background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%);
             border: 2px solid #FFFFFF;
@@ -170,74 +203,49 @@ def main():
             padding: 15px;
             margin-bottom: 15px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.2);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
         }
-        .sidebar-box:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.3);
-        }
         .sidebar-box h2 {
-            color: #FFFFFF !important; /* White for headers */
+            color: #FFFFFF !important; /* White for Filters header */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 22px !important;
             margin: 0;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
             text-align: center;
         }
-        .sidebar-box p {
-            color: #FFFFFF !important; /* White for text */
+
+        /* Styling for select boxes in sidebar */
+        [data-testid="stSidebar"] .css-1v3fvcr {
+            background: rgba(255, 255, 255, 0.8); /* White box for dropdowns */
+            color: #2E3E4F !important; /* Grey text for options */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            font-size: 16px !important;
+            font-size: 20px !important;
+            border-radius: 8px;
+            padding: 8px;
             margin: 5px 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
 
-        /* Custom dropdown container */
-        .custom-dropdown {
-            margin: 10px 0;
-            width: 100%;
-        }
-        /* Adjusted dropdown titles */
-        .sidebar-box .stSelectbox label {
-            color: #2E3E4F !important; /* Grey for dropdown titles */
+        /* Ensure dropdown titles are white */
+        [data-testid="stSidebar"] .css-145kmo2 {
+            color: #FFFFFF !important; /* White for dropdown titles */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            font-size: 20px !important; /* Bigger font */
-            font-weight: bold !important; /* Bolded */
-            -webkit-text-stroke: 1px #FFFFFF !important; /* White outline */
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+            font-size: 20px !important;
             margin-bottom: 5px;
-            display: block;
         }
-        .custom-dropdown select {
-            background: linear-gradient(135deg, #FFFFFF 0%, #E0E0E0 100%);
-            color: #2E3E4F !important; /* Grey for dropdown options */
-            border: 1px solid #FFFFFF;
-            border-radius: 8px;
-            padding: 8px 12px;
-            width: 100%;
-            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
-            font-size: 16px !important;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(255, 255, 255, 0.8);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            appearance: none;
-            background-image: url('data:image/svg+xml;utf8,<svg fill="#2E3E4F" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
-            background-repeat: no-repeat;
-            background-position: right 10px center;
-        }
-        .custom-dropdown select:hover {
-            transform: scale(1.02);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.9);
-        }
-        .custom-dropdown select:focus {
-            outline: none;
-            border-color: #E0E0E0;
+
+        /* Hover effect for select boxes */
+        [data-testid="stSidebar"] .css-1v3fvcr:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
         }
 
         /* Sidebar button styling */
-        .sidebar-box .stButton > button {
+        [data-testid="stSidebar"] .stButton > button {
             color: #2E3E4F !important; /* Grey text for button */
             background: linear-gradient(135deg, #FFFFFF 0%, #E0E0E0 100%);
             border: 1px solid #FFFFFF;
@@ -246,7 +254,7 @@ def main():
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             transition: background 0.3s ease, transform 0.3s ease;
         }
-        .sidebar-box .stButton > button:hover {
+        [data-testid="stSidebar"] .stButton > button:hover {
             background: linear-gradient(135deg, #E0E0E0 0%, #FFFFFF 100%);
             transform: scale(1.05);
         }
@@ -457,7 +465,7 @@ def main():
                 unsafe_allow_html=True
             )
         
-        # Sidebar content in dark grey metallic boxes with white text
+        # Sidebar content
         st.sidebar.markdown(
             """
             <div class='sidebar-box'>
@@ -490,7 +498,6 @@ def main():
 
     with st.sidebar:
         st.markdown("<div class='sidebar-box'><h2>Filters</h2></div>", unsafe_allow_html=True)
-        # Custom dropdowns (still using st.selectbox for now due to functionality)
         team_filter = st.selectbox("Team", ["All"] + teams, key="team_filter")
         player_filter = st.selectbox("Player Name", ["All"] + player_names, key="player_filter")
         source_filter = st.selectbox("Source", ["All"] + sources, key="source_filter")
