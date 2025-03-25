@@ -48,7 +48,7 @@ def handle_login(cognito_client, get_username_by_email_func, email, password):
                 st.session_state['access_token'] = auth_result['AccessToken']
                 st.session_state['username'] = username
                 st.session_state['user_email'] = email
-                st.experimental_rerun()  # Immediately rerun to show main content
+                st.rerun()  # Updated to st.rerun()
             else:
                 st.error("Authentication failed. Please check your credentials.")
         else:

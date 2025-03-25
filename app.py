@@ -468,9 +468,8 @@ def main():
         )
         if st.sidebar.button("Logout"):
             st.session_state['authenticated'] = False
-            st.experimental_rerun()
-
-    user_email = st.session_state['user_email']
+            st.rerun()
+            user_email = st.session_state['user_email']
 
     pose_spin_jobs = fetch_user_completed_jobs(user_email)
     data_file_jobs = fetch_user_completed_data_file_jobs(user_email)
