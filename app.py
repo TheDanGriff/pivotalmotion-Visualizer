@@ -205,7 +205,7 @@ def main():
             color: #2E3E4F !important;
             border: 2px solid #3A506B !important;
             border-radius: 8px !important;
-            padding: 12px !important; /* Increased padding to prevent cropping */
+            padding: 8px !important; /* Increased padding to prevent cropping */
             min-height: 40px !important; /* Ensure enough height for text */
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2) !important;
             transition: all 0.3s ease !important;
