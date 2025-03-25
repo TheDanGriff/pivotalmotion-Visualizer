@@ -129,7 +129,7 @@ def format_source_type(source):
     return source.replace('_', ' ').title()
 
 def main():
-    st.set_page_config(page_title="Pivotal Motion Visualizer", layout="wide")
+    st.set_page_config(page_title="ShotMetrics", layout="wide")
     
     # Load and encode logo with updated path
     logo_path = os.path.join("images", "whiteoutline.png")
@@ -141,7 +141,7 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Enhanced CSS with fixes for user info and dropdown cropping
+    # Enhanced CSS with reduced glow for main title
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -205,7 +205,7 @@ def main():
             color: #2E3E4F !important;
             border: 2px solid #3A506B !important;
             border-radius: 8px !important;
-            padding: 8px !important; /* Increased padding to prevent cropping */
+            padding: 12px !important; /* Increased padding to prevent cropping */
             min-height: 40px !important; /* Ensure enough height for text */
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2) !important;
             transition: all 0.3s ease !important;
@@ -245,7 +245,7 @@ def main():
             transform: scale(1.05) !important;
         }
 
-        /* ShotMetrics header with animations and spacing */
+        /* ShotMetrics header with reduced glow */
         .shotmetrics-header {
             background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%) !important;
             padding: 50px 20px !important;
@@ -280,9 +280,9 @@ def main():
             font-weight: 400 !important;
             color: #FFFFFF !important;
             text-shadow: 
-                0 0 15px #FFFFFF,
-                0 0 30px #2E3E4F,
-                2px 2px 8px rgba(0, 0, 0, 0.6) !important;
+                0 0 5px #FFFFFF, /* Reduced blur radius from 15px to 5px */
+                0 0 10px #2E3E4F, /* Reduced from 30px to 10px */
+                2px 2px 4px rgba(0, 0, 0, 0.4) !important; /* Reduced opacity and blur */
             margin: 0 !important;
             animation: metallicShine 3s infinite alternate !important;
         }
@@ -291,8 +291,12 @@ def main():
             100% { transform: rotate(360deg); }
         }
         @keyframes metallicShine {
-            0% { text-shadow: 0 0 10px #FFFFFF, 2px 2px 8px rgba(46, 62, 79, 0.6), -2px -2px 8px rgba(46, 62, 79, 0.6); }
-            100% { text-shadow: 0 0 20px #FFFFFF, 3px 3px 12px rgba(46, 62, 79, 0.8), -3px -3px 12px rgba(46, 62, 79, 0.8); }
+            0% { 
+                text-shadow: 0 0 5px #FFFFFF, 2px 2px 4px rgba(46, 62, 79, 0.4), -2px -2px 4px rgba(46, 62, 79, 0.4); /* Reduced glow */
+            }
+            100% { 
+                text-shadow: 0 0 10px #FFFFFF, 3px 3px 6px rgba(46, 62, 79, 0.6), -3px -3px 6px rgba(46, 62, 79, 0.6); /* Reduced glow */
+            }
         }
         .shotmetrics-header::after {
             content: '';
