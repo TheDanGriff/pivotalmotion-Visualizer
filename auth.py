@@ -44,14 +44,15 @@ def handle_login(cognito_client, get_username_by_email_func, email, password):
         if username:
             auth_result = authenticate_user(cognito_client, username, password)
             if auth_result:
-                st.session_state['authenticated'] = True
                 st.session_state['access_token'] = auth_result['AccessToken']
                 st.session_state['username'] = username
                 st.session_state['user_email'] = email
-                st.success("Successfully logged in!")
+                return True
             else:
-                st.error("Authentication failed. Please check your credentials.")
+                return False
         else:
             st.error("Username retrieval failed.")
+            return False
     else:
         st.error("Please enter both email and password.")
+        return False
