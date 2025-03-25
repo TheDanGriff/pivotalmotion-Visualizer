@@ -66,7 +66,7 @@ logging.basicConfig(level=logging.INFO)
 # Initialize AWS clients
 cognito_client, dynamodb, s3_client = initialize_aws_clients()
 
-# Teams Dictionary (unchanged)
+# Teams Dictionary
 TEAMS = {
     'hawks': 'Atlanta Hawks',
     'nets': 'Brooklyn Nets',
@@ -130,12 +130,8 @@ def format_source_type(source):
 
 def main():
     st.set_page_config(page_title="ShotMetrics", layout="wide")
-
-    # Initialize session state for login status
-    if 'login_status' not in st.session_state:
-        st.session_state['login_status'] = "not_logged_in"
-
-    # Load and encode logo
+    
+    # Load and encode logo with updated path
     logo_path = os.path.join("images", "whiteoutline.png")
     try:
         with open(logo_path, "rb") as f:
@@ -145,10 +141,17 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # CSS remains mostly unchanged, but background is now handled dynamically
+    # Enhanced CSS with reduced glow for main title
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
+
+        /* Main app background remains white */
+        .stApp {
+            padding: 10px;
+            background: #FFFFFF;
+            color: #333333 !important;
+        }
 
         /* Sidebar styling with dark grey-to-blue gradient */
         [data-testid="stSidebar"] {
@@ -181,7 +184,7 @@ def main():
             text-align: center !important;
         }
         .sidebar-box p {
-            color: #FFFFFF !important;
+            color: #FFFFFF !important; /* White for user info text */
             font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
             font-size: 18px !important;
             margin: 5px 0 !important;
@@ -190,7 +193,7 @@ def main():
 
         /* Remove conflicting user info styles */
         [data-testid="stSidebar"] .css-17eq0hr {
-            display: none !important;
+            display: none !important; /* Hide default Streamlit text to use our custom HTML */
         }
 
         /* Creative dropdown styling */
@@ -202,8 +205,8 @@ def main():
             color: #2E3E4F !important;
             border: 2px solid #3A506B !important;
             border-radius: 8px !important;
-            padding: 8px !important;
-            min-height: 40px !important;
+            padding: 8px !important; /* Increased padding to prevent cropping */
+            min-height: 40px !important; /* Ensure enough height for text */
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2) !important;
             transition: all 0.3s ease !important;
         }
@@ -242,7 +245,7 @@ def main():
             transform: scale(1.05) !important;
         }
 
-        /* ShotMetrics header */
+        /* ShotMetrics header with reduced glow */
         .shotmetrics-header {
             background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%) !important;
             padding: 50px 20px !important;
@@ -277,9 +280,9 @@ def main():
             font-weight: 400 !important;
             color: #FFFFFF !important;
             text-shadow: 
-                0 0 5px #FFFFFF,
-                0 0 10px #2E3E4F,
-                2px 2px 4px rgba(0, 0, 0, 0.4) !important;
+                0 0 5px #FFFFFF, /* Reduced blur radius from 15px to 5px */
+                0 0 10px #2E3E4F, /* Reduced from 30px to 10px */
+                2px 2px 4px rgba(0, 0, 0, 0.4) !important; /* Reduced opacity and blur */
             margin: 0 !important;
             animation: metallicShine 3s infinite alternate !important;
         }
@@ -289,10 +292,10 @@ def main():
         }
         @keyframes metallicShine {
             0% { 
-                text-shadow: 0 0 5px #FFFFFF, 2px 2px 4px rgba(46, 62, 79, 0.4), -2px -2px 4px rgba(46, 62, 79, 0.4);
+                text-shadow: 0 0 5px #FFFFFF, 2px 2px 4px rgba(46, 62, 79, 0.4), -2px -2px 4px rgba(46, 62, 79, 0.4); /* Reduced glow */
             }
             100% { 
-                text-shadow: 0 0 10px #FFFFFF, 3px 3px 6px rgba(46, 62, 79, 0.6), -3px -3px 6px rgba(46, 62, 79, 0.6);
+                text-shadow: 0 0 10px #FFFFFF, 3px 3px 6px rgba(46, 62, 79, 0.6), -3px -3px 6px rgba(46, 62, 79, 0.6); /* Reduced glow */
             }
         }
         .shotmetrics-header::after {
@@ -313,7 +316,7 @@ def main():
             gap: 30px !important;
         }
 
-        /* Divider Styling */
+        /* Divider Styling with increased spacing */
         .divider-space {
             margin: 60px 0 !important;
         }
@@ -399,79 +402,49 @@ def main():
         </style>
     """, unsafe_allow_html=True)
 
-    # Dynamic background based on login status
-    if st.session_state['login_status'] in ["not_logged_in", "login_success"]:
-        st.markdown("""
-            <style>
-            .stApp {
-                background: linear-gradient(180deg, #2E3E4F 0%, #3A506B 100%) !important;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown("""
-            <style>
-            .stApp {
-                background: #FFFFFF !important;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-
-    # Login flow
-    if st.session_state['login_status'] == "not_logged_in":
+    # Display the ShotMetrics header with logo and title spaced apart
+    if logo_src:
         st.markdown(
-            "<div style='background: white; padding: 20px; border-radius: 10px; width: 300px; margin: 50px auto;'>",
+            f"""
+            <div class='shotmetrics-header'>
+                <div class='header-container'>
+                    <img src="{logo_src}" style='width: 150px; height: auto;'>
+                    <h1 class='shotmetrics-title'>ShotMetrics</h1>
+                </div>
+            </div>
+            """,
             unsafe_allow_html=True
         )
-        if logo_src:
-            st.markdown(
-                f"<div style='text-align: center; margin-bottom: 20px;'><img src='{logo_src}' style='width: 100px; height: auto;'></div>",
-                unsafe_allow_html=True
-            )
+    else:
+        st.markdown(
+            """
+            <div class='shotmetrics-header'>
+                <h1 class='shotmetrics-title'>ShotMetrics</h1>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    if not st.session_state.get('authenticated', False):
         with st.form("login_form"):
+            if logo_src:
+                st.markdown(
+                    f"""
+                    <div style='text-align: center; margin-bottom: 20px;'>
+                        <img src="{logo_src}" style='width: 100px; height: auto;'>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            st.header("Login")
             email = st.text_input("Email")
             password = st.text_input("Password", type="password")
             submit = st.form_submit_button("Login")
         if submit:
-            if handle_login(cognito_client, get_username_by_email, email, password):
-                st.session_state['login_status'] = "login_success"
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    elif st.session_state['login_status'] == "login_success":
-        st.markdown(
-            "<p style='color: green; text-align: center; font-size: 20px; margin-top: 50px;'>Login successful!</p>",
-            unsafe_allow_html=True
-        )
-        col1, col2 = st.columns([3, 1])
-        with col2:
-            if st.button("Continue", key="continue_button"):
-                st.session_state['login_status'] = "authenticated"
-
-    elif st.session_state['login_status'] == "authenticated":
-        # Display the ShotMetrics header
-        if logo_src:
-            st.markdown(
-                f"""
-                <div class='shotmetrics-header'>
-                    <div class='header-container'>
-                        <img src="{logo_src}" style='width: 150px; height: auto;'>
-                        <h1 class='shotmetrics-title'>ShotMetrics</h1>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-        else:
-            st.markdown(
-                """
-                <div class='shotmetrics-header'>
-                    <h1 class='shotmetrics-title'>ShotMetrics</h1>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-        # Sidebar content
+            handle_login(cognito_client, get_username_by_email, email, password)
+        return
+    else:
+        # Add logo to the top of the sidebar
         if logo_src:
             st.sidebar.markdown(
                 f"""
@@ -481,6 +454,8 @@ def main():
                 """,
                 unsafe_allow_html=True
             )
+        
+        # Sidebar content with white user info
         st.sidebar.markdown(
             """
             <div class='sidebar-box'>
@@ -488,181 +463,187 @@ def main():
                 <p><b>Username:</b> {}</p>
                 <p><b>Email:</b> {}</p>
             </div>
-            """.format(st.session_state.get('username', 'N/A'), st.session_state.get('user_email', 'N/A')),
+            """.format(st.session_state['username'], st.session_state['user_email']),
             unsafe_allow_html=True
         )
         if st.sidebar.button("Logout"):
-            st.session_state['login_status'] = "not_logged_in"
-            for key in ['access_token', 'username', 'user_email']:
-                if key in st.session_state:
-                    del st.session_state[key]
+            st.session_state['authenticated'] = False
             st.experimental_rerun()
 
-        # Main app content (unchanged from here onward)
-        user_email = st.session_state['user_email']
-        pose_spin_jobs = fetch_user_completed_jobs(user_email)
-        data_file_jobs = fetch_user_completed_data_file_jobs(user_email)
-        jobs = pose_spin_jobs + data_file_jobs
-        if not jobs:
-            st.info("No completed jobs found for this user.")
-            return
+    user_email = st.session_state['user_email']
 
-        teams = sorted({humanize_label(job.get("Team", "N/A")) for job in jobs if humanize_label(job.get("Team", "N/A")) != "N/A"})
-        player_names = sorted({humanize_label(job.get("PlayerName", "Unknown")) for job in jobs})
-        sources = sorted({job.get("Source", "Unknown").title() for job in jobs})
-        shot_types = ["3 Point", "Free Throw", "Mid-Range"]
-        dates = sorted({pd.to_datetime(int(job['UploadTimestamp']), unit='s').strftime('%Y-%m-%d')
-                        for job in jobs if job.get("UploadTimestamp")})
+    pose_spin_jobs = fetch_user_completed_jobs(user_email)
+    data_file_jobs = fetch_user_completed_data_file_jobs(user_email)
+    jobs = pose_spin_jobs + data_file_jobs
+    if not jobs:
+        st.info("No completed jobs found for this user.")
+        return
 
-        with st.sidebar:
-            st.markdown("<div class='sidebar-box'><h2>Filters</h2></div>", unsafe_allow_html=True)
-            team_filter = st.selectbox("Select Team", ["All"] + teams, key="team_filter")
-            player_filter = st.selectbox("Select Player", ["All"] + player_names, key="player_filter")
-            source_filter = st.selectbox("Select Source", ["All"] + sources, key="source_filter")
-            shot_type_filter = st.selectbox("Select Shot Type", ["All"] + shot_types, key="shot_type_filter")
-            date_filter = st.selectbox("Select Upload Date", ["All"] + dates, key="date_filter")
+    teams = sorted({humanize_label(job.get("Team", "N/A")) for job in jobs if humanize_label(job.get("Team", "N/A")) != "N/A"})
+    player_names = sorted({humanize_label(job.get("PlayerName", "Unknown")) for job in jobs})
+    sources = sorted({job.get("Source", "Unknown").title() for job in jobs})
+    shot_types = ["3 Point", "Free Throw", "Mid-Range"]
+    dates = sorted({pd.to_datetime(int(job['UploadTimestamp']), unit='s').strftime('%Y-%m-%d')
+                    for job in jobs if job.get("UploadTimestamp")})
 
-        filtered_jobs = jobs
-        if team_filter != "All":
-            filtered_jobs = [j for j in filtered_jobs if humanize_label(j.get("Team", "N/A")) == team_filter]
-        if player_filter != "All":
-            filtered_jobs = [j for j in filtered_jobs if humanize_label(j.get("PlayerName", "Unknown")) == player_filter]
-        if source_filter != "All":
-            filtered_jobs = [j for j in filtered_jobs if j.get("Source", "Unknown").title() == source_filter]
-        if shot_type_filter != "All":
-            filtered_jobs = [j for j in filtered_jobs if get_shot_type(j.get("ShootingType", "Unknown")) == shot_type_filter]
-        if date_filter != "All":
-            filtered_jobs = [j for j in filtered_jobs if pd.to_datetime(int(j["UploadTimestamp"]), unit='s').strftime('%Y-%m-%d') == date_filter]
+    with st.sidebar:
+        st.markdown("<div class='sidebar-box'><h2>Filters</h2></div>", unsafe_allow_html=True)
+        team_filter = st.selectbox("Select Team", ["All"] + teams, key="team_filter")
+        player_filter = st.selectbox("Select Player", ["All"] + player_names, key="player_filter")
+        source_filter = st.selectbox("Select Source", ["All"] + sources, key="source_filter")
+        shot_type_filter = st.selectbox("Select Shot Type", ["All"] + shot_types, key="shot_type_filter")
+        date_filter = st.selectbox("Select Upload Date", ["All"] + dates, key="date_filter")
 
-        if not filtered_jobs:
-            st.info("No jobs match the selected filters.")
-            return
+    filtered_jobs = jobs
+    if team_filter != "All":
+        filtered_jobs = [j for j in filtered_jobs if humanize_label(j.get("Team", "N/A")) == team_filter]
+    if player_filter != "All":
+        filtered_jobs = [j for j in filtered_jobs if humanize_label(j.get("PlayerName", "Unknown")) == player_filter]
+    if source_filter != "All":
+        filtered_jobs = [j for j in filtered_jobs if j.get("Source", "Unknown").title() == source_filter]
+    if shot_type_filter != "All":
+        filtered_jobs = [j for j in filtered_jobs if get_shot_type(j.get("ShootingType", "Unknown")) == shot_type_filter]
+    if date_filter != "All":
+        filtered_jobs = [j for j in filtered_jobs if pd.to_datetime(int(j["UploadTimestamp"]), unit='s').strftime('%Y-%m-%d') == date_filter]
 
-        selected_job = filtered_jobs[0]
-        selected_job_id = selected_job['JobID']
-        shot_type = get_shot_type(selected_job.get("ShootingType", "Unknown"))
+    if not filtered_jobs:
+        st.info("No jobs match the selected filters.")
+        return
 
-        if selected_job['Source'].lower() == 'pose_video':
-            segments = list_segments(s3_client, BUCKET_NAME, user_email, selected_job_id)
-        elif selected_job['Source'].lower() == 'data_file':
-            segments = list_data_file_job_segments(BUCKET_NAME, user_email, selected_job_id)
-        elif selected_job['Source'].lower() == 'spin_video':
-            segments = ["spin_axis"]
-        else:
-            st.error(f"Unsupported source type: {selected_job['Source']}")
-            return
+    selected_job = filtered_jobs[0]
+    selected_job_id = selected_job['JobID']
+    shot_type = get_shot_type(selected_job.get("ShootingType", "Unknown"))
 
-        if not segments:
-            st.error("No segments found for this job.")
-            return
+    # Get segment details
+    if selected_job['Source'].lower() == 'pose_video':
+        segments = list_segments(s3_client, BUCKET_NAME, user_email, selected_job_id)
+    elif selected_job['Source'].lower() == 'data_file':
+        segments = list_data_file_job_segments(BUCKET_NAME, user_email, selected_job_id)
+    elif selected_job['Source'].lower() == 'spin_video':
+        segments = ["spin_axis"]
+    else:
+        st.error(f"Unsupported source type: {selected_job['Source']}")
+        return
 
-        selected_segment = segments[0]
-        segment_label = humanize_segment_label(get_segment_label(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment, selected_job['Source']))
+    if not segments:
+        st.error("No segments found for this job.")
+        return
 
-        parts = segment_label.split(" | ")
-        segment_number = parts[0] if len(parts) > 0 else "1/1"
-        period = parts[1].replace("Period: ", "") if len(parts) > 1 and "Period: " in parts[1] else "N/A"
-        clock = parts[2].replace("Clock: ", "") if len(parts) > 2 and "Clock: " in parts[2] else "N/A"
-        shot_display = parts[3] if len(parts) > 3 else shot_type if shot_type in ["3 Point", "Free Throw", "Mid-Range"] else "Unknown"
+    selected_segment = segments[0]
+    segment_label = humanize_segment_label(get_segment_label(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment, selected_job['Source']))
 
-        player_name = humanize_label(selected_job.get('PlayerName', 'Unknown'))
-        team_name_shorthand = humanize_label(selected_job.get('Team', 'N/A'))
-        team_name = next((value for key, value in TEAMS.items() if key.lower() == team_name_shorthand.lower() or value.lower() == team_name_shorthand.lower()), team_name_shorthand)
-        team_shorthand = next((key for key, value in TEAMS.items() if value.lower() == team_name.lower()), team_name.lower().replace(' ', '-'))
-        logo_path = os.path.join("images", "teams", f"{team_shorthand}_logo.png")
-        default_logo_path = os.path.join("images", "teams", "default.png")
+    # Parse segment label
+    parts = segment_label.split(" | ")
+    segment_number = parts[0] if len(parts) > 0 else "1/1"
+    period = parts[1].replace("Period: ", "") if len(parts) > 1 and "Period: " in parts[1] else "N/A"
+    clock = parts[2].replace("Clock: ", "") if len(parts) > 2 and "Clock: " in parts[2] else "N/A"
+    shot_display = parts[3] if len(parts) > 3 else shot_type if shot_type in ["3 Point", "Free Throw", "Mid-Range"] else "Unknown"
 
+    # Display player, team, logo, and job details
+    player_name = humanize_label(selected_job.get('PlayerName', 'Unknown'))
+    team_name_shorthand = humanize_label(selected_job.get('Team', 'N/A'))
+    team_name = next((value for key, value in TEAMS.items() if key.lower() == team_name_shorthand.lower() or value.lower() == team_name_shorthand.lower()), team_name_shorthand)
+    team_shorthand = next((key for key, value in TEAMS.items() if value.lower() == team_name.lower()), team_name.lower().replace(' ', '-'))
+    logo_path = os.path.join("images", "teams", f"{team_shorthand}_logo.png")
+    default_logo_path = os.path.join("images", "teams", "default.png")
+
+    # Load and encode team logo as base64
+    try:
+        with open(logo_path, "rb") as f:
+            logo_data = base64.b64encode(f.read()).decode("utf-8")
+        team_logo_src = f"data:image/png;base64,{logo_data}"
+    except FileNotFoundError:
         try:
-            with open(logo_path, "rb") as f:
+            with open(default_logo_path, "rb") as f:
                 logo_data = base64.b64encode(f.read()).decode("utf-8")
             team_logo_src = f"data:image/png;base64,{logo_data}"
         except FileNotFoundError:
-            try:
-                with open(default_logo_path, "rb") as f:
-                    logo_data = base64.b64encode(f.read()).decode("utf-8")
-                team_logo_src = f"data:image/png;base64,{logo_data}"
-            except FileNotFoundError:
-                team_logo_src = None
-                st.warning(f"Team logo not found in {default_logo_path}")
+            team_logo_src = None
+            st.warning(f"Team logo not found in {default_logo_path}")
 
-        job_details_html = ""
-        for char in f"{segment_number} | Period: {period} | Clock: {clock} | {shot_display}":
-            if char.isdigit() or char in ":/":
-                job_details_html += f"<span class='numeric'>{char}</span>"
-            else:
-                job_details_html += char
+    # Format job details with numbers in Arial
+    job_details_html = ""
+    for char in f"{segment_number} | Period: {period} | Clock: {clock} | {shot_display}":
+        if char.isdigit() or char in ":/":
+            job_details_html += f"<span class='numeric'>{char}</span>"
+        else:
+            job_details_html += char
 
-        st.markdown("<div class='divider-space'></div>", unsafe_allow_html=True)
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            if team_logo_src:
-                st.markdown(
-                    f"""
-                    <img src="{team_logo_src}" class='logo-img'>
-                    <p class='team-name'>{team_name}</p>
-                    <p class='player-name'>{player_name}</p>
-                    <p class='job-details'>{job_details_html}</p>
-                    """,
-                    unsafe_allow_html=True
-                )
-            else:
-                st.markdown(
-                    f"""
-                    <p>No logo available</p>
-                    <p class='team-name'>{team_name}</p>
-                    <p class='player-name'>{player_name}</p>
-                    <p class='job-details'>{job_details_html}</p>
-                    """,
-                    unsafe_allow_html=True
-                )
-        st.markdown("<hr class='subtle-divider'>", unsafe_allow_html=True)
+    # Display content with the logo and increased spacing
+    st.markdown("<div class='divider-space'></div>", unsafe_allow_html=True)  # Increased spacing before team logo
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if team_logo_src:
+            st.markdown(
+                f"""
+                <img src="{team_logo_src}" class='logo-img'>
+                <p class='team-name'>{team_name}</p>
+                <p class='player-name'>{player_name}</p>
+                <p class='job-details'>{job_details_html}</p>
+                """,
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                f"""
+                <p>No logo available</p>
+                <p class='team-name'>{team_name}</p>
+                <p class='player-name'>{player_name}</p>
+                <p class='job-details'>{job_details_html}</p>
+                """,
+                unsafe_allow_html=True
+            )
+    st.markdown("<hr class='subtle-divider'>", unsafe_allow_html=True)
 
+    # Load segment data
+    if selected_job['Source'].lower() in ['pose_video', 'data_file']:
+        if selected_job['Source'].lower() == 'data_file':
+            df_segment = load_data_file_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
+        else:
+            df_segment = load_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
+    elif selected_job['Source'].lower() == 'spin_video':
+        df_segment = load_spin_axis_csv(s3_client, BUCKET_NAME, user_email, selected_job_id)
+    else:
+        st.error(f"Unsupported source type: {selected_job['Source']}")
+        return
+
+    if df_segment is not None and not df_segment.empty:
         if selected_job['Source'].lower() in ['pose_video', 'data_file']:
-            if selected_job['Source'].lower() == 'data_file':
-                df_segment = load_data_file_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
-            else:
-                df_segment = load_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
+            df_pose, df_ball = separate_pose_and_ball_tracking(df_segment, selected_job['Source'])
+            df_spin = pd.DataFrame()
         elif selected_job['Source'].lower() == 'spin_video':
-            df_segment = load_spin_axis_csv(s3_client, BUCKET_NAME, user_email, selected_job_id)
-        else:
-            st.error(f"Unsupported source type: {selected_job['Source']}")
-            return
+            df_spin = df_segment
+            df_pose, df_ball = pd.DataFrame(), pd.DataFrame()
+    else:
+        st.error("No data loaded. Please check the file format and contents.")
+        return
 
-        if df_segment is not None and not df_segment.empty:
-            if selected_job['Source'].lower() in ['pose_video', 'data_file']:
-                df_pose, df_ball = separate_pose_and_ball_tracking(df_segment, selected_job['Source'])
-                df_spin = pd.DataFrame()
-            elif selected_job['Source'].lower() == 'spin_video':
-                df_spin = df_segment
-                df_pose, df_ball = pd.DataFrame(), pd.DataFrame()
-        else:
-            st.error("No data loaded. Please check the file format and contents.")
-            return
+    metrics = {
+        'shot_distance': 0.0,
+        'release_height': 0.0,
+        'release_angle': 0.0,
+        'release_velocity': 0.0,
+        'release_time': 0.0,
+        'apex_height': 0.0,
+        'release_curvature': 0.0,
+        'lateral_deviation': 0.0
+    }
+    if not df_ball.empty:
+        try:
+            logger.debug(f"Columns in df_ball: {df_ball.columns.tolist()}")
+            logger.debug(f"Columns in df_pose: {df_pose.columns.tolist()}")
+            metrics, df_pose, df_ball = calculate_shot_metrics(df_pose, df_ball)
+        except Exception as e:
+            st.error(f"Error calculating metrics: {str(e)}")
 
-        metrics = {
-            'shot_distance': 0.0,
-            'release_height': 0.0,
-            'release_angle': 0.0,
-            'release_velocity': 0.0,
-            'release_time': 0.0,
-            'apex_height': 0.0,
-            'release_curvature': 0.0,
-            'lateral_deviation': 0.0
-        }
-        if not df_ball.empty:
-            try:
-                metrics, df_pose, df_ball = calculate_shot_metrics(df_pose, df_ball)
-            except Exception as e:
-                st.error(f"Error calculating metrics: {str(e)}")
+    tab1, tab2, tab3 = st.tabs(["Overview", "Biomechanics", "Spin Analysis"])
 
-        tab1, tab2, tab3 = st.tabs(["Overview", "Biomechanics", "Spin Analysis"])
-
-        with tab1:
-            show_overview_page(df_pose, df_ball, df_spin, metrics, selected_job['PlayerName'], shot_type)
-        with tab2:
-            show_biomechanics_page(df_pose, df_ball, df_spin, metrics)
-        with tab3:
-            show_spin_analysis_page(df_spin)
+    with tab1:
+        show_overview_page(df_pose, df_ball, df_spin, metrics, selected_job['PlayerName'], shot_type)
+    with tab2:
+        show_biomechanics_page(df_pose, df_ball, df_spin, metrics)
+    with tab3:
+        show_spin_analysis_page(df_spin)
 
 def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_type):
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
