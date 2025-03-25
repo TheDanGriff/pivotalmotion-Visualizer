@@ -466,10 +466,17 @@ def main():
             """.format(st.session_state['username'], st.session_state['user_email']),
             unsafe_allow_html=True
         )
+        
+        # Ensure user_email is defined and exists in session state
+        if 'user_email' not in st.session_state:
+            st.error("User email not found in session state. Please log in again.")
+            return
+        user_email = st.session_state['user_email']
+        
+        # Logout button
         if st.sidebar.button("Logout"):
             st.session_state['authenticated'] = False
             st.rerun()
-            user_email = st.session_state['user_email']
 
     pose_spin_jobs = fetch_user_completed_jobs(user_email)
     data_file_jobs = fetch_user_completed_data_file_jobs(user_email)
