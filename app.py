@@ -412,6 +412,17 @@ def main():
                     <h1 class='shotmetrics-title'>ShotMetrics</h1>
                 </div>
             </div>
+            <style>
+                .shotmetrics-header {{
+                    margin-bottom: 40px;  /* Increased from default */
+                }}
+                .header-container {{
+                    display: flex;
+                    align-items: center;
+                    gap: 20px;  /* Space between logo and title */
+                    justify-content: center;
+                }}
+            </style>
             """,
             unsafe_allow_html=True
         )
@@ -421,6 +432,11 @@ def main():
             <div class='shotmetrics-header'>
                 <h1 class='shotmetrics-title'>ShotMetrics</h1>
             </div>
+            <style>
+                .shotmetrics-header {{
+                    margin-bottom: 40px;  /* Increased from default */
+                }}
+            </style>
             """,
             unsafe_allow_html=True
         )
@@ -430,7 +446,7 @@ def main():
             if logo_src:
                 st.markdown(
                     f"""
-                    <div style='text-align: center; margin-bottom: 20px;'>
+                    <div style='text-align: center; margin-bottom: 30px; margin-top: 20px;'>
                         <img src="{logo_src}" style='width: 100px; height: auto;'>
                     </div>
                     """,
