@@ -434,7 +434,7 @@ def main():
             </div>
             <style>
                 .shotmetrics-header {{
-                    margin-bottom: 40px;  /* Increased from default */
+                    margin-bottom: 60px;  /* Increased from default */
                 }}
             </style>
             """,
