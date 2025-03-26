@@ -494,294 +494,436 @@ def main():
             st.session_state['authenticated'] = False
             st.rerun()
 
-        pose_spin_jobs = fetch_user_completed_jobs(user_email)
-        data_file_jobs = fetch_user_completed_data_file_jobs(user_email)
-        jobs = pose_spin_jobs + data_file_jobs
-        if not jobs:
-            st.info("No completed jobs found for this user.")
-            return
+import streamlit as st
+import logging
+import pandas as pd
+import numpy as np
+import os
+import base64
+from datetime import datetime
+from auth import handle_login
+from aws_client import initialize_aws_clients
+from config import BUCKET_NAME, FPS
+from data_processing import (
+    load_final_output,
+    load_spin_axis_csv,
+    separate_pose_and_ball_tracking,
+    get_username_by_email,
+    fetch_user_completed_jobs,
+    fetch_user_completed_data_file_jobs,
+    list_data_file_job_segments,
+    load_data_file_final_output,
+    calculate_shot_metrics,
+    calculate_body_alignment,
+    vector_angle,
+    create_alignment_diagram,
+    plot_curvature_analysis,
+    get_segment_label,
+    get_player_kpi_averages,
+    get_shot_type,
+    plot_shot_location,
+    plot_joint_flexion_analysis
+)
+from visualization import (
+    plot_single_shot,
+    show_brand_header,
+    display_kpi_grid,
+    plot_kinematic_sequence,
+    plot_spin_analysis,
+    plot_velocity_profile,
+    plot_trajectory_arc,
+    plot_asymmetry_radar,
+    plot_distance_over_height,
+    plot_3d_ball_path,
+    plot_velocity_vs_angle,
+    plot_spin_bullseye,
+    plot_shot_analysis,
+    plot_release_angle_analysis,
+    plot_foot_alignment,
+    create_foot_alignment_visual,
+    create_body_alignment_visual,
+    plot_shot_location_in_inches
+)
+from kpi import (
+    calculate_kpis_pose,
+    calculate_kpis_spin,
+    get_kpi_benchmarks,
+    calculate_release_velocity,
+    display_clickable_kpi_card,
+    animated_flip_kpi_card
+)
+from utils import add_time_column, humanize_label, humanize_segment_label
 
-        # Extract all possible seasons from jobs
-        seasons = sorted({job.get("Season", "2023-24") for job in jobs}, reverse=True)
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
-        with st.sidebar:
-            st.markdown("<div class='sidebar-box'><h2>Filters</h2></div>", unsafe_allow_html=True)
+# Initialize AWS clients
+cognito_client, dynamodb, s3_client = initialize_aws_clients()
+
+# Teams Dictionary
+TEAMS = {
+    'hawks': 'Atlanta Hawks',
+    'nets': 'Brooklyn Nets',
+    'celtics': 'Boston Celtics',
+    'hornets': 'Charlotte Hornets',
+    'bulls': 'Chicago Bulls',
+    'cavaliers': 'Cleveland Cavaliers',
+    'mavericks': 'Dallas Mavericks',
+    'nuggets': 'Denver Nuggets',
+    'pistons': 'Detroit Pistons',
+    'warriors': 'Golden State Warriors',
+    'rockets': 'Houston Rockets',
+    'pacers': 'Indiana Pacers',
+    'clippers': 'Los Angeles Clippers',
+    'lakers': 'Los Angeles Lakers',
+    'grizzlies': 'Memphis Grizzlies',
+    'heat': 'Miami Heat',
+    'bucks': 'Milwaukee Bucks',
+    'timberwolves': 'Minnesota Timberwolves',
+    'pelicans': 'New Orleans Pelicans',
+    'knicks': 'New York Knicks',
+    'thunder': 'Oklahoma City Thunder',
+    'magic': 'Orlando Magic',
+    '76ers': 'Philadelphia 76ers',
+    'suns': 'Phoenix Suns',
+    'blazers': 'Portland Trail Blazers',
+    'kings': 'Sacramento Kings',
+    'spurs': 'San Antonio Spurs',
+    'raptors': 'Toronto Raptors',
+    'jazz': 'Utah Jazz',
+    'wizards': 'Washington Wizards'
+}
+
+def parse_segment_label(segment_label):
+    """Parse segment label into date, period, clock, and shot type components."""
+    parts = [part.strip() for part in segment_label.split("|")]
+    
+    date = "Unknown"
+    period = "N/A"
+    clock = "N/A"
+    shot_type = "Unknown"
+    
+    if len(parts) > 0:
+        date = parts[0]
+    if len(parts) > 1 and "Period:" in parts[1]:
+        period = parts[1].replace("Period:", "").strip()
+    if len(parts) > 2 and "Clock:" in parts[2]:
+        clock = parts[2].replace("Clock:", "").strip()
+    if len(parts) > 3:
+        shot_type = parts[3]
+    
+    return date, period, clock, shot_type
+
+def process_segment_for_table(job, segment, s3_client):
+    """Process a single segment to extract all needed data for the table."""
+    try:
+        # Load the segment data to calculate metrics
+        if job['Source'].lower() in ['pose_video', 'data_file']:
+            if job['Source'].lower() == 'data_file':
+                df_segment = load_data_file_final_output(s3_client, BUCKET_NAME, job['user_email'], job['JobID'], segment)
+            else:
+                df_segment = load_final_output(s3_client, BUCKET_NAME, job['user_email'], job['JobID'], segment)
             
-            # Season filter
-            season_filter = st.selectbox("Select Season", ["All"] + seasons, key="season_filter")
-            
-            # Filter jobs by season first
-            season_filtered_jobs = [j for j in jobs 
-                                if season_filter == "All" or j.get("Season") == season_filter]
-            
-            # Team filter (dynamic based on season)
-            teams = ["All"] + sorted({humanize_label(j.get("Team", "N/A")) 
-                    for j in season_filtered_jobs 
-                    if humanize_label(j.get("Team", "N/A")) != "N/A"})
-            team_filter = st.selectbox("Select Team", teams, key="team_filter")
+            if df_segment is not None and not df_segment.empty:
+                df_pose, df_ball = separate_pose_and_ball_tracking(df_segment, job['Source'])
+                metrics, _, _ = calculate_shot_metrics(df_pose, df_ball)
+            else:
+                metrics = {}
+        else:
+            metrics = {}
+        
+        # Get segment label and parse it
+        segment_label = get_segment_label(s3_client, BUCKET_NAME, job['user_email'], 
+                                        job['JobID'], segment, job['Source'])
+        date, period, clock, shot_type = parse_segment_label(segment_label)
+        
+        # Determine shot outcome
+        outcome = "Miss"
+        if 'OUTCOME' in df_segment.columns:
+            outcome = "Make" if df_segment['OUTCOME'].iloc[0] == 'Y' else "Miss"
+        elif 'IS_MADE' in df_segment.columns:
+            outcome = "Make" if df_segment['IS_MADE'].iloc[0] in [True, 'TRUE', 1] else "Miss"
+        
+        return {
+            "Game Date": date,
+            "Period": period,
+            "Clock": clock,
+            "Player": humanize_label(job.get("PlayerName", "Unknown")),
+            "Team": humanize_label(job.get("Team", "N/A")),
+            "Shot Type": get_shot_type(shot_type) if shot_type != "Unknown" else get_shot_type(job.get("ShootingType", "Unknown")),
+            "Distance (ft)": metrics.get('shot_distance', 0),
+            "Release Angle": metrics.get('release_angle', 0),
+            "Release Velocity": metrics.get('release_velocity', 0),
+            "Apex Height": metrics.get('apex_height', 0),
+            "Release Time": metrics.get('release_time', 0),
+            "Side Curvature": metrics.get('weighted_curvature_area_side', 0),
+            "Rear Curvature": metrics.get('weighted_curvature_area_rear', 0),
+            "Lateral Deviation": metrics.get('lateral_deviation', 0),
+            "Result": outcome,
+            "JobID": job['JobID'],
+            "Segment": segment
+        }
+    except Exception as e:
+        logger.error(f"Error processing segment {segment} for job {job['JobID']}: {str(e)}")
+        return None
 
-            # Player filter (dynamic based on team)
-            team_filtered_jobs = [j for j in season_filtered_jobs 
-                                if team_filter == "All" or humanize_label(j.get("Team")) == team_filter]
-            player_names = ["All"] + sorted({humanize_label(j.get("PlayerName", "Unknown")) 
-                        for j in team_filtered_jobs})
-            player_filter = st.selectbox("Select Player", player_names, key="player_filter")
+def main():
+    st.set_page_config(page_title="ShotMetrics", layout="wide")
+    
+    # Load and encode logo
+    logo_path = os.path.join("images", "whiteoutline.png")
+    try:
+        with open(logo_path, "rb") as f:
+            logo_data = base64.b64encode(f.read()).decode("utf-8")
+        logo_src = f"data:image/png;base64,{logo_data}"
+    except FileNotFoundError:
+        logo_src = None
+        st.warning(f"Logo not found at {logo_path}")
 
-            # Game date filter (dynamic based on player)
-            player_filtered_jobs = [j for j in team_filtered_jobs 
-                                if player_filter == "All" or humanize_label(j.get("PlayerName", "Unknown")) == player_filter]
-            
-            # Extract game dates from segment labels
-            game_dates = set()
-            for job in player_filtered_jobs:
-                if job['Source'].lower() in ['pose_video', 'data_file']:
-                    segments = list_segments(s3_client, BUCKET_NAME, user_email, job['JobID'])
-                    for segment in segments:
-                        segment_label = get_segment_label(s3_client, BUCKET_NAME, user_email, 
-                                                        job['JobID'], segment, job['Source'])
-                        # Parse game date from segment label (assuming format contains date)
-                        if "|" in segment_label:
-                            parts = segment_label.split("|")
-                            if len(parts) > 1 and parts[1].strip():
-                                date_part = parts[1].strip()
-                                if any(char.isdigit() for char in date_part):
-                                    game_dates.add(date_part)
-            
-            date_filter = st.selectbox("Select Game Date", ["All"] + sorted(game_dates), key="date_filter")
+    # Authentication check
+    if not st.session_state.get('authenticated', False):
+        with st.form("login_form"):
+            if logo_src:
+                st.markdown(
+                    f"""
+                    <div style='text-align: center; margin-bottom: 30px; margin-top: 20px;'>
+                        <img src="{logo_src}" style='width: 100px; height: auto;'>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            st.header("Login")
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password")
+            submit = st.form_submit_button("Login")
+        if submit:
+            handle_login(cognito_client, get_username_by_email, email, password)
+        return
+    
+    # Main application after authentication
+    user_email = st.session_state['user_email']
+    username = st.session_state['username']
+    
+    # Sidebar setup
+    if logo_src:
+        st.sidebar.markdown(
+            f"""
+            <div style='text-align: center; margin-bottom: 20px;'>
+                <img src="{logo_src}" style='width: 120px; height: auto;'>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    
+    st.sidebar.markdown(
+        """
+        <div class='sidebar-box'>
+            <h2>User Information</h2>
+            <p><b>Username:</b> {}</p>
+            <p><b>Email:</b> {}</p>
+        </div>
+        """.format(username, user_email),
+        unsafe_allow_html=True
+    )
+    
+    if st.sidebar.button("Logout"):
+        st.session_state['authenticated'] = False
+        st.rerun()
 
-            # Other filters
-            sources = ["All"] + sorted({j.get("Source", "Unknown").title() for j in player_filtered_jobs})
-            source_filter = st.selectbox("Select Source", sources, key="source_filter")
-            
-            shot_types = ["All"] + ["3 Point", "Free Throw", "Mid-Range"]
-            shot_type_filter = st.selectbox("Select Shot Type", shot_types, key="shot_type_filter")
+    # Fetch and filter jobs
+    pose_spin_jobs = fetch_user_completed_jobs(user_email)
+    data_file_jobs = fetch_user_completed_data_file_jobs(user_email)
+    jobs = pose_spin_jobs + data_file_jobs
+    
+    # Add user_email to each job for processing
+    for job in jobs:
+        job['user_email'] = user_email
+    
+    if not jobs:
+        st.info("No completed jobs found for this user.")
+        return
 
-        # Apply all filters
-        filtered_jobs = player_filtered_jobs
-        if source_filter != "All":
-            filtered_jobs = [j for j in filtered_jobs if j.get("Source", "Unknown").title() == source_filter]
-        if shot_type_filter != "All":
-            filtered_jobs = [j for j in filtered_jobs if get_shot_type(j.get("ShootingType", "Unknown")) == shot_type_filter]
-        if date_filter != "All":
-            filtered_jobs = [j for j in filtered_jobs if any(
-                date_filter in get_segment_label(s3_client, BUCKET_NAME, user_email, j['JobID'], segment, j['Source'])
-                for segment in list_segments(s3_client, BUCKET_NAME, user_email, j['JobID'])
-            )]
+    # Extract all possible seasons from jobs
+    seasons = sorted({job.get("Season", "2023-24") for job in jobs}, reverse=True)
 
-        if not filtered_jobs:
-            st.info("No jobs match the selected filters.")
-            return
+    with st.sidebar:
+        st.markdown("<div class='sidebar-box'><h2>Filters</h2></div>", unsafe_allow_html=True)
+        
+        # Season filter
+        season_filter = st.selectbox("Select Season", ["All"] + seasons, key="season_filter")
+        
+        # Filter jobs by season first
+        season_filtered_jobs = [j for j in jobs 
+                            if season_filter == "All" or j.get("Season") == season_filter]
+        
+        # Team filter (dynamic based on season)
+        teams = ["All"] + sorted({humanize_label(j.get("Team", "N/A")) 
+                for j in season_filtered_jobs 
+                if humanize_label(j.get("Team", "N/A")) != "N/A"})
+        team_filter = st.selectbox("Select Team", teams, key="team_filter")
 
-        # Create DataFrame for table display
-        table_data = []
+        # Player filter (dynamic based on team)
+        team_filtered_jobs = [j for j in season_filtered_jobs 
+                            if team_filter == "All" or humanize_label(j.get("Team")) == team_filter]
+        player_names = ["All"] + sorted({humanize_label(j.get("PlayerName", "Unknown")) 
+                    for j in team_filtered_jobs})
+        player_filter = st.selectbox("Select Player", player_names, key="player_filter")
+
+        # Game date filter (dynamic based on player)
+        player_filtered_jobs = [j for j in team_filtered_jobs 
+                            if player_filter == "All" or humanize_label(j.get("PlayerName", "Unknown")) == player_filter]
+        
+        # Extract game dates from segment labels
+        game_dates = set()
+        for job in player_filtered_jobs:
+            if job['Source'].lower() in ['pose_video', 'data_file']:
+                segments = list_segments(s3_client, BUCKET_NAME, user_email, job['JobID'])
+                for segment in segments:
+                    segment_label = get_segment_label(s3_client, BUCKET_NAME, user_email, 
+                                                    job['JobID'], segment, job['Source'])
+                    date, _, _, _ = parse_segment_label(segment_label)
+                    if date != "Unknown":
+                        game_dates.add(date)
+        
+        date_filter = st.selectbox("Select Game Date", ["All"] + sorted(game_dates), key="date_filter")
+
+        # Other filters
+        sources = ["All"] + sorted({j.get("Source", "Unknown").title() for j in player_filtered_jobs})
+        source_filter = st.selectbox("Select Source", sources, key="source_filter")
+        
+        shot_types = ["All"] + ["3 Point", "Free Throw", "Mid-Range"]
+        shot_type_filter = st.selectbox("Select Shot Type", shot_types, key="shot_type_filter")
+
+    # Apply all filters
+    filtered_jobs = player_filtered_jobs
+    if source_filter != "All":
+        filtered_jobs = [j for j in filtered_jobs if j.get("Source", "Unknown").title() == source_filter]
+    if shot_type_filter != "All":
+        filtered_jobs = [j for j in filtered_jobs if get_shot_type(j.get("ShootingType", "Unknown")) == shot_type_filter]
+    if date_filter != "All":
+        filtered_jobs = [j for j in filtered_jobs if any(
+            date_filter in get_segment_label(s3_client, BUCKET_NAME, user_email, j['JobID'], segment, j['Source'])
+            for segment in list_segments(s3_client, BUCKET_NAME, user_email, j['JobID'])
+        )]
+
+    if not filtered_jobs:
+        st.info("No jobs match the selected filters.")
+        return
+
+    # Process all segments for table display
+    table_data = []
+    with st.spinner("Loading shot data..."):
         for job in filtered_jobs:
             segments = list_segments(s3_client, BUCKET_NAME, user_email, job['JobID'])
             for segment in segments:
-                segment_label = get_segment_label(s3_client, BUCKET_NAME, user_email, 
-                                                job['JobID'], segment, job['Source'])
-                
-                # Parse game date from segment label
-                game_date = "Unknown"
-                if "|" in segment_label:
-                    parts = segment_label.split("|")
-                    if len(parts) > 1 and parts[1].strip():
-                        game_date = parts[1].strip()
-                
-                # Get metrics (simplified for table display)
-                metrics = {
-                    'shot_distance': job.get('ShotDistance', 0),
-                    'release_angle': job.get('ReleaseAngle', 0),
-                    'release_velocity': job.get('ReleaseVelocity', 0),
-                    'made': job.get('Made', False)
-                }
-                
-                table_data.append({
-                    "Game Date": game_date,
-                    "Player": humanize_label(job.get("PlayerName", "Unknown")),
-                    "Team": humanize_label(job.get("Team", "N/A")),
-                    "Shot Type": get_shot_type(job.get("ShootingType", "Unknown")),
-                    "Distance (ft)": metrics.get('shot_distance', 0),
-                    "Release Angle": metrics.get('release_angle', 0),
-                    "Release Velocity": metrics.get('release_velocity', 0),
-                    "Result": "Make" if metrics.get('made', False) else "Miss",
-                    "JobID": job['JobID'],
-                    "Segment": segment
-                })
+                segment_data = process_segment_for_table(job, segment, s3_client)
+                if segment_data:
+                    table_data.append(segment_data)
 
-        df_table = pd.DataFrame(table_data)
+    if not table_data:
+        st.error("No valid shot data found for the selected filters.")
+        return
 
-        # Display interactive table
-        st.subheader("Filtered Shots")
-        
-        # Add selection column
-        df_table.insert(0, "Select", False)
-        
-        # Display editable dataframe with selection
-        edited_df = st.data_editor(
-            df_table,
-            column_config={
-                "Select": st.column_config.CheckboxColumn("Select"),
-                "Distance (ft)": st.column_config.NumberColumn(format="%.1f"),
-                "Release Angle": st.column_config.NumberColumn(format="%.1f°"),
-                "Release Velocity": st.column_config.NumberColumn(format="%.1f ft/s"),
-                "JobID": None,
-                "Segment": None
-            },
-            hide_index=True,
-            disabled=["Game Date", "Player", "Team", "Shot Type", "Distance (ft)", 
-                    "Release Angle", "Release Velocity", "Result"],
-            use_container_width=True,
-            key="shot_table"
-        )
+    # Create DataFrame for table display
+    df_table = pd.DataFrame(table_data)
 
-        # Get selected rows
-        selected_rows = edited_df[edited_df.Select]
-        
-        # Show aggregated stats if multiple selected
-        if len(selected_rows) > 1:
-            st.subheader("Aggregate Statistics")
-            agg_df = selected_rows[["Distance (ft)", "Release Angle", "Release Velocity"]].agg(['min', 'max', 'mean', 'std'])
-            st.dataframe(agg_df.style.format("{:.2f}"), use_container_width=True)
-        
-        # Show individual shot details when selected
-        if not selected_rows.empty:
-            selected_row = selected_rows.iloc[0] if len(selected_rows) == 1 else selected_rows.iloc[-1]
-            selected_job = next(j for j in filtered_jobs if j['JobID'] == selected_row['JobID'])
-            selected_segment = selected_row['Segment']
-            selected_job_id = selected_job['JobID']
-            shot_type = get_shot_type(selected_job.get("ShootingType", "Unknown"))
+    # Display interactive table
+    st.subheader("Filtered Shots")
+    
+    # Add selection column
+    df_table.insert(0, "Select", False)
+    
+    # Display editable dataframe with selection
+    edited_df = st.data_editor(
+        df_table,
+        column_config={
+            "Select": st.column_config.CheckboxColumn("Select"),
+            "Distance (ft)": st.column_config.NumberColumn(format="%.1f"),
+            "Release Angle": st.column_config.NumberColumn(format="%.1f°"),
+            "Release Velocity": st.column_config.NumberColumn(format="%.1f ft/s"),
+            "Apex Height": st.column_config.NumberColumn(format="%.1f ft"),
+            "Release Time": st.column_config.NumberColumn(format="%.2f s"),
+            "Side Curvature": st.column_config.NumberColumn(format="%.3f 1/ft"),
+            "Rear Curvature": st.column_config.NumberColumn(format="%.3f 1/ft"),
+            "Lateral Deviation": st.column_config.NumberColumn(format="%.2f ft"),
+            "JobID": None,
+            "Segment": None
+        },
+        hide_index=True,
+        disabled=["Game Date", "Period", "Clock", "Player", "Team", "Shot Type", 
+                "Distance (ft)", "Release Angle", "Release Velocity", "Apex Height",
+                "Release Time", "Side Curvature", "Rear Curvature", "Lateral Deviation", "Result"],
+        use_container_width=True,
+        key="shot_table"
+    )
 
-            # Get segment details
-            if selected_job['Source'].lower() == 'pose_video':
-                segments = list_segments(s3_client, BUCKET_NAME, user_email, selected_job_id)
-            elif selected_job['Source'].lower() == 'data_file':
-                segments = list_data_file_job_segments(BUCKET_NAME, user_email, selected_job_id)
-            elif selected_job['Source'].lower() == 'spin_video':
-                segments = ["spin_axis"]
+    # Get selected rows
+    selected_rows = edited_df[edited_df.Select]
+    
+    # Show aggregated stats if multiple selected
+    if len(selected_rows) > 1:
+        st.subheader("Aggregate Statistics")
+        agg_df = selected_rows[["Distance (ft)", "Release Angle", "Release Velocity", 
+                              "Apex Height", "Release Time", "Side Curvature", 
+                              "Rear Curvature", "Lateral Deviation"]].agg(['min', 'max', 'mean', 'std'])
+        st.dataframe(agg_df.style.format("{:.2f}"), use_container_width=True)
+    
+    # Show individual shot details when selected
+    if not selected_rows.empty:
+        selected_row = selected_rows.iloc[0] if len(selected_rows) == 1 else selected_rows.iloc[-1]
+        selected_job = next(j for j in filtered_jobs if j['JobID'] == selected_row['JobID'])
+        selected_segment = selected_row['Segment']
+        selected_job_id = selected_job['JobID']
+        shot_type = selected_row['Shot Type']
+
+        # Get segment details
+        if selected_job['Source'].lower() in ['pose_video', 'data_file']:
+            if selected_job['Source'].lower() == 'data_file':
+                df_segment = load_data_file_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
             else:
-                st.error(f"Unsupported source type: {selected_job['Source']}")
-                return
-
-            if not segments:
-                st.error("No segments found for this job.")
-                return
-
-            segment_label = humanize_segment_label(get_segment_label(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment, selected_job['Source']))
-
-            # Parse segment label
-            parts = segment_label.split(" | ")
-            segment_number = parts[0] if len(parts) > 0 else "1/1"
-            period = parts[1].replace("Period: ", "") if len(parts) > 1 and "Period: " in parts[1] else "N/A"
-            clock = parts[2].replace("Clock: ", "") if len(parts) > 2 and "Clock: " in parts[2] else "N/A"
-            shot_display = parts[3] if len(parts) > 3 else shot_type if shot_type in ["3 Point", "Free Throw", "Mid-Range"] else "Unknown"
-
-            # Display player, team, logo, and job details
-            player_name = humanize_label(selected_job.get('PlayerName', 'Unknown'))
-            team_name_shorthand = humanize_label(selected_job.get('Team', 'N/A'))
-            team_name = next((value for key, value in TEAMS.items() if key.lower() == team_name_shorthand.lower() or value.lower() == team_name_shorthand.lower()), team_name_shorthand)
-            team_shorthand = next((key for key, value in TEAMS.items() if value.lower() == team_name.lower()), team_name.lower().replace(' ', '-'))
-            logo_path = os.path.join("images", "teams", f"{team_shorthand}_logo.png")
-            default_logo_path = os.path.join("images", "teams", "default.png")
-
-            # Load and encode team logo as base64
-            try:
-                with open(logo_path, "rb") as f:
-                    logo_data = base64.b64encode(f.read()).decode("utf-8")
-                team_logo_src = f"data:image/png;base64,{logo_data}"
-            except FileNotFoundError:
-                try:
-                    with open(default_logo_path, "rb") as f:
-                        logo_data = base64.b64encode(f.read()).decode("utf-8")
-                    team_logo_src = f"data:image/png;base64,{logo_data}"
-                except FileNotFoundError:
-                    team_logo_src = None
-                    st.warning(f"Team logo not found in {default_logo_path}")
-
-            # Format job details with numbers in Arial
-            job_details_html = ""
-            for char in f"{segment_number} | Period: {period} | Clock: {clock} | {shot_display}":
-                if char.isdigit() or char in ":/":
-                    job_details_html += f"<span class='numeric'>{char}</span>"
-                else:
-                    job_details_html += char
-
-            # Display content with the logo and increased spacing
-            st.markdown("<div class='divider-space'></div>", unsafe_allow_html=True)
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                if team_logo_src:
-                    st.markdown(
-                        f"""
-                        <img src="{team_logo_src}" class='logo-img'>
-                        <p class='team-name'>{team_name}</p>
-                        <p class='player-name'>{player_name}</p>
-                        <p class='job-details'>{job_details_html}</p>
-                        """,
-                        unsafe_allow_html=True
-                    )
-                else:
-                    st.markdown(
-                        f"""
-                        <p>No logo available</p>
-                        <p class='team-name'>{team_name}</p>
-                        <p class='player-name'>{player_name}</p>
-                        <p class='job-details'>{job_details_html}</p>
-                        """,
-                        unsafe_allow_html=True
-                    )
-            st.markdown("<hr class='subtle-divider'>", unsafe_allow_html=True)
-
-            # Load segment data
-            if selected_job['Source'].lower() in ['pose_video', 'data_file']:
-                if selected_job['Source'].lower() == 'data_file':
-                    df_segment = load_data_file_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
-                else:
-                    df_segment = load_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
-            elif selected_job['Source'].lower() == 'spin_video':
-                df_segment = load_spin_axis_csv(s3_client, BUCKET_NAME, user_email, selected_job_id)
-            else:
-                st.error(f"Unsupported source type: {selected_job['Source']}")
-                return
-
-            if df_segment is not None and not df_segment.empty:
-                if selected_job['Source'].lower() in ['pose_video', 'data_file']:
-                    df_pose, df_ball = separate_pose_and_ball_tracking(df_segment, selected_job['Source'])
-                    df_spin = pd.DataFrame()
-                elif selected_job['Source'].lower() == 'spin_video':
-                    df_spin = df_segment
-                    df_pose, df_ball = pd.DataFrame(), pd.DataFrame()
-            else:
-                st.error("No data loaded. Please check the file format and contents.")
-                return
-
-            metrics = {
-                'shot_distance': 0.0,
-                'release_height': 0.0,
-                'release_angle': 0.0,
-                'release_velocity': 0.0,
-                'release_time': 0.0,
-                'apex_height': 0.0,
-                'release_curvature': 0.0,
-                'lateral_deviation': 0.0
-            }
-            if not df_ball.empty:
-                try:
-                    logger.debug(f"Columns in df_ball: {df_ball.columns.tolist()}")
-                    logger.debug(f"Columns in df_pose: {df_pose.columns.tolist()}")
-                    metrics, df_pose, df_ball = calculate_shot_metrics(df_pose, df_ball)
-                except Exception as e:
-                    st.error(f"Error calculating metrics: {str(e)}")
-
-            tab1, tab2, tab3 = st.tabs(["Overview", "Biomechanics", "Spin Analysis"])
-
-            with tab1:
-                show_overview_page(df_pose, df_ball, df_spin, metrics, selected_job['PlayerName'], shot_type)
-            with tab2:
-                show_biomechanics_page(df_pose, df_ball, df_spin, metrics)
-            with tab3:
-                show_spin_analysis_page(df_spin)
+                df_segment = load_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
+        elif selected_job['Source'].lower() == 'spin_video':
+            df_segment = load_spin_axis_csv(s3_client, BUCKET_NAME, user_email, selected_job_id)
         else:
-            st.info("Select one or more shots from the table above to view detailed analysis")
+            st.error(f"Unsupported source type: {selected_job['Source']}")
+            return
+
+        if df_segment is not None and not df_segment.empty:
+            if selected_job['Source'].lower() in ['pose_video', 'data_file']:
+                df_pose, df_ball = separate_pose_and_ball_tracking(df_segment, selected_job['Source'])
+                df_spin = pd.DataFrame()
+            elif selected_job['Source'].lower() == 'spin_video':
+                df_spin = df_segment
+                df_pose, df_ball = pd.DataFrame(), pd.DataFrame()
+        else:
+            st.error("No data loaded. Please check the file format and contents.")
+            return
+
+        # Calculate metrics if not already in table
+        metrics = {
+            'shot_distance': selected_row['Distance (ft)'],
+            'release_height': 0.0,
+            'release_angle': selected_row['Release Angle'],
+            'release_velocity': selected_row['Release Velocity'],
+            'release_time': selected_row['Release Time'],
+            'apex_height': selected_row['Apex Height'],
+            'release_curvature': selected_row['Side Curvature'] + selected_row['Rear Curvature'],
+            'lateral_deviation': selected_row['Lateral Deviation'],
+            'weighted_curvature_area_side': selected_row['Side Curvature'],
+            'weighted_curvature_area_rear': selected_row['Rear Curvature']
+        }
+
+        # Display detailed view
+        tab1, tab2, tab3 = st.tabs(["Overview", "Biomechanics", "Spin Analysis"])
+
+        with tab1:
+            show_overview_page(df_pose, df_ball, df_spin, metrics, selected_job['PlayerName'], shot_type)
+        with tab2:
+            show_biomechanics_page(df_pose, df_ball, df_spin, metrics)
+        with tab3:
+            show_spin_analysis_page(df_spin)
+    else:
+        st.info("Select one or more shots from the table above to view detailed analysis")
 
 def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_type):
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
