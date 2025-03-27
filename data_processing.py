@@ -1321,10 +1321,10 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     from scipy.signal import savgol_filter
     from plotly.subplots import make_subplots
 
-    # Use the indices computed in calculate_shot_metrics
-    lift_idx = int(metrics.get('lift_idx', 0))
-    set_idx = int(metrics.get('set_idx', 0))
-    release_idx = int(metrics.get('release_idx', lift_idx + 1))
+    # Use stored indices from metrics with consistent keys
+    lift_idx = int(metrics.get('lift_frame', 0))
+    set_idx = int(metrics.get('set_frame', 0))  # Use set_frame, no default to release_idx
+    release_idx = int(metrics.get('release_frame', lift_idx + 1))
 
     # Log indices for debugging
     logger.debug(f"Curvature indices - lift_frame: {lift_idx}, set_frame: {set_idx}, release_frame: {release_idx}")
@@ -1799,7 +1799,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
     INCHES_TO_FEET = 1 / 12
 
     # Get shot location at lift_idx (prefer foot position, fallback to ball position)
-    lift_idx = metrics.get('lift_idx', 0)
+    lift_idx = metrics.get['lift_idx']
     if pose_df is not None and 'MIDHIP_X' in pose_df.columns and 'MIDHIP_Y' in pose_df.columns:
         shot_x = pose_df.loc[lift_idx, 'MIDHIP_X']
         shot_y = pose_df.loc[lift_idx, 'MIDHIP_Y']
