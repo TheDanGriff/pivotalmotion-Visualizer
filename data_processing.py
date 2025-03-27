@@ -1006,8 +1006,8 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         ball_df['velocity_magnitude'] = (
             ball_df['velocity_magnitude']
             .interpolate(method='linear')
-            .bfill
-            .ffill
+            .fillna(method='bfill')
+            .fillna(method='ffill')
         )
 
         # 4. Identify key indices
