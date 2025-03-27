@@ -1321,7 +1321,27 @@ def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_
     from scipy.signal import savgol_filter
     from plotly.subplots import make_subplots
 
-    # Use the indices computed in calculate_shot_metrics
+    # If 'velocity_magnitude' is missing, compute it.
+    if 'velocity_magnitude' not in df_ball.columns:
+        required = ['Basketball_X', 'Basketball_Y', 'Basketball_Z']
+        if all(col in df_ball.columns for col in required):
+            df_ball['velocity_x'] = df_ball['Basketball_X'].diff() * fps
+            df_ball['velocity_y'] = df_ball['Basketball_Y'].diff() * fps
+            df_ball['velocity_z'] = df_ball['Basketball_Z'].diff() * fps
+            df_ball['velocity_magnitude'] = np.sqrt(
+                df_ball['velocity_x']**2 +
+                df_ball['velocity_y']**2 +
+                df_ball['velocity_z']**2
+            )
+            df_ball['velocity_magnitude'] = df_ball['velocity_magnitude'].replace(0, np.nan)
+            df_ball['velocity_magnitude'] = (df_ball['velocity_magnitude']
+                .interpolate(method='linear')
+                .fillna(method='bfill')
+                .fillna(method='ffill'))
+        else:
+            raise ValueError("df_ball is missing required columns for velocity computation.")
+
+    # Use the stored indices from metrics
     lift_idx = int(metrics.get('lift_idx', 0))
     set_idx = int(metrics.get('set_idx', 0))
     release_idx = int(metrics.get('release_idx', lift_idx + 1))
