@@ -617,6 +617,11 @@ def main():
         metrics['set_frame'] = metrics.get('set_idx')
         metrics['release_frame'] = metrics.get('release_idx')
 
+        # Ensure the release index is at least one frame after the lift index:
+        if metrics.get('release_idx', 0) <= metrics.get('lift_idx', 0):
+            metrics['release_idx'] = metrics.get('lift_idx', 0) + 1
+
+
 
         tab1, tab2, tab3 = st.tabs(["Overview", "Biomechanics Analysis", "Spin Analysis"])
         with tab1:
