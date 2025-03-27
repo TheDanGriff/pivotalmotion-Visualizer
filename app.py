@@ -598,16 +598,14 @@ def main():
 
         # Reuse the precomputed metrics from the table row for the detailed view.
         metrics = {
-            'shot_distance': selected_row['Distance (ft)'],
-            'Release Height': {'value': metrics.get('release_height', 0), 'min': 0, 'max': 12},
-            'release_angle': selected_row['Release Angle'],
-            'release_velocity': selected_row['Release Velocity'],
-            'release_time': selected_row['Release Time'],
-            'apex_height': selected_row['Apex Height'],
-            'release_curvature': selected_row['Side Curvature'] + selected_row['Rear Curvature'],
-            'lateral_deviation': selected_row['Lateral Deviation'],
-            'weighted_curvature_area_side': selected_row['Side Curvature'],
-            'weighted_curvature_area_rear': selected_row['Rear Curvature']
+            'shot_distance': 0.0,
+            'release_height': 0.0,
+            'release_angle': 0.0,
+            'release_velocity': 0.0,
+            'release_time': 0.0,
+            'apex_height': 0.0,
+            'release_curvature': 0.0,
+            'lateral_deviation': 0.0
         }
 
         tab1, tab2, tab3 = st.tabs(["Overview", "Biomechanics", "Spin Analysis"])
