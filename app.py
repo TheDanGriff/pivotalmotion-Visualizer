@@ -157,7 +157,7 @@ def process_segment_for_table(job, segment, s3_client):
             metrics = {}
 
         segment_label = get_segment_label(s3_client, BUCKET_NAME, job['user_email'], job['JobID'], segment, job['Source'])
-        date, period, clock, shot_type = parse_segment_label(segment_label)
+        date, period, clock, parsed_label_shot_type = parse_segment_label(segment_label)
 
         # Determine shot outcome
         outcome = "Miss"
@@ -172,6 +172,8 @@ def process_segment_for_table(job, segment, s3_client):
             "Clock": clock,
             "Player": humanize_label(job.get("PlayerName", "Unknown")),
             "Team": humanize_label(job.get("Team", "N/A")),
+            # Use the computed shot distance to classify shot type:
+            "Shot Type": get_shot_type(metrics.get('shot_distance', 0)),
             "Distance (ft)": metrics.get('shot_distance', 0),
             "Release Angle": metrics.get('release_angle', 0),
             "Release Velocity": metrics.get('release_velocity', 0),
@@ -187,6 +189,7 @@ def process_segment_for_table(job, segment, s3_client):
     except Exception as e:
         logger.error(f"Error processing segment {segment} for job {job['JobID']}: {str(e)}")
         return None
+
 
 # ---------------- Main App Function ---------------- #
 
@@ -546,7 +549,7 @@ def main():
             "Segment": None
         },
         hide_index=True,
-        disabled=["Game Date", "Period", "Clock", "Player", "Team", 
+        disabled=["Game Date", "Period", "Clock", "Player", "Team", "Shot Type", 
                   "Distance (ft)", "Release Angle", "Release Velocity", "Apex Height",
                   "Release Time", "Side Curvature", "Rear Curvature", "Lateral Deviation", "Result"],
         use_container_width=True,
@@ -568,6 +571,7 @@ def main():
         selected_job = next(j for j in filtered_jobs if j['JobID'] == selected_row['JobID'])
         selected_segment = selected_row['Segment']
         selected_job_id = selected_job['JobID']
+        shot_type = selected_row['Shot Type']
 
         # Load segment data based on the job's source
         if selected_job['Source'].lower() in ['pose_video', 'data_file']:
