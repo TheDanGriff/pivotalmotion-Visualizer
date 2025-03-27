@@ -611,14 +611,14 @@ def main():
             'weighted_curvature_area_side': selected_row['Side Curvature'],
             'weighted_curvature_area_rear': selected_row['Rear Curvature']
         }
-        
+
         # After calculating metrics in your app.py:
         metrics['lift_frame'] = metrics.get('lift_idx')
         metrics['set_frame'] = metrics.get('set_idx')
         metrics['release_frame'] = metrics.get('release_idx')
 
 
-        tab1, tab2, tab3 = st.tabs(["Overview", "Biomechanics", "Spin Analysis"])
+        tab1, tab2, tab3 = st.tabs(["Overview", "Biomechanics Analysis", "Spin Analysis"])
         with tab1:
             show_overview_page(df_pose, df_ball, df_spin, metrics, selected_job['PlayerName'], shot_type)
         with tab2:
