@@ -7,7 +7,6 @@ import plotly.graph_objects as go
 import os
 import base64
 from datetime import datetime
-from scipy import stats
 
 # Import your project modules
 from auth import handle_login
@@ -186,87 +185,6 @@ def process_segment_for_table(job, segment, s3_client):
     except Exception as e:
         logger.error(f"Error processing segment {segment} for job {job['JobID']}: {str(e)}")
         return None
-
-def create_aggregated_stats_table(selected_rows):
-    if len(selected_rows) < 2:
-        return None
-    
-    # Define numeric columns to aggregate
-    numeric_cols = [
-        "Distance (ft)", "Release Height", "Release Angle", "Release Velocity",
-        "Apex Height", "Release Time", "Side Curvature", "Rear Curvature",
-        "Lateral Deviation"
-    ]
-    
-    # Calculate means and standard deviations
-    agg_stats = {}
-    for col in numeric_cols:
-        values = selected_rows[col].astype(float)
-        agg_stats[col] = {
-            'mean': values.mean(),
-            'std': values.std(),
-            'values': values.tolist()
-        }
-    
-    # Create styled table
-    header_color = '#2E3E4F'
-    cell_color = '#FFFFFF'
-    yellow_threshold = 1  # 1 standard deviation
-    red_threshold = 2    # 2 standard deviations
-    
-    table_data = []
-    for col in numeric_cols:
-        mean = agg_stats[col]['mean']
-        std = agg_stats[col]['std']
-        row = [col, f"{mean:.2f}", f"±{std:.2f}"]
-        
-        # Calculate color coding for each value
-        colors = []
-        for value in agg_stats[col]['values']:
-            z_score = abs((value - mean) / std) if std > 0 else 0
-            if z_score > red_threshold:
-                colors.append('#FF6B6B')  # Red
-            elif z_score > yellow_threshold:
-                colors.append('#FFFF99')  # Yellow
-            else:
-                colors.append(cell_color)  # White
-        agg_stats[col]['colors'] = colors
-        
-        table_data.append(row)
-    
-    # Create Plotly table
-    fig = go.Figure(data=[go.Table(
-        header=dict(
-            values=['Metric', 'Average', 'Std Dev'],
-            fill_color=header_color,
-            align='center',
-            font=dict(color='white', size=14, family='Oswald'),
-            height=40
-        ),
-        cells=dict(
-            values=[list(x) for x in zip(*table_data)],
-            fill_color=[cell_color],
-            align='center',
-            font=dict(color='#333333', size=12, family='Oswald'),
-            height=30
-        )
-    )])
-    
-    fig.update_layout(
-        title={
-            'text': f"Aggregated Statistics ({len(selected_rows)} Shots)",
-            'y':0.95,
-            'x':0.5,
-            'xanchor': 'center',
-            'yanchor': 'top',
-            'font': dict(size=20, color='#2E3E4F', family='Oswald')
-        },
-        margin=dict(l=20, r=20, t=60, b=20),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
-    )
-    
-    return fig, agg_stats
 
 # ---------------- Detailed View Helper Functions ---------------- #
 
@@ -571,7 +489,7 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Insert combined CSS styling
+    # Insert combined CSS styling (your custom styling)
     st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
@@ -969,25 +887,6 @@ def main():
     )
 
     selected_rows = edited_df[edited_df.Select]
-    
-    # --- Aggregated Stats Section ---
-    if len(selected_rows) >= 2:
-        st.markdown("""
-            <div style='margin: 30px 0;'>
-                <h2 style='font-family: Oswald; color: #2E3E4F; text-align: center;'>
-                    Aggregated Statistics
-                </h2>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        agg_fig, agg_stats = create_aggregated_stats_table(selected_rows)
-        if agg_fig:
-            st.plotly_chart(agg_fig, use_container_width=True)
-            
-            # Add a subtle divider
-            st.markdown("""
-                <hr style='border: none; height: 2px; background: linear-gradient(to right, transparent, #2E3E4F, transparent); margin: 30px 0;'>
-            """, unsafe_allow_html=True)
 
     # --- Detailed View ---
     if not selected_rows.empty:
