@@ -172,7 +172,6 @@ def process_segment_for_table(job, segment, s3_client):
             "Clock": clock,
             "Player": humanize_label(job.get("PlayerName", "Unknown")),
             "Team": humanize_label(job.get("Team", "N/A")),
-            "Shot Type": get_shot_type(shot_type) if shot_type != "Unknown" else get_shot_type(job.get("ShootingType", "Unknown")),
             "Distance (ft)": metrics.get('shot_distance', 0),
             "Release Angle": metrics.get('release_angle', 0),
             "Release Velocity": metrics.get('release_velocity', 0),
