@@ -882,17 +882,29 @@ def main():
         st.info("No completed jobs found for this user.")
         return
 
-    seasons = sorted({job.get("Season", "2023-24") for job in jobs}, reverse=True)
+    # Initial processing to get all table data for shot type filtering
+    all_table_data = []
+    with st.spinner("Loading initial shot data..."):
+        for job in jobs:
+            segments = list_segments(s3_client, BUCKET_NAME, user_email, job['JobID'])
+            for segment in segments:
+                segment_data = process_segment_for_table(job, segment, s3_client)
+                if segment_data:
+                    all_table_data.append(segment_data)
+
+    all_df = pd.DataFrame(all_table_data)
+
     with st.sidebar:
         st.markdown("<div class='sidebar-box'><h2>Filters</h2></div>", unsafe_allow_html=True)
-        season_filter = st.selectbox("Select Season", ["All"] + seasons, key="season_filter")
-        season_filtered_jobs = [j for j in jobs if season_filter == "All" or j.get("Season") == season_filter]
-        teams = ["All"] + sorted({humanize_label(j.get("Team", "N/A")) for j in season_filtered_jobs if humanize_label(j.get("Team", "N/A")) != "N/A"})
+        
+        teams = ["All"] + sorted({humanize_label(j.get("Team", "N/A")) for j in jobs if humanize_label(j.get("Team", "N/A")) != "N/A"})
         team_filter = st.selectbox("Select Team", teams, key="team_filter")
-        team_filtered_jobs = [j for j in season_filtered_jobs if team_filter == "All" or humanize_label(j.get("Team")) == team_filter]
+        team_filtered_jobs = [j for j in jobs if team_filter == "All" or humanize_label(j.get("Team")) == team_filter]
+        
         player_names = ["All"] + sorted({humanize_label(j.get("PlayerName", "Unknown")) for j in team_filtered_jobs})
         player_filter = st.selectbox("Select Player", player_names, key="player_filter")
         player_filtered_jobs = [j for j in team_filtered_jobs if player_filter == "All" or humanize_label(j.get("PlayerName", "Unknown")) == player_filter]
+        
         game_dates = set()
         for job in player_filtered_jobs:
             if job['Source'].lower() in ['pose_video', 'data_file']:
@@ -903,36 +915,32 @@ def main():
                     if date != "Unknown":
                         game_dates.add(date)
         date_filter = st.selectbox("Select Game Date", ["All"] + sorted(game_dates), key="date_filter")
+        
         sources = ["All"] + sorted({j.get("Source", "Unknown").title() for j in player_filtered_jobs})
         source_filter = st.selectbox("Select Source", sources, key="source_filter")
-        shot_types = ["3 Point", "Free Throw", "Mid-Range"]
-        shot_type_filter = st.selectbox("Select Shot Type", ["All"] + shot_types, key="shot_type_filter")
+        
+        shot_types = ["All", "3 Point", "Free Throw", "Mid Range"]
+        shot_type_filter = st.selectbox("Select Shot Type", shot_types, key="shot_type_filter")
 
-    filtered_jobs = player_filtered_jobs
-    if source_filter != "All":
-        filtered_jobs = [j for j in filtered_jobs if j.get("Source", "Unknown").title() == source_filter]
-    if shot_type_filter != "All":
-        filtered_jobs = [j for j in filtered_jobs if get_shot_type(j.get("ShootingType", "Unknown")) == shot_type_filter]
+    # Process filtered table data
+    filtered_table_data = all_table_data
+    if team_filter != "All":
+        filtered_table_data = [d for d in filtered_table_data if d["Team"] == team_filter]
+    if player_filter != "All":
+        filtered_table_data = [d for d in filtered_table_data if d["Player"] == player_filter]
     if date_filter != "All":
-        filtered_jobs = [j for j in filtered_jobs if pd.to_datetime(int(j["UploadTimestamp"]), unit='s').strftime('%Y-%m-%d') == date_filter]
+        filtered_table_data = [d for d in filtered_table_data if d["Game Date"] == date_filter]
+    if source_filter != "All":
+        filtered_table_data = [d for d in filtered_table_data if format_source_type(d["Source"]) == source_filter]
+    if shot_type_filter != "All":
+        shot_type_filter = shot_type_filter.replace("Mid Range", "Mid-Range")  # Adjust for table data format
+        filtered_table_data = [d for d in filtered_table_data if d["Shot Type"] == shot_type_filter]
 
-    if not filtered_jobs:
+    if not filtered_table_data:
         st.info("No jobs match the selected filters.")
         return
 
-    # --- Process Segments for Interactive Table ---
-    table_data = []
-    with st.spinner("Loading shot data..."):
-        for job in filtered_jobs:
-            segments = list_segments(s3_client, BUCKET_NAME, user_email, job['JobID'])
-            for segment in segments:
-                segment_data = process_segment_for_table(job, segment, s3_client)
-                if segment_data:
-                    table_data.append(segment_data)
-
-    if not table_data:
-        st.error("No valid shot data found for the selected filters.")
-        return
+    df_table = pd.DataFrame(filtered_table_data)
 
     # --- Aggregation Selection Table ---
     st.markdown("""
@@ -943,7 +951,6 @@ def main():
         </div>
     """, unsafe_allow_html=True)
     
-    df_table = pd.DataFrame(table_data)
     df_table.insert(0, "Select", False)
     edited_df = st.data_editor(
         df_table,
@@ -1022,7 +1029,7 @@ def main():
                 st.plotly_chart(agg_fig, use_container_width=True)
             
             # Load comparison shot data
-            selected_job = next(j for j in filtered_jobs if j['JobID'] == comparison_row['JobID'])
+            selected_job = next(j for j in jobs if j['JobID'] == comparison_row['JobID'])
             selected_segment = comparison_row['Segment']
             selected_job_id = selected_job['JobID']
             shot_type = comparison_row['Shot Type']
