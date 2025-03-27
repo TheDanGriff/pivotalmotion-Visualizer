@@ -193,7 +193,7 @@ def create_aggregated_stats_table(selected_rows, comparison_row):
     
     # Define numeric columns to aggregate
     numeric_cols = [
-        "Distance (ft)", "Release Height", "Release Angle", "Release Velocity",
+        "Release Height", "Release Angle", "Release Velocity",
         "Apex Height", "Release Time", "Side Curvature", "Rear Curvature",
         "Lateral Deviation"
     ]
@@ -949,7 +949,6 @@ def main():
         df_table,
         column_config={
             "Select": st.column_config.CheckboxColumn("Select"),
-            "Distance (ft)": st.column_config.NumberColumn(format="%.1f"),
             "Release Angle": st.column_config.NumberColumn(format="%.1f°"),
             "Release Velocity": st.column_config.NumberColumn(format="%.1f ft/s"),
             "Apex Height": st.column_config.NumberColumn(format="%.1f ft"),
@@ -985,7 +984,6 @@ def main():
             df_table,
             column_config={
                 "Compare": st.column_config.CheckboxColumn("Compare"),
-                "Distance (ft)": st.column_config.NumberColumn(format="%.1f"),
                 "Release Angle": st.column_config.NumberColumn(format="%.1f°"),
                 "Release Velocity": st.column_config.NumberColumn(format="%.1f ft/s"),
                 "Apex Height": st.column_config.NumberColumn(format="%.1f ft"),
@@ -1012,7 +1010,7 @@ def main():
         if comparison_row is not None:
             # Show aggregated stats table
             st.markdown("""
-                <div style='margin: 30px 0;'>
+                <div style='margin: 40px 0;'>
                     <h2 style='font-family: Oswald; color: #2E3E4F; text-align: center;'>
                         Aggregated Statistics vs Comparison
                     </h2>
