@@ -186,375 +186,6 @@ def process_segment_for_table(job, segment, s3_client):
         logger.error(f"Error processing segment {segment} for job {job['JobID']}: {str(e)}")
         return None
 
-# ---------------- Aggregation and Metallic KPI Card Helpers ---------------- #
-
-def aggregate_kpis(selected_df):
-    """Aggregate KPI columns from the selected rows, returning mean and std for each."""
-    kpi_cols = ["Distance (ft)", "Release Height", "Release Angle", "Release Velocity",
-                "Apex Height", "Release Time", "Side Curvature", "Rear Curvature", "Lateral Deviation"]
-    agg_df = selected_df[kpi_cols].agg(['mean', 'std'])
-    return agg_df
-
-def kpi_metallic_color(mean_val, overall_avg, std_val):
-    """
-    Determine a metallic color based on how many std deviations mean_val is away from overall_avg.
-    (These thresholds and colors can be adjusted for a more 'metallic' appearance.)
-    """
-    if std_val == 0 or np.isnan(std_val):
-        return "silver"
-    diff = mean_val - overall_avg
-    normalized = diff / std_val
-    # Use gradients: far above average -> emerald, far below -> ruby, in between -> brass/gold.
-    if normalized > 1:
-        return "linear-gradient(90deg, #00c853, #64dd17)"  # Emerald gradient
-    elif normalized < -1:
-        return "linear-gradient(90deg, #d50000, #ff1744)"  # Ruby gradient
-    else:
-        return "linear-gradient(90deg, #ffab00, #ffd600)"  # Brass/Gold gradient
-
-def display_aggregated_kpi_cards(agg_df, overall_avgs):
-    """Display KPI cards using aggregated mean and std with metallic color styling."""
-    col_names = {
-        "Distance (ft)": "Shot Distance",
-        "Release Height": "Release Height",
-        "Release Angle": "Release Angle",
-        "Release Velocity": "Release Velocity",
-        "Apex Height": "Apex Height",
-        "Release Time": "Release Time",
-        "Side Curvature": "Side Curvature",
-        "Rear Curvature": "Rear Curvature",
-        "Lateral Deviation": "Lateral Deviation"
-    }
-    cols = st.columns(3)
-    idx = 0
-    for kpi, disp_name in col_names.items():
-        mean_val = agg_df.loc['mean', kpi]
-        std_val = agg_df.loc['std', kpi]
-        overall = overall_avgs.get(disp_name, 0)
-        color_style = kpi_metallic_color(mean_val, overall, std_val)
-        with cols[idx % 3]:
-            st.markdown(f"""
-            <div style='border: 2px solid #424242; border-radius: 10px; padding: 10px; margin: 5px;
-                        background: {color_style}; box-shadow: 0px 4px 8px rgba(0,0,0,0.3);'>
-                <h4 style='margin-bottom: 0; font-family: "Oswald", sans-serif;'>{disp_name}</h4>
-                <p style='font-size: 24px; margin: 0; font-weight: bold;'>{mean_val:.2f}</p>
-                <p style='margin: 0; font-size: 12px;'>Std: {std_val:.2f}</p>
-            </div>
-            """, unsafe_allow_html=True)
-        idx += 1
-
-# ---------------- Main App Function ---------------- #
-
-def main():
-    st.set_page_config(page_title="ShotMetrics", layout="wide")
-    
-    # Load and encode logo image
-    logo_path = os.path.join("images", "whiteoutline.png")
-    try:
-        with open(logo_path, "rb") as f:
-            logo_data = base64.b64encode(f.read()).decode("utf-8")
-        logo_src = f"data:image/png;base64,{logo_data}"
-    except FileNotFoundError:
-        logo_src = None
-        st.warning(f"Logo not found at {logo_path}")
-
-    # Insert combined CSS styling (Metallic look and creative table styling)
-    st.markdown("""
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
-        .stApp { padding: 10px; background: #FFFFFF; color: #333333 !important; }
-        [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #2E3E4F 0%, #3A506B 100%) !important;
-            padding: 20px !important; border-right: 2px solid #2E3E4F !important;
-            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1) !important; border-radius: 0 10px 10px 0 !important;
-        }
-        .sidebar-box {
-            background: linear-gradient(135deg, #2E3E4F, #3A506B) !important;
-            border: 2px solid #FFFFFF !important; border-radius: 10px !important;
-            padding: 15px !important; margin-bottom: 20px !important;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1) !important;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-        }
-        .sidebar-box h2 { color: #FFFFFF !important; font-family: 'Oswald', sans-serif !important;
-                         font-size: 22px !important; margin: 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); text-align: center; }
-        .sidebar-box p { color: #FFFFFF !important; font-family: 'Oswald', sans-serif !important;
-                         font-size: 18px; margin: 5px 0; text-align: center; }
-        [data-testid="stSidebar"] .stSelectbox { margin: 10px 0 !important; }
-        [data-testid="stSidebar"] .stSelectbox > div > div > div {
-            background-color: #FFFFFF !important; color: #2E3E4F !important;
-            border: 2px solid #3A506B !important; border-radius: 8px !important;
-            padding: 8px !important; min-height: 40px !important;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2) !important;
-            transition: all 0.3s ease;
-        }
-        [data-testid="stSidebar"] .stSelectbox > div > div > div:hover {
-            background-color: #F0F0F0 !important; transform: translateY(-2px) !important;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25) !important;
-        }
-        [data-testid="stSidebar"] .stButton > button {
-            color: #2E3E4F !important;
-            background: linear-gradient(135deg, #FFFFFF 0%, #E0E0E0 100%) !important;
-            border: 1px solid #FFFFFF !important; border-radius: 5px !important;
-            padding: 8px 16px !important; font-family: 'Oswald', sans-serif !important;
-            transition: background 0.3s ease, transform 0.3s ease;
-        }
-        [data-testid="stSidebar"] .stButton > button:hover {
-            background: linear-gradient(135deg, #E0E0E0 0%, #FFFFFF 100%) !important;
-            transform: scale(1.05) !important;
-        }
-        .shotmetrics-header {
-            background: linear-gradient(135deg, #2E3E4F, #3A506B) !important;
-            padding: 50px 20px !important; text-align: center !important;
-            border-bottom: 6px solid #FFFFFF !important;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.4) !important;
-            position: relative; width: 100%; margin: 0; overflow: hidden;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .shotmetrics-header::before {
-            content: ''; position: absolute; top: -50%; left: -50%;
-            width: 200%; height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 10%, transparent 60%);
-            animation: rotateGlow 15s linear infinite; z-index: -1;
-        }
-        .shotmetrics-title {
-            font-family: 'Oswald', sans-serif; font-size: 85px; font-weight: 400;
-            color: #FFFFFF; text-shadow: 0 0 5px #FFFFFF, 0 0 10px #2E3E4F, 2px 2px 4px rgba(0,0,0,0.4);
-            margin: 0; animation: metallicShine 3s infinite alternate;
-        }
-        @keyframes rotateGlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes metallicShine {
-            0% { text-shadow: 0 0 5px #FFFFFF, 2px 2px 4px rgba(46,62,79,0.4), -2px -2px 4px rgba(46,62,79,0.4); }
-            100% { text-shadow: 0 0 10px #FFFFFF, 3px 3px 6px rgba(46,62,79,0.6), -3px -3px 6px rgba(46,62,79,0.6); }
-        }
-        .header-container { display: flex; align-items: center; justify-content: center; gap: 30px; }
-        .divider-space { margin: 60px 0; }
-        .subtle-divider {
-            border: none; height: 4px;
-            background: linear-gradient(to right, transparent, #2E3E4F, transparent);
-            margin: 20px 0;
-        }
-        .team-name, .player-name {
-            font-family: 'Oswald', sans-serif; font-size: 36px; font-weight: bold;
-            color: transparent; background-clip: text; -webkit-background-clip: text;
-            background-image: linear-gradient(135deg, #2E3E4F, #3A506B);
-            text-transform: uppercase; -webkit-text-stroke: 0.5px #2E3E4F;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.3), -1px -1px 2px rgba(255,255,255,0.5);
-            margin: 0; line-height: 1.2; word-wrap: break-word; text-align: center;
-            transition: transform 0.3s ease;
-        }
-        .team-name:hover, .player-name:hover { transform: scale(1.05); }
-        .job-details {
-            font-family: 'Oswald', sans-serif; font-size: 18px; color: #333333;
-            text-transform: uppercase; margin: 0; line-height: 1.2; word-wrap: break-word;
-            text-align: center; transition: transform 0.3s ease;
-        }
-        .job-details span.numeric { font-family: Arial, sans-serif; color: #2E3E4F; }
-        .job-details:hover { transform: scale(1.05); }
-        .logo-img {
-            width: 150px; height: auto; margin-bottom: 30px;
-            display: block; margin-left: auto; margin-right: auto;
-            border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            transition: transform 0.3s ease;
-        }
-        .logo-img:hover { transform: scale(1.1); }
-        /* Metallic Data Editor styling */
-        .stDataEditor div[data-baseweb="table"] {
-            border: 2px solid #424242;
-            border-radius: 10px;
-            box-shadow: 0px 4px 8px rgba(0,0,0,0.3);
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Display header with logo and title
-    if logo_src:
-        st.markdown(f"""
-            <div class='shotmetrics-header'>
-                <div class='header-container'>
-                    <img src="{logo_src}" class="logo-img">
-                    <h1 class='shotmetrics-title'>ShotMetrics</h1>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown("""
-            <div class='shotmetrics-header'>
-                <h1 class='shotmetrics-title'>ShotMetrics</h1>
-            </div>
-        """, unsafe_allow_html=True)
-
-    # --- Authentication ---
-    if not st.session_state.get('authenticated', False):
-        with st.form("login_form"):
-            if logo_src:
-                st.markdown(f"""
-                    <div style='text-align: center; margin-bottom: 30px; margin-top: 20px;'>
-                        <img src="{logo_src}" style='width: 100px; height: auto;'>
-                    </div>
-                """, unsafe_allow_html=True)
-            st.header("Login")
-            email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
-            submit = st.form_submit_button("Login")
-        if submit:
-            handle_login(cognito_client, get_username_by_email, email, password)
-        return
-    else:
-        if logo_src:
-            st.sidebar.markdown(f"""
-                <div style='text-align: center; margin-bottom: 20px;'>
-                    <img src="{logo_src}" style='width: 120px; height: auto;'>
-                </div>
-            """, unsafe_allow_html=True)
-        st.sidebar.markdown(f"""
-            <div class='sidebar-box'>
-                <h2>User Information</h2>
-                <p><b>Username:</b> {st.session_state['username']}</p>
-                <p><b>Email:</b> {st.session_state['user_email']}</p>
-            </div>
-        """, unsafe_allow_html=True)
-        if st.sidebar.button("Logout"):
-            st.session_state['authenticated'] = False
-            st.experimental_rerun()
-
-    user_email = st.session_state['user_email']
-    username = st.session_state['username']
-
-    # --- Fetch Jobs & Apply Filters ---
-    pose_spin_jobs = fetch_user_completed_jobs(user_email)
-    data_file_jobs = fetch_user_completed_data_file_jobs(user_email)
-    jobs = pose_spin_jobs + data_file_jobs
-    for job in jobs:
-        job['user_email'] = user_email
-    if not jobs:
-        st.info("No completed jobs found for this user.")
-        return
-
-    # Remove Season filter; use Team, Player, Source, Shot Type and Upload Date only.
-    teams = sorted({humanize_label(job.get("Team", "N/A")) for job in jobs if humanize_label(job.get("Team", "N/A")) != "N/A"})
-    player_names = sorted({humanize_label(job.get("PlayerName", "Unknown")) for job in jobs})
-    sources = sorted({job.get("Source", "Unknown").title() for job in jobs})
-    shot_types = ["3 Point", "Free Throw", "Mid-Range"]
-    dates = sorted({pd.to_datetime(int(job['UploadTimestamp']), unit='s').strftime('%Y-%m-%d')
-                    for job in jobs if job.get("UploadTimestamp")})
-
-    with st.sidebar:
-        st.markdown("<div class='sidebar-box'><h2>Filters</h2></div>", unsafe_allow_html=True)
-        team_filter = st.selectbox("Select Team", ["All"] + teams, key="team_filter")
-        player_filter = st.selectbox("Select Player", ["All"] + player_names, key="player_filter")
-        source_filter = st.selectbox("Select Source", ["All"] + sources, key="source_filter")
-        shot_type_filter = st.selectbox("Select Shot Type", ["All"] + shot_types, key="shot_type_filter")
-        date_filter = st.selectbox("Select Upload Date", ["All"] + dates, key="date_filter")
-
-    filtered_jobs = jobs
-    if team_filter != "All":
-        filtered_jobs = [j for j in filtered_jobs if humanize_label(j.get("Team", "N/A")) == team_filter]
-    if player_filter != "All":
-        filtered_jobs = [j for j in filtered_jobs if humanize_label(j.get("PlayerName", "Unknown")) == player_filter]
-    if source_filter != "All":
-        filtered_jobs = [j for j in filtered_jobs if j.get("Source", "Unknown").title() == source_filter]
-    if shot_type_filter != "All":
-        filtered_jobs = [j for j in filtered_jobs if get_shot_type(j.get("ShootingType", "Unknown")) == shot_type_filter]
-    if date_filter != "All":
-        filtered_jobs = [j for j in filtered_jobs if pd.to_datetime(int(j["UploadTimestamp"]), unit='s').strftime('%Y-%m-%d') == date_filter]
-
-    if not filtered_jobs:
-        st.info("No jobs match the selected filters.")
-        return
-
-    # --- Process Segments for Interactive Table ---
-    table_data = []
-    with st.spinner("Loading shot data..."):
-        for job in filtered_jobs:
-            segments = list_segments(s3_client, BUCKET_NAME, user_email, job['JobID'])
-            for segment in segments:
-                segment_data = process_segment_for_table(job, segment, s3_client)
-                if segment_data:
-                    table_data.append(segment_data)
-    if not table_data:
-        st.error("No valid shot data found for the selected filters.")
-        return
-
-    df_table = pd.DataFrame(table_data)
-    st.subheader("Filtered Shots")
-    df_table.insert(0, "Select", False)
-    # Use a creative data editor with metallic touches (via CSS in the styling block above)
-    edited_df = st.data_editor(
-        df_table,
-        column_config={
-            "Select": st.column_config.CheckboxColumn("Select"),
-            "Distance (ft)": st.column_config.NumberColumn(format="%.1f"),
-            "Release Angle": st.column_config.NumberColumn(format="%.1f°"),
-            "Release Velocity": st.column_config.NumberColumn(format="%.1f ft/s"),
-            "Apex Height": st.column_config.NumberColumn(format="%.1f ft"),
-            "Release Time": st.column_config.NumberColumn(format="%.2f s"),
-            "Side Curvature": st.column_config.NumberColumn(format="%.3f 1/ft"),
-            "Rear Curvature": st.column_config.NumberColumn(format="%.3f 1/ft"),
-            "Lateral Deviation": st.column_config.NumberColumn(format="%.2f ft"),
-            "JobID": None,
-            "Segment": None
-        },
-        hide_index=True,
-        disabled=["Game Date", "Period", "Clock", "Player", "Team", "Shot Type", 
-                  "Distance (ft)", "Release Angle", "Release Velocity", "Apex Height",
-                  "Release Time", "Side Curvature", "Rear Curvature", "Lateral Deviation", "Result"],
-        use_container_width=True,
-        key="shot_table"
-    )
-    selected_rows = edited_df[edited_df.Select]
-
-    # --- If multiple shots are selected, display aggregated KPIs ---
-    if len(selected_rows) > 1:
-        st.subheader("Aggregate Statistics")
-        agg_df = aggregate_kpis(selected_rows)
-        overall_avgs = get_player_kpi_averages(st.session_state['username'], shot_type) or {}
-        st.dataframe(agg_df.style.format("{:.2f}"), use_container_width=True)
-        st.subheader("Aggregated KPI Cards")
-        display_aggregated_kpi_cards(agg_df, overall_avgs)
-
-    # --- Detailed View ---
-    if not selected_rows.empty:
-        selected_row = selected_rows.iloc[0] if len(selected_rows) == 1 else selected_rows.iloc[-1]
-        selected_job = next(j for j in filtered_jobs if j['JobID'] == selected_row['JobID'])
-        selected_segment = selected_row['Segment']
-        selected_job_id = selected_job['JobID']
-        shot_type = selected_row['Shot Type']
-
-        if selected_job['Source'].lower() in ['pose_video', 'data_file']:
-            if selected_job['Source'].lower() == 'data_file':
-                df_segment = load_data_file_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
-            else:
-                df_segment = load_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
-        elif selected_job['Source'].lower() == 'spin_video':
-            df_segment = load_spin_axis_csv(s3_client, BUCKET_NAME, user_email, selected_job_id)
-        else:
-            st.error(f"Unsupported source type: {selected_job['Source']}")
-            return
-
-        if df_segment is not None and not df_segment.empty:
-            if selected_job['Source'].lower() in ['pose_video', 'data_file']:
-                df_pose, df_ball = separate_pose_and_ball_tracking(df_segment, selected_job['Source'])
-                df_spin = pd.DataFrame()
-            elif selected_job['Source'].lower() == 'spin_video':
-                df_spin = df_segment
-                df_pose, df_ball = pd.DataFrame(), pd.DataFrame()
-        else:
-            st.error("No data loaded. Please check the file format and contents.")
-            return
-
-        # Recalculate full shot metrics from raw data
-        metrics, df_pose, df_ball = calculate_shot_metrics(df_pose, df_ball)
-
-        tab1, tab2, tab3 = st.tabs(["Overview", "Biomechanics Analysis", "Spin Analysis"])
-        with tab1:
-            show_overview_page(df_pose, df_ball, df_spin, metrics, selected_job['PlayerName'], shot_type)
-        with tab2:
-            show_biomechanics_page(df_pose, df_ball, df_spin, metrics)
-        with tab3:
-            show_spin_analysis_page(df_spin)
-    else:
-        st.info("Select one or more shots from the table above to view detailed analysis.")
-
 # ---------------- Detailed View Helper Functions ---------------- #
 
 def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_type):
@@ -585,7 +216,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
     else:
         st.error("No ball data available for shot location visualization.")
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
-
+    
     st.subheader("Key Performance Indicators")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -632,7 +263,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             description="Good range: 20-25 ft/s",
             calculation_info="Speed of the ball at release."
         )
-    col5, col6, col7 = st.columns(3)
+    col5, col6, col7 = st.columns([1, 1, 1])
     with col5:
         animated_flip_kpi_card(
             "Release Time",
@@ -667,7 +298,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             calculation_info="Measured lateral deviation."
         )
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
-
+    
     st.subheader("Curvature Analysis")
     col_curv_left, col_curv_right = st.columns(2)
     with col_curv_left:
@@ -694,13 +325,10 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             description="Good range: 0.05-0.15 1/ft",
             calculation_info="Cubic-weighted curvature area in YZ plane."
         )
-    try:
-        fig_curvature = plot_curvature_analysis(df_ball, metrics, weighting_exponent=3, num_interp=300, curvature_scale=2.3)
-        st.plotly_chart(fig_curvature, use_container_width=True)
-    except Exception as e:
-        st.error(f"Error generating curvature analysis: {e}")
+    fig_curvature = plot_curvature_analysis(df_ball, metrics, weighting_exponent=3, num_interp=300, curvature_scale=2.3)
+    st.plotly_chart(fig_curvature, use_container_width=True)
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
-
+    
     st.subheader("Ball Path Analysis")
     if not df_ball.empty:
         if fig_shot is not None:
@@ -717,7 +345,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             fig_3d = plot_3d_ball_path(df_ball)
             st.plotly_chart(fig_3d, use_container_width=True, key="overview_3d_ball_path")
         except Exception as e:
-            st.error(f"3D Ball Path Visualization error: {e}")
+            st.error(f"3D Ball Path Visualization error: {str(e)}")
     else:
         st.error("No ball data available for 3D ball path visualization.")
 
@@ -846,7 +474,7 @@ def show_spin_analysis_page(df_spin):
         plot_spin_analysis(df_spin)
         plot_spin_bullseye(df_spin)
 
-# ---------------- Main App Runner ---------------- #
+# ---------------- Main App Function ---------------- #
 
 def main():
     st.set_page_config(page_title="ShotMetrics", layout="wide")
@@ -861,129 +489,276 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Insert combined CSS styling (metallic look for KPI cards and creative table)
+    # Insert combined CSS styling (your custom styling)
     st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
-        .stApp { padding: 10px; background: #FFFFFF; color: #333333 !important; }
+
+        /* Main app background */
+        .stApp {
+            padding: 10px;
+            background: #FFFFFF;
+            color: #333333 !important;
+        }
+        /* Sidebar styling */
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #2E3E4F, #3A506B) !important;
-            padding: 20px; border-right: 2px solid #2E3E4F;
-            box-shadow: 2px 0 8px rgba(0,0,0,0.1); border-radius: 0 10px 10px 0;
+            background: linear-gradient(180deg, #2E3E4F 0%, #3A506B 100%) !important;
+            padding: 20px !important;
+            border-right: 2px solid #2E3E4F !important;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1) !important;
+            border-radius: 0 10px 10px 0 !important;
         }
+        /* Sidebar box styling */
         .sidebar-box {
-            background: linear-gradient(135deg, #2E3E4F, #3A506B);
-            border: 2px solid #FFFFFF; border-radius: 10px;
-            padding: 15px; margin-bottom: 20px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%) !important;
+            border: 2px solid #FFFFFF !important;
+            border-radius: 10px !important;
+            padding: 15px !important;
+            margin-bottom: 20px !important;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1) !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
         }
-        .sidebar-box h2 { color: #FFFFFF; font-family: 'Oswald', sans-serif; font-size: 22px; margin: 0;
-                           text-shadow: 1px 1px 2px rgba(0,0,0,0.2); text-align: center; }
-        .sidebar-box p { color: #FFFFFF; font-family: 'Oswald', sans-serif; font-size: 18px; margin: 5px 0;
-                         text-align: center; }
-        [data-testid="stSidebar"] .stSelectbox { margin: 10px 0; }
+        .sidebar-box h2 {
+            color: #FFFFFF !important;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 22px !important;
+            margin: 0 !important;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2) !important;
+            text-align: center !important;
+        }
+        .sidebar-box p {
+            color: #FFFFFF !important;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 18px !important;
+            margin: 5px 0 !important;
+            text-align: center !important;
+        }
+        /* Remove conflicting user info styles */
+        [data-testid="stSidebar"] .css-17eq0hr {
+            display: none !important;
+        }
+        /* Creative dropdown styling */
+        [data-testid="stSidebar"] .stSelectbox {
+            margin: 10px 0 !important;
+        }
         [data-testid="stSidebar"] .stSelectbox > div > div > div {
-            background-color: #FFFFFF; color: #2E3E4F;
-            border: 2px solid #3A506B; border-radius: 8px;
-            padding: 8px; min-height: 40px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            transition: all 0.3s ease;
+            background-color: #FFFFFF !important;
+            color: #2E3E4F !important;
+            border: 2px solid #3A506B !important;
+            border-radius: 8px !important;
+            padding: 8px !important;
+            min-height: 40px !important;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2) !important;
+            transition: all 0.3s ease !important;
         }
         [data-testid="stSidebar"] .stSelectbox > div > div > div:hover {
-            background-color: #F0F0F0; transform: translateY(-2px);
-            box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+            background-color: #F0F0F0 !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25) !important;
         }
+        [data-testid="stSidebar"] .stSelectbox > div > div > div:focus {
+            border-color: #FF4500 !important;
+            box-shadow: 0 0 5px rgba(255,69,0,0.4) !important;
+        }
+        /* Dropdown titles */
+        [data-testid="stSidebar"] .stSelectbox > label {
+            color: #FFFFFF !important;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 18px !important;
+            font-weight: bold !important;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2) !important;
+            margin-bottom: 5px !important;
+        }
+        /* Sidebar button styling */
         [data-testid="stSidebar"] .stButton > button {
-            color: #2E3E4F;
-            background: linear-gradient(135deg, #FFFFFF, #E0E0E0);
-            border: 1px solid #FFFFFF; border-radius: 5px;
-            padding: 8px 16px; font-family: 'Oswald', sans-serif;
-            transition: background 0.3s ease, transform 0.3s ease;
+            color: #2E3E4F !important;
+            background: linear-gradient(135deg, #FFFFFF 0%, #E0E0E0 100%) !important;
+            border: 1px solid #FFFFFF !important;
+            border-radius: 5px !important;
+            padding: 8px 16px !important;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            transition: background 0.3s ease, transform 0.3s ease !important;
         }
         [data-testid="stSidebar"] .stButton > button:hover {
-            background: linear-gradient(135deg, #E0E0E0, #FFFFFF);
-            transform: scale(1.05);
+            background: linear-gradient(135deg, #E0E0E0 0%, #FFFFFF 100%) !important;
+            transform: scale(1.05) !important;
         }
+        /* ShotMetrics header styling */
         .shotmetrics-header {
-            background: linear-gradient(135deg, #2E3E4F, #3A506B);
-            padding: 50px 20px; text-align: center;
-            border-bottom: 6px solid #FFFFFF;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-            position: relative; width: 100%; margin: 0; overflow: hidden;
-            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%) !important;
+            padding: 50px 20px !important;
+            text-align: center !important;
+            border-bottom: 6px solid #FFFFFF !important;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4) !important;
+            position: relative !important;
+            width: 100% !important;
+            margin: 0 !important;
+            top: 0 !important;
+            left: 0 !important;
+            z-index: 1 !important;
+            overflow: hidden !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
         }
         .shotmetrics-header::before {
             content: '';
-            position: absolute; top: -50%; left: -50%;
-            width: 200%; height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 10%, transparent 60%);
-            animation: rotateGlow 15s linear infinite; z-index: -1;
+            position: absolute !important;
+            top: -50% !important;
+            left: -50% !important;
+            width: 200% !important;
+            height: 200% !important;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 10%, transparent 60%) !important;
+            animation: rotateGlow 15s linear infinite !important;
+            z-index: -1 !important;
         }
         .shotmetrics-title {
-            font-family: 'Oswald', sans-serif; font-size: 85px; font-weight: 400;
-            color: #FFFFFF; text-shadow: 0 0 5px #FFFFFF, 0 0 10px #2E3E4F, 2px 2px 4px rgba(0,0,0,0.4);
-            margin: 0; animation: metallicShine 3s infinite alternate;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 85px !important;
+            font-weight: 400 !important;
+            color: #FFFFFF !important;
+            text-shadow: 0 0 5px #FFFFFF, 0 0 10px #2E3E4F, 2px 2px 4px rgba(0,0,0,0.4) !important;
+            margin: 0 !important;
+            animation: metallicShine 3s infinite alternate !important;
         }
-        @keyframes rotateGlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes rotateGlow {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
         @keyframes metallicShine {
-            0% { text-shadow: 0 0 5px #FFFFFF, 2px 2px 4px rgba(46,62,79,0.4), -2px -2px 4px rgba(46,62,79,0.4); }
-            100% { text-shadow: 0 0 10px #FFFFFF, 3px 3px 6px rgba(46,62,79,0.6), -3px -3px 6px rgba(46,62,79,0.6); }
+            0% { 
+                text-shadow: 0 0 5px #FFFFFF, 2px 2px 4px rgba(46,62,79,0.4), -2px -2px 4px rgba(46,62,79,0.4);
+            }
+            100% { 
+                text-shadow: 0 0 10px #FFFFFF, 3px 3px 6px rgba(46,62,79,0.6), -3px -3px 6px rgba(46,62,79,0.6);
+            }
         }
-        .header-container { display: flex; align-items: center; justify-content: center; gap: 30px; }
-        .divider-space { margin: 60px 0; }
+        .shotmetrics-header::after {
+            content: '';
+            position: absolute !important;
+            bottom: 10px !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 2px !important;
+            background: linear-gradient(to right, transparent, #FFFFFF, transparent) !important;
+        }
+        /* Logo and title container */
+        .header-container {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 30px !important;
+        }
+        /* Divider styling */
+        .divider-space {
+            margin: 60px 0 !important;
+        }
         .subtle-divider {
-            border: none; height: 4px;
-            background: linear-gradient(to right, transparent, #2E3E4F, transparent);
-            margin: 20px 0;
+            border: none !important;
+            height: 4px !important;
+            background: linear-gradient(to right, transparent, #2E3E4F, transparent) !important;
+            margin: 20px 0 !important;
         }
-        .team-name, .player-name {
-            font-family: 'Oswald', sans-serif; font-size: 36px; font-weight: bold;
-            color: transparent; background-clip: text; -webkit-background-clip: text;
-            background-image: linear-gradient(135deg, #2E3E4F, #3A506B);
-            text-transform: uppercase; -webkit-text-stroke: 0.5px #2E3E4F;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.3), -1px -1px 2px rgba(255,255,255,0.5);
-            margin: 0; line-height: 1.2; word-wrap: break-word; text-align: center;
-            transition: transform 0.3s ease;
+        /* Content styling */
+        .team-name {
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 36px !important;
+            font-weight: bold !important;
+            color: transparent !important;
+            background-clip: text !important;
+            -webkit-background-clip: text !important;
+            background-image: linear-gradient(135deg, #2E3E4F, #3A506B) !important;
+            text-transform: uppercase !important;
+            -webkit-text-stroke: 0.5px #2E3E4F !important;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3), -1px -1px 2px rgba(255,255,255,0.5) !important;
+            margin: 0 !important;
+            line-height: 1.2 !important;
+            word-wrap: break-word !important;
+            text-align: center !important;
+            transition: transform 0.3s ease !important;
         }
-        .team-name:hover, .player-name:hover { transform: scale(1.05); }
+        .team-name:hover {
+            transform: scale(1.05) !important;
+        }
+        .player-name {
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 36px !important;
+            color: transparent !important;
+            background-clip: text !important;
+            -webkit-background-clip: text !important;
+            background-image: linear-gradient(135deg, #2E3E4F, #3A506B) !important;
+            text-transform: uppercase !important;
+            -webkit-text-stroke: 0.5px #2E3E4F !important;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3), -1px -1px 2px rgba(255,255,255,0.5) !important;
+            margin: 20px 0 !important;
+            line-height: 1.2 !important;
+            word-wrap: break-word !important;
+            text-align: center !important;
+            transition: transform 0.3s ease !important;
+        }
+        .player-name:hover {
+            transform: scale(1.05) !important;
+        }
         .job-details {
-            font-family: 'Oswald', sans-serif; font-size: 18px; color: #333333;
-            text-transform: uppercase; margin: 0; line-height: 1.2; word-wrap: break-word;
-            text-align: center; transition: transform 0.3s ease;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 18px !important;
+            color: #333333 !important;
+            text-transform: uppercase !important;
+            margin: 0 !important;
+            line-height: 1.2 !important;
+            word-wrap: break-word !important;
+            text-align: center !important;
+            transition: transform 0.3s ease !important;
         }
-        .job-details span.numeric { font-family: Arial, sans-serif; color: #2E3E4F; }
-        .job-details:hover { transform: scale(1.05); }
+        .job-details span.numeric {
+            font-family: Arial, sans-serif !important;
+            color: #2E3E4F !important;
+        }
+        .job-details:hover {
+            transform: scale(1.05) !important;
+        }
         .logo-img {
-            width: 150px; height: auto; margin-bottom: 30px;
-            display: block; margin-left: auto; margin-right: auto;
-            border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            transition: transform 0.3s ease;
+            width: 150px !important;
+            height: auto !important;
+            margin-bottom: 30px !important;
+            display: block !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            border-radius: 50% !important;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+            transition: transform 0.3s ease !important;
         }
-        .logo-img:hover { transform: scale(1.1); }
-        /* Metallic look for the interactive data editor */
-        .stDataEditor div[data-baseweb="table"] {
-            border: 2px solid #424242; border-radius: 10px;
-            box-shadow: 0px 4px 8px rgba(0,0,0,0.3);
+        .logo-img:hover {
+            transform: scale(1.1) !important;
         }
     </style>
     """, unsafe_allow_html=True)
 
-    # Display header with logo and title (already above)
+    # Display header with logo and title
     if logo_src:
         st.markdown(f"""
             <div class='shotmetrics-header'>
                 <div class='header-container'>
-                    <img src="{logo_src}" class="logo-img">
+                    <img src="{logo_src}" style='width: 150px; height: auto;'>
                     <h1 class='shotmetrics-title'>ShotMetrics</h1>
                 </div>
             </div>
+            <style>
+                .shotmetrics-header {{ margin-bottom: 40px; }}
+                .header-container {{ display: flex; align-items: center; gap: 20px; justify-content: center; }}
+            </style>
         """, unsafe_allow_html=True)
     else:
         st.markdown("""
             <div class='shotmetrics-header'>
                 <h1 class='shotmetrics-title'>ShotMetrics</h1>
             </div>
+            <style>
+                .shotmetrics-header { margin-bottom: 60px; }
+            </style>
         """, unsafe_allow_html=True)
 
     # --- Authentication ---
@@ -1009,13 +784,13 @@ def main():
                     <img src="{logo_src}" style='width: 120px; height: auto;'>
                 </div>
             """, unsafe_allow_html=True)
-        st.sidebar.markdown(f"""
+        st.sidebar.markdown("""
             <div class='sidebar-box'>
                 <h2>User Information</h2>
-                <p><b>Username:</b> {st.session_state['username']}</p>
-                <p><b>Email:</b> {st.session_state['user_email']}</p>
+                <p><b>Username:</b> {}</p>
+                <p><b>Email:</b> {}</p>
             </div>
-        """, unsafe_allow_html=True)
+        """.format(st.session_state['username'], st.session_state['user_email']), unsafe_allow_html=True)
         if st.sidebar.button("Logout"):
             st.session_state['authenticated'] = False
             st.experimental_rerun()
@@ -1029,31 +804,38 @@ def main():
     jobs = pose_spin_jobs + data_file_jobs
     for job in jobs:
         job['user_email'] = user_email
+
     if not jobs:
         st.info("No completed jobs found for this user.")
         return
 
-    # Removed Season filter
-    teams = sorted({humanize_label(job.get("Team", "N/A")) for job in jobs if humanize_label(job.get("Team", "N/A")) != "N/A"})
-    player_names = sorted({humanize_label(job.get("PlayerName", "Unknown")) for job in jobs})
-    sources = sorted({job.get("Source", "Unknown").title() for job in jobs})
-    shot_types = ["3 Point", "Free Throw", "Mid-Range"]
-    dates = sorted({pd.to_datetime(int(job['UploadTimestamp']), unit='s').strftime('%Y-%m-%d')
-                    for job in jobs if job.get("UploadTimestamp")})
-
+    seasons = sorted({job.get("Season", "2023-24") for job in jobs}, reverse=True)
     with st.sidebar:
         st.markdown("<div class='sidebar-box'><h2>Filters</h2></div>", unsafe_allow_html=True)
-        team_filter = st.selectbox("Select Team", ["All"] + teams, key="team_filter")
-        player_filter = st.selectbox("Select Player", ["All"] + player_names, key="player_filter")
-        source_filter = st.selectbox("Select Source", ["All"] + sources, key="source_filter")
+        season_filter = st.selectbox("Select Season", ["All"] + seasons, key="season_filter")
+        season_filtered_jobs = [j for j in jobs if season_filter == "All" or j.get("Season") == season_filter]
+        teams = ["All"] + sorted({humanize_label(j.get("Team", "N/A")) for j in season_filtered_jobs if humanize_label(j.get("Team", "N/A")) != "N/A"})
+        team_filter = st.selectbox("Select Team", teams, key="team_filter")
+        team_filtered_jobs = [j for j in season_filtered_jobs if team_filter == "All" or humanize_label(j.get("Team")) == team_filter]
+        player_names = ["All"] + sorted({humanize_label(j.get("PlayerName", "Unknown")) for j in team_filtered_jobs})
+        player_filter = st.selectbox("Select Player", player_names, key="player_filter")
+        player_filtered_jobs = [j for j in team_filtered_jobs if player_filter == "All" or humanize_label(j.get("PlayerName", "Unknown")) == player_filter]
+        game_dates = set()
+        for job in player_filtered_jobs:
+            if job['Source'].lower() in ['pose_video', 'data_file']:
+                segments = list_segments(s3_client, BUCKET_NAME, user_email, job['JobID'])
+                for segment in segments:
+                    segment_label = get_segment_label(s3_client, BUCKET_NAME, user_email, job['JobID'], segment, job['Source'])
+                    date, _, _, _ = parse_segment_label(segment_label)
+                    if date != "Unknown":
+                        game_dates.add(date)
+        date_filter = st.selectbox("Select Game Date", ["All"] + sorted(game_dates), key="date_filter")
+        sources = ["All"] + sorted({j.get("Source", "Unknown").title() for j in player_filtered_jobs})
+        source_filter = st.selectbox("Select Source", sources, key="source_filter")
+        shot_types = ["3 Point", "Free Throw", "Mid-Range"]
         shot_type_filter = st.selectbox("Select Shot Type", ["All"] + shot_types, key="shot_type_filter")
-        date_filter = st.selectbox("Select Upload Date", ["All"] + dates, key="date_filter")
 
-    filtered_jobs = jobs
-    if team_filter != "All":
-        filtered_jobs = [j for j in filtered_jobs if humanize_label(j.get("Team", "N/A")) == team_filter]
-    if player_filter != "All":
-        filtered_jobs = [j for j in filtered_jobs if humanize_label(j.get("PlayerName", "Unknown")) == player_filter]
+    filtered_jobs = player_filtered_jobs
     if source_filter != "All":
         filtered_jobs = [j for j in filtered_jobs if j.get("Source", "Unknown").title() == source_filter]
     if shot_type_filter != "All":
@@ -1074,12 +856,12 @@ def main():
                 segment_data = process_segment_for_table(job, segment, s3_client)
                 if segment_data:
                     table_data.append(segment_data)
+
     if not table_data:
         st.error("No valid shot data found for the selected filters.")
         return
 
     df_table = pd.DataFrame(table_data)
-    st.subheader("Filtered Shots")
     df_table.insert(0, "Select", False)
     edited_df = st.data_editor(
         df_table,
@@ -1103,16 +885,8 @@ def main():
         use_container_width=True,
         key="shot_table"
     )
-    selected_rows = edited_df[edited_df.Select]
 
-    # --- If multiple shots are selected, display aggregated KPIs ---
-    if len(selected_rows) > 1:
-        st.subheader("Aggregate Statistics")
-        agg_df = aggregate_kpis(selected_rows)
-        overall_avgs = get_player_kpi_averages(st.session_state['username'], shot_type) or {}
-        st.dataframe(agg_df.style.format("{:.2f}"), use_container_width=True)
-        st.subheader("Aggregated KPI Cards")
-        display_aggregated_kpi_cards(agg_df, overall_avgs)
+    selected_rows = edited_df[edited_df.Select]
 
     # --- Detailed View ---
     if not selected_rows.empty:
@@ -1155,7 +929,7 @@ def main():
         with tab3:
             show_spin_analysis_page(df_spin)
     else:
-        st.info("Select one or more shots from the table above to view detailed analysis.")
+        st.info("Select one or more shots from the table above to view detailed analysis")
 
 if __name__ == "__main__":
     main()
