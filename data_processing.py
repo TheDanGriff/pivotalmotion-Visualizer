@@ -1799,7 +1799,7 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
     INCHES_TO_FEET = 1 / 12
 
     # Get shot location at lift_idx (prefer foot position, fallback to ball position)
-    lift_idx = metrics.get['lift_idx']
+    lift_idx = metrics.get('lift_idx', 0)
     if pose_df is not None and 'MIDHIP_X' in pose_df.columns and 'MIDHIP_Y' in pose_df.columns:
         shot_x = pose_df.loc[lift_idx, 'MIDHIP_X']
         shot_y = pose_df.loc[lift_idx, 'MIDHIP_Y']
