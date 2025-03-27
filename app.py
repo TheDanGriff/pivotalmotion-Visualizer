@@ -611,6 +611,12 @@ def main():
             'weighted_curvature_area_side': selected_row['Side Curvature'],
             'weighted_curvature_area_rear': selected_row['Rear Curvature']
         }
+        
+        # After calculating metrics in your app.py:
+        metrics['lift_frame'] = metrics.get('lift_idx')
+        metrics['set_frame'] = metrics.get('set_idx')
+        metrics['release_frame'] = metrics.get('release_idx')
+
 
         tab1, tab2, tab3 = st.tabs(["Overview", "Biomechanics", "Spin Analysis"])
         with tab1:
