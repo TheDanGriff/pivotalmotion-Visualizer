@@ -172,9 +172,9 @@ def process_segment_for_table(job, segment, s3_client):
             "Clock": clock,
             "Player": humanize_label(job.get("PlayerName", "Unknown")),
             "Team": humanize_label(job.get("Team", "N/A")),
-            # Use the computed shot distance to classify shot type:
             "Shot Type": get_shot_type(metrics.get('shot_distance', 0)),
             "Distance (ft)": metrics.get('shot_distance', 0),
+            "Release Height": metrics.get('release_height', 0),  # <-- Added line
             "Release Angle": metrics.get('release_angle', 0),
             "Release Velocity": metrics.get('release_velocity', 0),
             "Apex Height": metrics.get('apex_height', 0),
@@ -186,6 +186,8 @@ def process_segment_for_table(job, segment, s3_client):
             "JobID": job['JobID'],
             "Segment": segment
         }
+
+
     except Exception as e:
         logger.error(f"Error processing segment {segment} for job {job['JobID']}: {str(e)}")
         return None
