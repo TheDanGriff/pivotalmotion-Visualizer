@@ -546,7 +546,7 @@ def main():
             "Segment": None
         },
         hide_index=True,
-        disabled=["Game Date", "Period", "Clock", "Player", "Team", "Shot Type", 
+        disabled=["Game Date", "Period", "Clock", "Player", "Team", 
                   "Distance (ft)", "Release Angle", "Release Velocity", "Apex Height",
                   "Release Time", "Side Curvature", "Rear Curvature", "Lateral Deviation", "Result"],
         use_container_width=True,
@@ -568,7 +568,6 @@ def main():
         selected_job = next(j for j in filtered_jobs if j['JobID'] == selected_row['JobID'])
         selected_segment = selected_row['Segment']
         selected_job_id = selected_job['JobID']
-        shot_type = selected_row['Shot Type']
 
         # Load segment data based on the job's source
         if selected_job['Source'].lower() in ['pose_video', 'data_file']:
