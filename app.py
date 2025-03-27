@@ -208,6 +208,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
     except Exception as e:
         logger.error(f"Precompute shot analysis error: {str(e)}")
         fig_shot = None
+
     st.subheader("Shot Location")
     if not df_ball.empty:
         shot_location_fig = plot_shot_location(df_ball, metrics)
@@ -215,6 +216,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
     else:
         st.error("No ball data available for shot location visualization.")
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
+    
     st.subheader("Key Performance Indicators")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -296,6 +298,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             calculation_info="Measured lateral deviation."
         )
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
+    
     st.subheader("Curvature Analysis")
     col_curv_left, col_curv_right = st.columns(2)
     with col_curv_left:
@@ -325,6 +328,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
     fig_curvature = plot_curvature_analysis(df_ball, metrics, weighting_exponent=3, num_interp=300, curvature_scale=2.3)
     st.plotly_chart(fig_curvature, use_container_width=True)
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
+    
     st.subheader("Ball Path Analysis")
     if not df_ball.empty:
         if fig_shot is not None:
@@ -334,6 +338,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
     else:
         st.error("No ball data available for shot path visualization.")
     st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
+    
     st.subheader("3D Ball Path")
     if not df_ball.empty:
         try:
@@ -484,10 +489,251 @@ def main():
         logo_src = None
         st.warning(f"Logo not found at {logo_path}")
 
-    # Insert combined CSS styling
+    # Insert combined CSS styling (your custom styling)
     st.markdown("""
     <style>
-    /* (Your CSS styling here as in your current code) */
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap');
+
+        /* Main app background */
+        .stApp {
+            padding: 10px;
+            background: #FFFFFF;
+            color: #333333 !important;
+        }
+        /* Sidebar styling */
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #2E3E4F 0%, #3A506B 100%) !important;
+            padding: 20px !important;
+            border-right: 2px solid #2E3E4F !important;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1) !important;
+            border-radius: 0 10px 10px 0 !important;
+        }
+        /* Sidebar box styling */
+        .sidebar-box {
+            background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%) !important;
+            border: 2px solid #FFFFFF !important;
+            border-radius: 10px !important;
+            padding: 15px !important;
+            margin-bottom: 20px !important;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1) !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+        }
+        .sidebar-box h2 {
+            color: #FFFFFF !important;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 22px !important;
+            margin: 0 !important;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2) !important;
+            text-align: center !important;
+        }
+        .sidebar-box p {
+            color: #FFFFFF !important;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 18px !important;
+            margin: 5px 0 !important;
+            text-align: center !important;
+        }
+        /* Remove conflicting user info styles */
+        [data-testid="stSidebar"] .css-17eq0hr {
+            display: none !important;
+        }
+        /* Creative dropdown styling */
+        [data-testid="stSidebar"] .stSelectbox {
+            margin: 10px 0 !important;
+        }
+        [data-testid="stSidebar"] .stSelectbox > div > div > div {
+            background-color: #FFFFFF !important;
+            color: #2E3E4F !important;
+            border: 2px solid #3A506B !important;
+            border-radius: 8px !important;
+            padding: 8px !important;
+            min-height: 40px !important;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2) !important;
+            transition: all 0.3s ease !important;
+        }
+        [data-testid="stSidebar"] .stSelectbox > div > div > div:hover {
+            background-color: #F0F0F0 !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25) !important;
+        }
+        [data-testid="stSidebar"] .stSelectbox > div > div > div:focus {
+            border-color: #FF4500 !important;
+            box-shadow: 0 0 5px rgba(255,69,0,0.4) !important;
+        }
+        /* Dropdown titles */
+        [data-testid="stSidebar"] .stSelectbox > label {
+            color: #FFFFFF !important;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 18px !important;
+            font-weight: bold !important;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2) !important;
+            margin-bottom: 5px !important;
+        }
+        /* Sidebar button styling */
+        [data-testid="stSidebar"] .stButton > button {
+            color: #2E3E4F !important;
+            background: linear-gradient(135deg, #FFFFFF 0%, #E0E0E0 100%) !important;
+            border: 1px solid #FFFFFF !important;
+            border-radius: 5px !important;
+            padding: 8px 16px !important;
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            transition: background 0.3s ease, transform 0.3s ease !important;
+        }
+        [data-testid="stSidebar"] .stButton > button:hover {
+            background: linear-gradient(135deg, #E0E0E0 0%, #FFFFFF 100%) !important;
+            transform: scale(1.05) !important;
+        }
+        /* ShotMetrics header styling */
+        .shotmetrics-header {
+            background: linear-gradient(135deg, #2E3E4F 0%, #3A506B 100%) !important;
+            padding: 50px 20px !important;
+            text-align: center !important;
+            border-bottom: 6px solid #FFFFFF !important;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4) !important;
+            position: relative !important;
+            width: 100% !important;
+            margin: 0 !important;
+            top: 0 !important;
+            left: 0 !important;
+            z-index: 1 !important;
+            overflow: hidden !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        .shotmetrics-header::before {
+            content: '';
+            position: absolute !important;
+            top: -50% !important;
+            left: -50% !important;
+            width: 200% !important;
+            height: 200% !important;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 10%, transparent 60%) !important;
+            animation: rotateGlow 15s linear infinite !important;
+            z-index: -1 !important;
+        }
+        .shotmetrics-title {
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 85px !important;
+            font-weight: 400 !important;
+            color: #FFFFFF !important;
+            text-shadow: 0 0 5px #FFFFFF, 0 0 10px #2E3E4F, 2px 2px 4px rgba(0,0,0,0.4) !important;
+            margin: 0 !important;
+            animation: metallicShine 3s infinite alternate !important;
+        }
+        @keyframes rotateGlow {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes metallicShine {
+            0% { 
+                text-shadow: 0 0 5px #FFFFFF, 2px 2px 4px rgba(46,62,79,0.4), -2px -2px 4px rgba(46,62,79,0.4);
+            }
+            100% { 
+                text-shadow: 0 0 10px #FFFFFF, 3px 3px 6px rgba(46,62,79,0.6), -3px -3px 6px rgba(46,62,79,0.6);
+            }
+        }
+        .shotmetrics-header::after {
+            content: '';
+            position: absolute !important;
+            bottom: 10px !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 2px !important;
+            background: linear-gradient(to right, transparent, #FFFFFF, transparent) !important;
+        }
+        /* Logo and title container */
+        .header-container {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 30px !important;
+        }
+        /* Divider styling */
+        .divider-space {
+            margin: 60px 0 !important;
+        }
+        .subtle-divider {
+            border: none !important;
+            height: 4px !important;
+            background: linear-gradient(to right, transparent, #2E3E4F, transparent) !important;
+            margin: 20px 0 !important;
+        }
+        /* Content styling */
+        .team-name {
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 36px !important;
+            font-weight: bold !important;
+            color: transparent !important;
+            background-clip: text !important;
+            -webkit-background-clip: text !important;
+            background-image: linear-gradient(135deg, #2E3E4F, #3A506B) !important;
+            text-transform: uppercase !important;
+            -webkit-text-stroke: 0.5px #2E3E4F !important;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3), -1px -1px 2px rgba(255,255,255,0.5) !important;
+            margin: 0 !important;
+            line-height: 1.2 !important;
+            word-wrap: break-word !important;
+            text-align: center !important;
+            transition: transform 0.3s ease !important;
+        }
+        .team-name:hover {
+            transform: scale(1.05) !important;
+        }
+        .player-name {
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 36px !important;
+            color: transparent !important;
+            background-clip: text !important;
+            -webkit-background-clip: text !important;
+            background-image: linear-gradient(135deg, #2E3E4F, #3A506B) !important;
+            text-transform: uppercase !important;
+            -webkit-text-stroke: 0.5px #2E3E4F !important;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3), -1px -1px 2px rgba(255,255,255,0.5) !important;
+            margin: 20px 0 !important;
+            line-height: 1.2 !important;
+            word-wrap: break-word !important;
+            text-align: center !important;
+            transition: transform 0.3s ease !important;
+        }
+        .player-name:hover {
+            transform: scale(1.05) !important;
+        }
+        .job-details {
+            font-family: 'Oswald', 'Roboto', 'Arial', sans-serif !important;
+            font-size: 18px !important;
+            color: #333333 !important;
+            text-transform: uppercase !important;
+            margin: 0 !important;
+            line-height: 1.2 !important;
+            word-wrap: break-word !important;
+            text-align: center !important;
+            transition: transform 0.3s ease !important;
+        }
+        .job-details span.numeric {
+            font-family: Arial, sans-serif !important;
+            color: #2E3E4F !important;
+        }
+        .job-details:hover {
+            transform: scale(1.05) !important;
+        }
+        .logo-img {
+            width: 150px !important;
+            height: auto !important;
+            margin-bottom: 30px !important;
+            display: block !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            border-radius: 50% !important;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+            transition: transform 0.3s ease !important;
+        }
+        .logo-img:hover {
+            transform: scale(1.1) !important;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -532,7 +778,6 @@ def main():
             handle_login(cognito_client, get_username_by_email, email, password)
         return
     else:
-        # Sidebar with user info and logout
         if logo_src:
             st.sidebar.markdown(f"""
                 <div style='text-align: center; margin-bottom: 20px;'>
@@ -635,7 +880,7 @@ def main():
             "Segment": None
         },
         hide_index=True,
-        disabled=["Game Date", "Period", "Clock", "Player", "Team", "Shot Type", 
+        disabled=["Game Date", "Period", "Clock", "Player", "Team", "Shot Type",
                   "Distance (ft)", "Release Angle", "Release Velocity", "Apex Height",
                   "Release Time", "Side Curvature", "Rear Curvature", "Lateral Deviation", "Result"],
         use_container_width=True,
@@ -646,14 +891,12 @@ def main():
 
     # --- Detailed View ---
     if not selected_rows.empty:
-        # Use the last selected row (if multiple are selected)
         selected_row = selected_rows.iloc[0] if len(selected_rows) == 1 else selected_rows.iloc[-1]
         selected_job = next(j for j in filtered_jobs if j['JobID'] == selected_row['JobID'])
         selected_segment = selected_row['Segment']
         selected_job_id = selected_job['JobID']
         shot_type = selected_row['Shot Type']
 
-        # Load segment data based on the job's source
         if selected_job['Source'].lower() in ['pose_video', 'data_file']:
             if selected_job['Source'].lower() == 'data_file':
                 df_segment = load_data_file_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
@@ -676,10 +919,9 @@ def main():
             st.error("No data loaded. Please check the file format and contents.")
             return
 
-        # ***** Recalculate full shot metrics from raw data *****
+        # Recalculate full shot metrics from raw data
         metrics, df_pose, df_ball = calculate_shot_metrics(df_pose, df_ball)
 
-        # Open tabs with detailed visuals
         tab1, tab2, tab3 = st.tabs(["Overview", "Biomechanics Analysis", "Spin Analysis"])
         with tab1:
             show_overview_page(df_pose, df_ball, df_spin, metrics, selected_job['PlayerName'], shot_type)
