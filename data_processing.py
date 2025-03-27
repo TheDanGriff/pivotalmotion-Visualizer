@@ -155,27 +155,25 @@ def get_value_case_insensitive(row, key):
     return None
 
 def get_shot_type(distance):
-    # If distance is already a known shot type string, return it.
-    if isinstance(distance, str):
-        if distance.strip().lower() in ["free throw", "3 point", "mid range"]:
-            return distance.strip().title()
-        else:
-            # Try to convert if it’s not one of the expected labels.
-            try:
-                d = float(distance)
-            except ValueError as e:
-                logger.warning(f"Invalid distance value: {distance}. Returning 'Unknown'. Error: {e}")
-                return "Unknown"
-    else:
+    """
+    Determine shot type based on the shot distance (in feet).
+    For example:
+      - Less than 15 ft: Free Throw
+      - 15 to 22 ft: Mid Range
+      - Over 22 ft: 3 Point
+    """
+    try:
         d = float(distance)
-    
+        logger.debug(f"Determining shot type for distance: {d} ft")
+    except (TypeError, ValueError) as e:
+        logger.warning(f"Invalid distance value: {distance}. Returning 'Unknown'. Error: {e}")
+        return "Unknown"
     if d < 15:
         return "Free Throw"
     elif d < 22:
         return "Mid Range"
     else:
         return "3 Point"
-
 
 def separate_pose_and_ball_tracking(df_segment, source):
     """Split data into pose and ball tracking, supporting multiple ball column name variations."""
