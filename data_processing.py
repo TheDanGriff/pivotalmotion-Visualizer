@@ -1316,27 +1316,34 @@ def compute_normalized_acceleration_from_raw(df_ball, lift_idx, release_idx, fps
 # ---------------------------
 def plot_curvature_analysis(df_ball, metrics, fps=60, weighting_exponent=3, num_interp=300, bezier_order=6, curvature_scale=2.3):
     INCHES_TO_FEET = 1 / 12
-    import numpy as np
-    import plotly.graph_objects as go
-    from scipy.signal import savgol_filter
-    from plotly.subplots import make_subplots
 
-    # Use stored indices from metrics with consistent keys
-    lift_idx = int(metrics.get('lift_frame', 0))
-    set_idx = int(metrics.get('set_frame', 0))  # Use set_frame, no default to release_idx
-    release_idx = int(metrics.get('release_frame', lift_idx + 1))
+    # Ensure the velocity_magnitude column is present
+    if 'velocity_magnitude' not in df_ball.columns:
+        if all(col in df_ball.columns for col in ['Basketball_X', 'Basketball_Y', 'Basketball_Z']):
+            df_ball['velocity_x'] = df_ball['Basketball_X'].diff() * fps
+            df_ball['velocity_y'] = df_ball['Basketball_Y'].diff() * fps
+            df_ball['velocity_z'] = df_ball['Basketball_Z'].diff() * fps
+            df_ball['velocity_magnitude'] = np.sqrt(
+                df_ball['velocity_x']**2 + 
+                df_ball['velocity_y']**2 + 
+                df_ball['velocity_z']**2
+            )
+        else:
+            raise ValueError("Ball tracking DataFrame is missing required position columns.")
 
-    # Log indices for debugging
-    logger.debug(f"Curvature indices - lift_frame: {lift_idx}, set_frame: {set_idx}, release_frame: {release_idx}")
+    # Retrieve indices from metrics (using a fallback if necessary)
+    lift_idx = int(metrics.get('lift_idx', 0))
+    release_idx = int(metrics.get('release_idx', lift_idx + 1))
+    if release_idx <= lift_idx:
+        release_idx = lift_idx + 1
 
-    # Extend range: 25% before lift and 25% after release
+    # Extend window: 25% before lift and after release
     lift_to_release_frames = release_idx - lift_idx
     extra_frames = int(lift_to_release_frames * 0.25)
     max_idx = len(df_ball) - 1
     start_idx = max(0, lift_idx - extra_frames)
     end_idx = min(max_idx, release_idx + extra_frames)
     total_frames = end_idx - start_idx
-
     if total_frames <= 0:
         raise ValueError("Invalid indices: end_idx must be greater than start_idx.")
 
