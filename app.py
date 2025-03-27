@@ -199,39 +199,32 @@ def create_aggregated_stats_table(selected_rows, comparison_row):
     ]
     
     # Calculate means and standard deviations
-    agg_stats = {}
-    for col in numeric_cols:
-        values = selected_rows[col].astype(float)
-        agg_stats[col] = {
-            'mean': values.mean(),
-            'std': values.std(),
-            'comparison_value': float(comparison_row[col])
-        }
+    metrics = [col for col in numeric_cols]
+    averages = [f"{selected_rows[col].mean():.2f}" for col in numeric_cols]
+    std_devs = [f"±{selected_rows[col].std():.2f}" for col in numeric_cols]
+    comparisons = [f"{float(comparison_row[col]):.2f}" for col in numeric_cols]
     
-    # Create styled table
+    # Calculate colors for comparison column only
     header_color = '#2E3E4F'
     cell_color = '#FFFFFF'
     yellow_threshold = 1  # 1 standard deviation
     red_threshold = 2    # 2 standard deviations
     
-    table_data = []
+    comparison_colors = []
     for col in numeric_cols:
-        mean = agg_stats[col]['mean']
-        std = agg_stats[col]['std']
-        comp_value = agg_stats[col]['comparison_value']
+        mean = selected_rows[col].mean()
+        std = selected_rows[col].std()
+        comp_value = float(comparison_row[col])
         z_score = abs((comp_value - mean) / std) if std > 0 else 0
         
-        # Determine cell color based on z-score
-        cell_fill = cell_color
         if z_score > red_threshold:
-            cell_fill = '#FF6B6B'  # Red
+            comparison_colors.append('#FF6B6B')  # Red
         elif z_score > yellow_threshold:
-            cell_fill = '#FFFF99'  # Yellow
-            
-        row = [col, f"{mean:.2f}", f"±{std:.2f}", f"{comp_value:.2f}"]
-        table_data.append((row, cell_fill))
+            comparison_colors.append('#FFFF99')  # Yellow
+        else:
+            comparison_colors.append(cell_color)  # White
     
-    # Create Plotly table
+    # Create Plotly table with separate color for comparison column
     fig = go.Figure(data=[go.Table(
         header=dict(
             values=['Metric', 'Average', 'Std Dev', 'Comparison'],
@@ -241,8 +234,9 @@ def create_aggregated_stats_table(selected_rows, comparison_row):
             height=50
         ),
         cells=dict(
-            values=[list(x[0]) for x in table_data],
-            fill_color=[list(x[1] for x in table_data)],
+            values=[metrics, averages, std_devs, comparisons],
+            fill_color=[[cell_color]*len(metrics), [cell_color]*len(averages), 
+                       [cell_color]*len(std_devs), comparison_colors],
             align='center',
             font=dict(color='#333333', size=14, family='Oswald'),
             height=40
@@ -500,7 +494,7 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
             min_value=kpi_ranges['Asymmetry Score']['min'],
             max_value=kpi_ranges['Asymmetry Score']['max'],
             description="Good range: 0-20°. Lower indicates better symmetry.",
-            calculation_info="Average difference between left and right knee-elbow angles at release."
+            calculation_info="Average difference between left and right knee/elbow angles at release."
         )
     with col6:
         animated_flip_kpi_card(
