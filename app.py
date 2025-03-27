@@ -187,8 +187,8 @@ def process_segment_for_table(job, segment, s3_client):
         logger.error(f"Error processing segment {segment} for job {job['JobID']}: {str(e)}")
         return None
 
-def create_aggregated_stats_table(selected_rows):
-    if len(selected_rows) < 2:
+def create_aggregated_stats_table(selected_rows, comparison_row):
+    if len(selected_rows) < 1 or comparison_row is None:
         return None
     
     # Define numeric columns to aggregate
@@ -205,7 +205,7 @@ def create_aggregated_stats_table(selected_rows):
         agg_stats[col] = {
             'mean': values.mean(),
             'std': values.std(),
-            'values': values.tolist()
+            'comparison_value': float(comparison_row[col])
         }
     
     # Create styled table
@@ -218,55 +218,52 @@ def create_aggregated_stats_table(selected_rows):
     for col in numeric_cols:
         mean = agg_stats[col]['mean']
         std = agg_stats[col]['std']
-        row = [col, f"{mean:.2f}", f"±{std:.2f}"]
+        comp_value = agg_stats[col]['comparison_value']
+        z_score = abs((comp_value - mean) / std) if std > 0 else 0
         
-        # Calculate color coding for each value
-        colors = []
-        for value in agg_stats[col]['values']:
-            z_score = abs((value - mean) / std) if std > 0 else 0
-            if z_score > red_threshold:
-                colors.append('#FF6B6B')  # Red
-            elif z_score > yellow_threshold:
-                colors.append('#FFFF99')  # Yellow
-            else:
-                colors.append(cell_color)  # White
-        agg_stats[col]['colors'] = colors
-        
-        table_data.append(row)
+        # Determine cell color based on z-score
+        cell_fill = cell_color
+        if z_score > red_threshold:
+            cell_fill = '#FF6B6B'  # Red
+        elif z_score > yellow_threshold:
+            cell_fill = '#FFFF99'  # Yellow
+            
+        row = [col, f"{mean:.2f}", f"±{std:.2f}", f"{comp_value:.2f}"]
+        table_data.append((row, cell_fill))
     
     # Create Plotly table
     fig = go.Figure(data=[go.Table(
         header=dict(
-            values=['Metric', 'Average', 'Std Dev'],
+            values=['Metric', 'Average', 'Std Dev', 'Comparison'],
             fill_color=header_color,
             align='center',
-            font=dict(color='white', size=14, family='Oswald'),
-            height=40
+            font=dict(color='white', size=16, family='Oswald'),
+            height=50
         ),
         cells=dict(
-            values=[list(x) for x in zip(*table_data)],
-            fill_color=[cell_color],
+            values=[list(x[0]) for x in table_data],
+            fill_color=[list(x[1] for x in table_data)],
             align='center',
-            font=dict(color='#333333', size=12, family='Oswald'),
-            height=30
+            font=dict(color='#333333', size=14, family='Oswald'),
+            height=40
         )
     )])
     
     fig.update_layout(
         title={
-            'text': f"Aggregated Statistics ({len(selected_rows)} Shots)",
+            'text': f"Aggregated Statistics vs Comparison ({len(selected_rows)} Shots)",
             'y':0.95,
             'x':0.5,
             'xanchor': 'center',
             'yanchor': 'top',
-            'font': dict(size=20, color='#2E3E4F', family='Oswald')
+            'font': dict(size=24, color='#2E3E4F', family='Oswald')
         },
         margin=dict(l=20, r=20, t=60, b=20),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
     
-    return fig, agg_stats
+    return fig
 
 # ---------------- Detailed View Helper Functions ---------------- #
 
@@ -503,7 +500,7 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
             min_value=kpi_ranges['Asymmetry Score']['min'],
             max_value=kpi_ranges['Asymmetry Score']['max'],
             description="Good range: 0-20°. Lower indicates better symmetry.",
-            calculation_info="Average difference between left and right knee/elbow angles at release."
+            calculation_info="Average difference between left and right knee-elbow angles at release."
         )
     with col6:
         animated_flip_kpi_card(
@@ -796,7 +793,7 @@ def main():
             transition: transform 0.3s ease !important;
         }
         .job-details span.numeric {
-            font-family: Arial, sans-serif !important;
+            font-family: 'Oswald', sans-serif !important;
             color: #2E3E4F !important;
         }
         .job-details:hover {
@@ -943,6 +940,15 @@ def main():
         st.error("No valid shot data found for the selected filters.")
         return
 
+    # --- Aggregation Selection Table ---
+    st.markdown("""
+        <div style='margin: 30px 0;'>
+            <h2 style='font-family: Oswald; color: #2E3E4F; text-align: center;'>
+                Select Shots for Aggregation
+            </h2>
+        </div>
+    """, unsafe_allow_html=True)
+    
     df_table = pd.DataFrame(table_data)
     df_table.insert(0, "Select", False)
     edited_df = st.data_editor(
@@ -965,72 +971,107 @@ def main():
                   "Distance (ft)", "Release Angle", "Release Velocity", "Apex Height",
                   "Release Time", "Side Curvature", "Rear Curvature", "Lateral Deviation", "Result"],
         use_container_width=True,
-        key="shot_table"
+        key="agg_table"
     )
 
     selected_rows = edited_df[edited_df.Select]
-    
-    # --- Aggregated Stats Section ---
-    if len(selected_rows) >= 2:
+
+    # --- Comparison Selection Table ---
+    if not selected_rows.empty:
         st.markdown("""
             <div style='margin: 30px 0;'>
                 <h2 style='font-family: Oswald; color: #2E3E4F; text-align: center;'>
-                    Aggregated Statistics
+                    Select Comparison Shot
                 </h2>
             </div>
         """, unsafe_allow_html=True)
         
-        agg_fig, agg_stats = create_aggregated_stats_table(selected_rows)
-        if agg_fig:
-            st.plotly_chart(agg_fig, use_container_width=True)
-            
-            # Add a subtle divider
+        df_table.insert(0, "Compare", False)
+        comp_df = st.data_editor(
+            df_table,
+            column_config={
+                "Compare": st.column_config.CheckboxColumn("Compare"),
+                "Distance (ft)": st.column_config.NumberColumn(format="%.1f"),
+                "Release Angle": st.column_config.NumberColumn(format="%.1f°"),
+                "Release Velocity": st.column_config.NumberColumn(format="%.1f ft/s"),
+                "Apex Height": st.column_config.NumberColumn(format="%.1f ft"),
+                "Release Time": st.column_config.NumberColumn(format="%.2f s"),
+                "Side Curvature": st.column_config.NumberColumn(format="%.3f 1/ft"),
+                "Rear Curvature": st.column_config.NumberColumn(format="%.3f 1/ft"),
+                "Lateral Deviation": st.column_config.NumberColumn(format="%.2f ft"),
+                "JobID": None,
+                "Segment": None,
+                "Select": None
+            },
+            hide_index=True,
+            disabled=["Game Date", "Period", "Clock", "Player", "Team", "Shot Type",
+                      "Distance (ft)", "Release Angle", "Release Velocity", "Apex Height",
+                      "Release Time", "Side Curvature", "Rear Curvature", "Lateral Deviation", "Result"],
+            use_container_width=True,
+            key="comp_table"
+        )
+
+        comparison_rows = comp_df[comp_df.Compare]
+        comparison_row = comparison_rows.iloc[0] if not comparison_rows.empty else None
+
+        # --- Aggregated Stats and Detailed View ---
+        if comparison_row is not None:
+            # Show aggregated stats table
             st.markdown("""
-                <hr style='border: none; height: 2px; background: linear-gradient(to right, transparent, #2E3E4F, transparent); margin: 30px 0;'>
+                <div style='margin: 30px 0;'>
+                    <h2 style='font-family: Oswald; color: #2E3E4F; text-align: center;'>
+                        Aggregated Statistics vs Comparison
+                    </h2>
+                </div>
             """, unsafe_allow_html=True)
+            
+            agg_fig = create_aggregated_stats_table(selected_rows, comparison_row)
+            if agg_fig:
+                st.plotly_chart(agg_fig, use_container_width=True)
+            
+            # Load comparison shot data
+            selected_job = next(j for j in filtered_jobs if j['JobID'] == comparison_row['JobID'])
+            selected_segment = comparison_row['Segment']
+            selected_job_id = selected_job['JobID']
+            shot_type = comparison_row['Shot Type']
 
-    # --- Detailed View ---
-    if not selected_rows.empty:
-        selected_row = selected_rows.iloc[0] if len(selected_rows) == 1 else selected_rows.iloc[-1]
-        selected_job = next(j for j in filtered_jobs if j['JobID'] == selected_row['JobID'])
-        selected_segment = selected_row['Segment']
-        selected_job_id = selected_job['JobID']
-        shot_type = selected_row['Shot Type']
-
-        if selected_job['Source'].lower() in ['pose_video', 'data_file']:
-            if selected_job['Source'].lower() == 'data_file':
-                df_segment = load_data_file_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
-            else:
-                df_segment = load_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
-        elif selected_job['Source'].lower() == 'spin_video':
-            df_segment = load_spin_axis_csv(s3_client, BUCKET_NAME, user_email, selected_job_id)
-        else:
-            st.error(f"Unsupported source type: {selected_job['Source']}")
-            return
-
-        if df_segment is not None and not df_segment.empty:
             if selected_job['Source'].lower() in ['pose_video', 'data_file']:
-                df_pose, df_ball = separate_pose_and_ball_tracking(df_segment, selected_job['Source'])
-                df_spin = pd.DataFrame()
+                if selected_job['Source'].lower() == 'data_file':
+                    df_segment = load_data_file_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
+                else:
+                    df_segment = load_final_output(s3_client, BUCKET_NAME, user_email, selected_job_id, selected_segment)
             elif selected_job['Source'].lower() == 'spin_video':
-                df_spin = df_segment
-                df_pose, df_ball = pd.DataFrame(), pd.DataFrame()
+                df_segment = load_spin_axis_csv(s3_client, BUCKET_NAME, user_email, selected_job_id)
+            else:
+                st.error(f"Unsupported source type: {selected_job['Source']}")
+                return
+
+            if df_segment is not None and not df_segment.empty:
+                if selected_job['Source'].lower() in ['pose_video', 'data_file']:
+                    df_pose, df_ball = separate_pose_and_ball_tracking(df_segment, selected_job['Source'])
+                    df_spin = pd.DataFrame()
+                elif selected_job['Source'].lower() == 'spin_video':
+                    df_spin = df_segment
+                    df_pose, df_ball = pd.DataFrame(), pd.DataFrame()
+            else:
+                st.error("No data loaded. Please check the file format and contents.")
+                return
+
+            # Recalculate full shot metrics from raw data
+            metrics, df_pose, df_ball = calculate_shot_metrics(df_pose, df_ball)
+
+            # Show detailed view
+            tab1, tab2, tab3 = st.tabs(["Overview", "Biomechanics Analysis", "Spin Analysis"])
+            with tab1:
+                show_overview_page(df_pose, df_ball, df_spin, metrics, selected_job['PlayerName'], shot_type)
+            with tab2:
+                show_biomechanics_page(df_pose, df_ball, df_spin, metrics)
+            with tab3:
+                show_spin_analysis_page(df_spin)
         else:
-            st.error("No data loaded. Please check the file format and contents.")
-            return
-
-        # Recalculate full shot metrics from raw data
-        metrics, df_pose, df_ball = calculate_shot_metrics(df_pose, df_ball)
-
-        tab1, tab2, tab3 = st.tabs(["Overview", "Biomechanics Analysis", "Spin Analysis"])
-        with tab1:
-            show_overview_page(df_pose, df_ball, df_spin, metrics, selected_job['PlayerName'], shot_type)
-        with tab2:
-            show_biomechanics_page(df_pose, df_ball, df_spin, metrics)
-        with tab3:
-            show_spin_analysis_page(df_spin)
+            st.info("Select a comparison shot to view aggregated statistics and detailed analysis")
     else:
-        st.info("Select one or more shots from the table above to view detailed analysis")
+        st.info("Select one or more shots for aggregation to proceed")
 
 if __name__ == "__main__":
     main()
