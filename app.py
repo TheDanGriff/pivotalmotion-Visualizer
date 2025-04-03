@@ -176,8 +176,8 @@ def process_segment_for_table(job, segment, s3_client):
             "Release Velocity": metrics.get('release_velocity', 0),
             "Apex Height": metrics.get('apex_height', 0),
             "Release Time": metrics.get('release_time', 0),
-            "Side Curvature": metrics.get('weighted_curvature_area_side', 0),
-            "Rear Curvature": metrics.get('weighted_curvature_area_rear', 0),
+            "Side Curvature": metrics.get('release_curvature_side', 0),
+            "Rear Curvature": metrics.get('release_curvature_rear', 0),
             "Lateral Deviation": metrics.get('lateral_deviation', 0),
             "Result": outcome,
             "JobID": job['JobID'],
@@ -398,7 +398,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             description="Good range: 0.05-0.15 1/ft",
             calculation_info="Curvature at release in YZ plane."
         )
-        
+
     st.subheader("Ball Path Analysis")
     if not df_ball.empty:
         if fig_shot is not None:
