@@ -378,30 +378,27 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         st.markdown("### Side View (XZ Plane)")
         animated_flip_kpi_card(
             "Side Curvature",
-            kpis['Side Curvature']['value'],
+            metrics.get('release_curvature_side', 0.0),
             "1/ft",
             player_average=player_averages.get('Side Curvature') if player_averages else None,
-            min_value=kpis['Side Curvature']['min'],
-            max_value=kpis['Side Curvature']['max'],
+            min_value=0,
+            max_value=5.0,
             description="Good range: 0.05-0.15 1/ft",
-            calculation_info="Cubic-weighted curvature area in XZ plane."
+            calculation_info="Curvature at release in XZ plane."
         )
     with col_curv_right:
         st.markdown("### Rear View (YZ Plane)")
         animated_flip_kpi_card(
             "Rear Curvature",
-            kpis['Rear Curvature']['value'],
+            metrics.get('release_curvature_rear', 0.0),
             "1/ft",
             player_average=player_averages.get('Rear Curvature') if player_averages else None,
-            min_value=kpis['Rear Curvature']['min'],
-            max_value=kpis['Rear Curvature']['max'],
+            min_value=0,
+            max_value=5.0,
             description="Good range: 0.05-0.15 1/ft",
-            calculation_info="Cubic-weighted curvature area in YZ plane."
+            calculation_info="Curvature at release in YZ plane."
         )
-    fig_curvature = plot_curvature_analysis(df_ball, metrics, weighting_exponent=3, num_interp=300, curvature_scale=2.3)
-    st.plotly_chart(fig_curvature, use_container_width=True)
-    st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
-    
+        
     st.subheader("Ball Path Analysis")
     if not df_ball.empty:
         if fig_shot is not None:

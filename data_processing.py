@@ -921,26 +921,53 @@ def compute_curvature(P, tau):
     return curvature if len(curvature) > 1 else curvature[0]
 
 def calculate_release_curvature(ball_df, lift_idx, release_idx):
+    """
+    Calculate the release curvature for side (XZ) and rear (YZ) views using Bezier curve fitting.
+    
+    Parameters:
+    - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', 'Basketball_Z' in inches.
+    - lift_idx: Index where the ball lift begins.
+    - release_idx: Index where the ball is released.
+    
+    Returns:
+    - tuple: (side curvature, rear curvature) in 1/inches.
+    """
     extra_frames = int((release_idx - lift_idx) * 0.5)
     start_idx = max(0, lift_idx - extra_frames)
     end_idx = min(len(ball_df), release_idx + extra_frames)
     
-    points_side = ball_df[['X', 'Z']].iloc[start_idx:end_idx].values
-    points_rear = ball_df[['Y', 'Z']].iloc[start_idx:end_idx].values
+    # Ensure indices are valid
+    if start_idx >= end_idx or end_idx > len(ball_df):
+        logger.error(f"Invalid indices: start_idx={start_idx}, end_idx={end_idx}, len(ball_df)={len(ball_df)}")
+        return 0.0, 0.0
     
+    # Extract points with correct column names
+    points_side = ball_df[['Basketball_X', 'Basketball_Z']].iloc[start_idx:end_idx].values
+    points_rear = ball_df[['Basketball_Y', 'Basketball_Z']].iloc[start_idx:end_idx].values
+    
+    logger.debug(f"Side view points: {len(points_side)}, Rear view points: {len(points_rear)}")
     print(f"Side view points: {len(points_side)}, Rear view points: {len(points_rear)}")
+    
+    # Check for sufficient points
     if len(points_side) <= 7 or len(points_rear) <= 7:
+        logger.warning(f"Not enough points! Side: {len(points_side)}, Rear: {len(points_rear)}")
         print("Not enough points!")
         return 0.0, 0.0
     
+    # Fit Bezier curves
     P_side = fit_bezier(points_side, n=6)
     P_rear = fit_bezier(points_rear, n=6)
+    
     if P_side is None or P_rear is None:
+        logger.error("Bezier fit failed!")
         print("Bezier fit failed!")
         return 0.0, 0.0
     
+    # Compute curvature at release (tau=1.0)
     kappa_release_side = compute_curvature(P_side, 1.0)
     kappa_release_rear = compute_curvature(P_rear, 1.0)
+    
+    logger.debug(f"Side curvature: {kappa_release_side}, Rear curvature: {kappa_release_rear}")
     print(f"Side curvature: {kappa_release_side}, Rear curvature: {kappa_release_rear}")
     
     return kappa_release_side, kappa_release_rear
@@ -1063,23 +1090,19 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
             release_velocity = np.sqrt(rv_x**2 + rv_y**2 + rv_z**2) * INCHES_TO_FEET
             metrics['release_velocity'] = release_velocity if not pd.isna(release_velocity) and release_velocity > 0 else 0.0
 
-        # 12. Release Curvature (moved to separate function)
+        # Inside calculate_shot_metrics, replace the curvature section (~line 1800):
         lift_idx = int(metrics.get('lift_idx', 0))
         release_idx = int(metrics.get('release_idx', lift_idx + 1))
-        weighted_area_side, weighted_area_rear = calculate_release_curvature(ball_df, lift_idx, release_idx)
-            # Compute release curvatures
         kappa_release_side, kappa_release_rear = calculate_release_curvature(ball_df, lift_idx, release_idx)
-        metrics['release_curvature_side'] = kappa_release_side
-        metrics['release_curvature_rear'] = kappa_release_rear
-        metrics['weighted_curvature_area_side'] = weighted_area_side
-        metrics['weighted_curvature_area_rear'] = weighted_area_rear
-        metrics['total_weighted_curvature_area'] = weighted_area_side + weighted_area_rear
+        metrics['release_curvature_side'] = kappa_release_side * 12  # Convert 1/inches to 1/feet
+        metrics['release_curvature_rear'] = kappa_release_rear * 12  # Convert 1/inches to 1/feet
 
-        # 13. Lateral Deviation
+        # Inside calculate_shot_metrics, replace the lateral deviation section (~line 1810):
         lateral_dev = calculate_lateral_deviation(ball_df, metrics['release_idx'], hoop_x=metrics['hoop_x'], hoop_y=metrics['hoop_y'])
-        if lateral_dev and len(lateral_dev) >= 4:
-            metrics['lateral_deviation'] = lateral_dev[0]
+        if lateral_dev is not None:
+            metrics['lateral_deviation'] = lateral_dev[0]  # deviation_feet
         else:
+            logger.warning(f"Lateral deviation calculation failed for release_idx={metrics['release_idx']}")
             metrics['lateral_deviation'] = 0.0
 
     except Exception as e:
