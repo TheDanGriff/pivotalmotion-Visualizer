@@ -1226,7 +1226,7 @@ def fit_bezier_curve(x_data, z_data, n=6):
     P, _, _, _ = np.linalg.lstsq(T, XZ, rcond=None)
     return P, t_data
 
-def evaluate_bezier(P, t):
+def evaluate_bezier_points(P, t):
     n = len(P) - 1
     t = np.array(t, ndmin=1)
     x_out = np.zeros_like(t)
@@ -1247,9 +1247,9 @@ def bezier_signed_curvature(P, t):
         ddP = (n-1) * (dP[1:] - dP[:-1])
     else:
         ddP = np.zeros_like(dP)
-    x1, z1 = evaluate_bezier(dP, t)
+    x1, z1 = evaluate_bezier_points(dP, t)  # Updated here
     if n >= 2:
-        x2, z2 = evaluate_bezier(ddP, t)
+        x2, z2 = evaluate_bezier_points(ddP, t)  # Updated here
     else:
         x2, z2 = np.zeros_like(t), np.zeros_like(t)
     numerator = x1 * z2 - z1 * x2
