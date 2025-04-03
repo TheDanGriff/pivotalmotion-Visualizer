@@ -272,8 +272,8 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         'Release Velocity': {'value': metrics.get('release_velocity', 0), 'min': 0, 'max': 30},
         'Release Time': {'value': metrics.get('release_time', 0), 'min': 0, 'max': 1},
         'Apex Height': {'value': metrics.get('apex_height', 0), 'min': 0, 'max': 20},
-        'Side Curvature': {'value': metrics.get('weighted_curvature_area_side', 0), 'min': 0, 'max': 0.5},
-        'Rear Curvature': {'value': metrics.get('weighted_curvature_area_rear', 0), 'min': 0, 'max': 0.5},
+        'Side Curvature': {'value': metrics.get('release_curvature_side', 0), 'min': 0, 'max': 5.0},
+        'Rear Curvature': {'value': metrics.get('release_curvature_rear', 0), 'min': 0, 'max': 5.0},
         'Lateral Deviation': {'value': metrics.get('lateral_deviation', 0), 'min': -0.5, 'max': 0.5}
     }
     try:
@@ -377,40 +377,37 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
     with col_curv_left:
         st.markdown("### Side View (XZ Plane)")
         animated_flip_kpi_card(
-            "Side Curvature",
+            "Side Release Curvature",
             kpis['Side Curvature']['value'],
             "1/ft",
             player_average=player_averages.get('Side Curvature') if player_averages else None,
             min_value=kpis['Side Curvature']['min'],
             max_value=kpis['Side Curvature']['max'],
-            description="Good range: 0.05-0.15 1/ft",
-            calculation_info="Cubic-weighted curvature area in XZ plane."
+            description="Curvature at release in the XZ plane.",
+            calculation_info="Computed using Bezier curve at τ=1."
         )
     with col_curv_right:
         st.markdown("### Rear View (YZ Plane)")
         animated_flip_kpi_card(
-            "Rear Curvature",
+            "Rear Release Curvature",
             kpis['Rear Curvature']['value'],
             "1/ft",
             player_average=player_averages.get('Rear Curvature') if player_averages else None,
             min_value=kpis['Rear Curvature']['min'],
             max_value=kpis['Rear Curvature']['max'],
-            description="Good range: 0.05-0.15 1/ft",
-            calculation_info="Cubic-weighted curvature area in YZ plane."
+            description="Curvature at release in the YZ plane.",
+            calculation_info="Computed using Bezier curve at τ=1."
         )
-    fig_curvature = plot_curvature_analysis(df_ball, metrics, weighting_exponent=3, num_interp=300, curvature_scale=2.3)
-    st.plotly_chart(fig_curvature, use_container_width=True)
-    st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
-    
-    st.subheader("Ball Path Analysis")
-    if not df_ball.empty:
-        if fig_shot is not None:
-            st.plotly_chart(fig_shot, use_container_width=True, key="overview_shot_analysis")
+        
+        st.subheader("Ball Path Analysis")
+        if not df_ball.empty:
+            if fig_shot is not None:
+                st.plotly_chart(fig_shot, use_container_width=True, key="overview_shot_analysis")
+            else:
+                st.error("Failed to precompute shot analysis visualization.")
         else:
-            st.error("Failed to precompute shot analysis visualization.")
-    else:
-        st.error("No ball data available for shot path visualization.")
-    st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
+            st.error("No ball data available for shot path visualization.")
+        st.markdown("<hr style='border: 1px solid #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
     
     st.subheader("3D Ball Path")
     if not df_ball.empty:

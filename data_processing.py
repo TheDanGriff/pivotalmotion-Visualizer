@@ -866,16 +866,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Bezier and Curvature Helper Functions
-def compute_tau(points):
-    """Compute parameter tau using chordal parameterization."""
-    diffs = np.diff(points, axis=0)
-    distances = np.linalg.norm(diffs, axis=1)
-    cumulative = np.cumsum(distances)
-    total = cumulative[-1] if cumulative[-1] != 0 else 1e-10
-    tau = np.r_[0, cumulative / total]
-    return tau
-
+# Bezier Helper Functions
 def bezier_design_matrix(tau, n):
     """Create design matrix A for Bezier curve fitting."""
     m = len(tau)
@@ -885,9 +876,10 @@ def bezier_design_matrix(tau, n):
     return A
 
 def fit_bezier(points, n=6):
-    """Fit an nth-order Bezier curve to points."""
+    """Fit an nth-order Bezier curve to points using linear parameterization."""
     try:
-        tau = compute_tau(points)
+        m = len(points)
+        tau = np.linspace(0, 1, m)  # Linear parameterization as per the paper
         A = bezier_design_matrix(tau, n)
         P = np.linalg.lstsq(A, points, rcond=None)[0]
         return P
@@ -903,39 +895,42 @@ def evaluate_bezier(P, tau):
     A = bezier_design_matrix(tau, n)
     return A @ P
 
-def compute_curvature(P, tau, h=1e-4):
-    """Compute curvature using finite differences."""
-    try:
-        tau = float(tau)
-        tau_minus = max(0.0, tau - h)
-        tau_plus = min(1.0, tau + h)
+def bezier_derivatives(P, tau):
+    """Compute first and second derivatives of a Bezier curve analytically."""
+    n = len(P) - 1
+    # First derivative control points: n * (P_{i+1} - P_i)
+    d1_pts = n * (P[1:] - P[:-1])
+    # Second derivative control points: (n-1) * (d1_{i+1} - d1_i)
+    d2_pts = (n - 1) * (d1_pts[1:] - d1_pts[:-1])
+    # Evaluate derivatives at tau
+    d1 = evaluate_bezier(d1_pts, tau)  # Order n-1
+    d2 = evaluate_bezier(d2_pts, tau)  # Order n-2
+    return d1, d2
 
-        B = np.asarray(evaluate_bezier(P, tau), dtype=np.float64).flatten()
-        B_minus = np.asarray(evaluate_bezier(P, tau_minus), dtype=np.float64).flatten()
-        B_plus = np.asarray(evaluate_bezier(P, tau_plus), dtype=np.float64).flatten()
-
-        if B.size != 2:
-            raise ValueError(f"evaluate_bezier returned array with {B.size} elements, expected 2 for [x, z] or [y, z]")
-
-        x1 = (B_plus[0] - B_minus[0]) / (2 * h)
-        z1 = (B_plus[1] - B_minus[1]) / (2 * h)
-        x2 = (B_plus[0] - 2 * B[0] + B_minus[0]) / (h**2)
-        z2 = (B_plus[1] - 2 * B[1] + B_minus[1]) / (h**2)
-
-        denom = (x1**2 + z1**2)**1.5
-        if denom == 0:
-            return 0.0
-        curvature = abs(x1 * z2 - z1 * x2) / denom
-        return float(curvature)
-    except Exception as e:
-        logger.error(f"Error computing curvature: {str(e)}")
-        return 0.0
+def compute_curvature(P, tau):
+    """Compute curvature analytically using Bezier derivatives."""
+    if np.isscalar(tau):
+        tau = np.array([tau])
+    d1, d2 = bezier_derivatives(P, tau)
+    x1, z1 = d1[:, 0], d1[:, 1]  # First derivatives
+    x2, z2 = d2[:, 0], d2[:, 1]  # Second derivatives
+    denom = (x1**2 + z1**2)**1.5
+    with np.errstate(divide='ignore', invalid='ignore'):
+        curvature = np.abs(x1 * z2 - z1 * x2) / denom
+        curvature[denom == 0] = 0.0  # Handle zero denominator
+    return curvature if len(curvature) > 1 else curvature[0]
 
 def calculate_release_curvature(ball_df, lift_idx, release_idx):
     """
-    Calculate the release curvature metrics independently.
-    Allows for separate data manipulation without affecting other metrics.
-    Returns weighted curvature areas for side and rear views.
+    Calculate the release curvature for side (XZ) and rear (YZ) views at the release point.
+    
+    Args:
+        ball_df (pd.DataFrame): DataFrame with ball position data.
+        lift_idx (int): Index where lift occurs.
+        release_idx (int): Index where release occurs.
+    
+    Returns:
+        tuple: (kappa_release_side, kappa_release_rear) - Curvature at release in 1/ft.
     """
     INCHES_TO_FEET = 1 / 12
 
@@ -945,10 +940,10 @@ def calculate_release_curvature(ball_df, lift_idx, release_idx):
             logger.warning("Invalid indices for release curvature calculation")
             return 0.0, 0.0
 
-        # Copy the data to allow independent manipulation
+        # Copy relevant columns
         ball_data = ball_df[['Basketball_X', 'Basketball_Y', 'Basketball_Z']].copy()
 
-        # Convert to feet (you can add other manipulations here)
+        # Convert to feet
         ball_data['Basketball_X_ft'] = ball_data['Basketball_X'] * INCHES_TO_FEET
         ball_data['Basketball_Y_ft'] = ball_data['Basketball_Y'] * INCHES_TO_FEET
         ball_data['Basketball_Z_ft'] = ball_data['Basketball_Z'] * INCHES_TO_FEET
@@ -968,30 +963,20 @@ def calculate_release_curvature(ball_df, lift_idx, release_idx):
             logger.warning("Insufficient points for Bezier fit")
             return 0.0, 0.0
 
-        # Fit Bezier curves
+        # Fit Bezier curves (assuming fit_bezier is defined elsewhere)
         P_side = fit_bezier(points_side, n=6)
         P_rear = fit_bezier(points_rear, n=6)
 
         if P_side is None or P_rear is None:
+            logger.warning("Bezier fit failed")
             return 0.0, 0.0
 
-        # Compute curvature for side view
-        tau_grid = np.linspace(0, 1, 100, dtype=np.float64)
-        kappa_grid_side = np.array([compute_curvature(P_side, tau) for tau in tau_grid], dtype=np.float64)
-        median_curvature = np.median(kappa_grid_side[int(100 * 0.01):])  # Exclude first 1%
-        cap_value = min(3 * median_curvature, 0.5)
-        kappa_grid_side = np.clip(kappa_grid_side, 0, cap_value)
-        w_grid = 4 * tau_grid**3  # Cubic weighting
-        weighted_area_side = trapezoid(np.abs(kappa_grid_side) * w_grid, tau_grid)
+        # Compute curvature at release point (τ=1)
+        # Assuming compute_curvature(P, tau) returns curvature at parameter τ
+        kappa_release_side = compute_curvature(P_side, 1.0)
+        kappa_release_rear = compute_curvature(P_rear, 1.0)
 
-        # Compute curvature for rear view
-        kappa_grid_rear = np.array([compute_curvature(P_rear, tau) for tau in tau_grid], dtype=np.float64)
-        median_curvature = np.median(kappa_grid_rear[int(100 * 0.01):])  # Exclude first 1%
-        cap_value = min(3 * median_curvature, 0.5)
-        kappa_grid_rear = np.clip(kappa_grid_rear, 0, cap_value)
-        weighted_area_rear = trapezoid(np.abs(kappa_grid_rear) * w_grid, tau_grid)
-
-        return weighted_area_side, weighted_area_rear
+        return kappa_release_side, kappa_release_rear
 
     except Exception as e:
         logger.error(f"Error in calculate_release_curvature: {str(e)}")
@@ -1118,6 +1103,10 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         lift_idx = int(metrics.get('lift_idx', 0))
         release_idx = int(metrics.get('release_idx', lift_idx + 1))
         weighted_area_side, weighted_area_rear = calculate_release_curvature(ball_df, lift_idx, release_idx)
+            # Compute release curvatures
+        kappa_release_side, kappa_release_rear = calculate_release_curvature(ball_df, lift_idx, release_idx)
+        metrics['release_curvature_side'] = kappa_release_side
+        metrics['release_curvature_rear'] = kappa_release_rear
         metrics['weighted_curvature_area_side'] = weighted_area_side
         metrics['weighted_curvature_area_rear'] = weighted_area_rear
         metrics['total_weighted_curvature_area'] = weighted_area_side + weighted_area_rear
