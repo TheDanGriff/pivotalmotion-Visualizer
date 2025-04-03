@@ -921,66 +921,30 @@ def compute_curvature(P, tau):
     return curvature if len(curvature) > 1 else curvature[0]
 
 def calculate_release_curvature(ball_df, lift_idx, release_idx):
-    """
-    Calculate the release curvature for side (XZ) and rear (YZ) views at the release point.
+    extra_frames = int((release_idx - lift_idx) * 0.5)
+    start_idx = max(0, lift_idx - extra_frames)
+    end_idx = min(len(ball_df), release_idx + extra_frames)
     
-    Args:
-        ball_df (pd.DataFrame): DataFrame with ball position data.
-        lift_idx (int): Index where lift occurs.
-        release_idx (int): Index where release occurs.
+    points_side = ball_df[['X', 'Z']].iloc[start_idx:end_idx].values
+    points_rear = ball_df[['Y', 'Z']].iloc[start_idx:end_idx].values
     
-    Returns:
-        tuple: (kappa_release_side, kappa_release_rear) - Curvature at release in 1/ft.
-    """
-    INCHES_TO_FEET = 1 / 12
-
-    try:
-        # Validate indices
-        if not (0 <= lift_idx < release_idx <= len(ball_df)):
-            logger.warning("Invalid indices for release curvature calculation")
-            return 0.0, 0.0
-
-        # Copy relevant columns
-        ball_data = ball_df[['Basketball_X', 'Basketball_Y', 'Basketball_Z']].copy()
-
-        # Convert to feet
-        ball_data['Basketball_X_ft'] = ball_data['Basketball_X'] * INCHES_TO_FEET
-        ball_data['Basketball_Y_ft'] = ball_data['Basketball_Y'] * INCHES_TO_FEET
-        ball_data['Basketball_Z_ft'] = ball_data['Basketball_Z'] * INCHES_TO_FEET
-
-        # Extended range: 25% before lift and after release
-        lift_to_release_frames = release_idx - lift_idx
-        extra_frames = int(lift_to_release_frames * 0.25)
-        start_idx = max(0, lift_idx - extra_frames)
-        end_idx = min(len(ball_df) - 1, release_idx + extra_frames)
-
-        # Extract points for side (XZ) and rear (YZ) views
-        points_side = ball_data.loc[start_idx:end_idx, ['Basketball_X_ft', 'Basketball_Z_ft']].dropna().values
-        points_rear = ball_data.loc[start_idx:end_idx, ['Basketball_Y_ft', 'Basketball_Z_ft']].dropna().values
-
-        # Check for sufficient points
-        if len(points_side) <= 7 or len(points_rear) <= 7:
-            logger.warning("Insufficient points for Bezier fit")
-            return 0.0, 0.0
-
-        # Fit Bezier curves (assuming fit_bezier is defined elsewhere)
-        P_side = fit_bezier(points_side, n=6)
-        P_rear = fit_bezier(points_rear, n=6)
-
-        if P_side is None or P_rear is None:
-            logger.warning("Bezier fit failed")
-            return 0.0, 0.0
-
-        # Compute curvature at release point (τ=1)
-        # Assuming compute_curvature(P, tau) returns curvature at parameter τ
-        kappa_release_side = compute_curvature(P_side, 1.0)
-        kappa_release_rear = compute_curvature(P_rear, 1.0)
-
-        return kappa_release_side, kappa_release_rear
-
-    except Exception as e:
-        logger.error(f"Error in calculate_release_curvature: {str(e)}")
+    print(f"Side view points: {len(points_side)}, Rear view points: {len(points_rear)}")
+    if len(points_side) <= 7 or len(points_rear) <= 7:
+        print("Not enough points!")
         return 0.0, 0.0
+    
+    P_side = fit_bezier(points_side, n=6)
+    P_rear = fit_bezier(points_rear, n=6)
+    if P_side is None or P_rear is None:
+        print("Bezier fit failed!")
+        return 0.0, 0.0
+    
+    kappa_release_side = compute_curvature(P_side, 1.0)
+    kappa_release_rear = compute_curvature(P_rear, 1.0)
+    print(f"Side curvature: {kappa_release_side}, Rear curvature: {kappa_release_rear}")
+    
+    return kappa_release_side, kappa_release_rear
+
 
 def calculate_shot_metrics(pose_df, ball_df, fps=60):
     """
