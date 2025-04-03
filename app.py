@@ -396,7 +396,7 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
             min_value=kpis['Rear Curvature']['min'],
             max_value=kpis['Rear Curvature']['max'],
             description="Curvature at release in the YZ plane.",
-            calculation_info="Computed using Bezier curve at τ=1."
+            calculation_info="Computed using a Bezier curve at τ=1."
         )
         
         st.subheader("Ball Path Analysis")
