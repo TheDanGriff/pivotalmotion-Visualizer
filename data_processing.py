@@ -958,132 +958,6 @@ def compute_weighted_curvature_area(P, N=100):
         logger.error(f"Error computing weighted curvature area: {str(e)}")
         return 0.0
 
-import numpy as np
-import pandas as pd
-from scipy.special import comb
-from scipy.integrate import trapezoid
-import logging
-
-logger = logging.getLogger(__name__)
-
-# Bezier and Curvature Helper Functions
-def compute_tau(points):
-    """Compute parameter tau using chordal parameterization."""
-    diffs = np.diff(points, axis=0)
-    distances = np.linalg.norm(diffs, axis=1)
-    cumulative = np.cumsum(distances)
-    total = cumulative[-1] if cumulative[-1] != 0 else 1e-10
-    tau = np.r_[0, cumulative / total]
-    return tau
-
-def bezier_design_matrix(tau, n):
-    """Create design matrix A for Bezier curve fitting."""
-    m = len(tau)
-    A = np.zeros((m, n + 1))
-    for k in range(n + 1):
-        A[:, k] = comb(n, k) * (1 - tau)**(n - k) * tau**k
-    return A
-
-def fit_bezier(points, n=6):
-    """Fit an nth-order Bezier curve to points."""
-    try:
-        tau = compute_tau(points)
-        A = bezier_design_matrix(tau, n)
-        P = np.linalg.lstsq(A, points, rcond=None)[0]
-        return P
-    except Exception as e:
-        logger.error(f"Error fitting Bezier curve: {str(e)}")
-        return None
-
-def bernstein_poly(k, n, tau):
-    """Compute Bernstein polynomial."""
-    return comb(n, k) * (1 - tau)**(n - k) * tau**k
-
-def evaluate_bezier(P, tau_vals):
-    """Evaluate Bezier curve at given tau values."""
-    n = len(P) - 1
-    A = bezier_design_matrix(tau_vals, n)
-    return A @ P
-
-def bezier_derivatives(P, tau_vals):
-    """Compute first and second derivatives of Bezier curve."""
-    n = len(P) - 1
-    d1_pts = n * (P[1:] - P[:-1])
-    d2_pts = (n - 1) * (d1_pts[1:] - d1_pts[:-1])
-    d1 = evaluate_bezier(d1_pts, tau_vals)
-    d2 = evaluate_bezier(d2_pts, tau_vals)
-    return d1, d2
-
-def compute_curvature_analytical(P, tau):
-    """Compute curvature analytically using Bezier derivatives."""
-    tau = np.array([tau])
-    d1, d2 = bezier_derivatives(P, tau)
-    x1, z1 = d1[0]
-    x2, z2 = d2[0]
-    denom = (x1**2 + z1**2)**1.5
-    if denom < 1e-10:
-        return 0.0
-    curvature = np.abs(x1 * z2 - z1 * x2) / denom
-    return curvature
-
-def compute_curvature(P, tau, h=1e-4):  # Original finite difference method
-    try:
-        tau = float(tau)
-        tau_minus = max(0.0, tau - h)
-        tau_plus = min(1.0, tau + h)
-
-        B = np.asarray(evaluate_bezier(P, tau), dtype=np.float64).flatten()
-        B_minus = np.asarray(evaluate_bezier(P, tau_minus), dtype=np.float64).flatten()
-        B_plus = np.asarray(evaluate_bezier(P, tau_plus), dtype=np.float64).flatten()
-
-        logger.debug(f"tau={tau}, B={B}, B_minus={B_minus}, B_plus={B_plus}")
-
-        if B.size != 2:
-            raise ValueError(f"evaluate_bezier returned array with {B.size} elements, expected 2 for [x, z] or [y, z]")
-
-        x1 = (B_plus[0] - B_minus[0]) / (2 * h)
-        z1 = (B_plus[1] - B_minus[1]) / (2 * h)
-        x2 = (B_plus[0] - 2 * B[0] + B_minus[0]) / (h**2)
-        z2 = (B_plus[1] - 2 * B[1] + B_minus[1]) / (h**2)
-
-        logger.debug(f"x1={x1}, z1={z1}, x2={x2}, z2={z2}")
-
-        denom = (x1**2 + z1**2)**1.5
-        if denom == 0:
-            logger.debug("Denominator = 0, curvature set to 0")
-            return 0.0
-        curvature = abs(x1 * z2 - z1 * x2) / denom
-        logger.debug(f"Curvature = {curvature}")
-        return float(curvature)
-    except Exception as e:
-        logger.error(f"Error computing curvature: {str(e)}")
-        return 0.0
-
-def compute_terminal_curvature(P, tau_max, N=50):
-    """Compute terminal curvature σ with cubic weighting."""
-    try:
-        z = np.linspace(0, 1, N)
-        tau_z = tau_max + z * (1 - tau_max)
-        kappa_z = np.array([compute_curvature_analytical(P, tau) for tau in tau_z], dtype=np.float64)
-        w_z = 4 * z**3
-        sigma = trapezoid(w_z * kappa_z, z)
-        return float(sigma)
-    except Exception as e:
-        logger.error(f"Error computing terminal curvature: {str(e)}")
-        return 0.0
-
-def compute_weighted_curvature_area(P, N=100):
-    """Compute the cubic-weighted curvature area from lift to release."""
-    try:
-        tau_grid = np.linspace(0, 1, N)
-        kappa_grid = np.array([compute_curvature(P, tau) for tau in tau_grid], dtype=np.float64)
-        w_grid = 4 * tau_grid**3
-        weighted_area = trapezoid(w_grid * kappa_grid, tau_grid)
-        return float(weighted_area)
-    except Exception as e:
-        logger.error(f"Error computing weighted curvature area: {str(e)}")
-        return 0.0
-
 def calculate_shot_metrics(pose_df, ball_df, fps=60):
     """
     Calculate basketball shot metrics entirely in FEET.
@@ -1160,11 +1034,6 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         hoop_x_ft = hoop_x * INCHES_TO_FEET
         hoop_y_ft = hoop_y * INCHES_TO_FEET
 
-        # Add feet columns for curvature calculation
-        ball_df['Basketball_X_ft'] = ball_df['Basketball_X'] * INCHES_TO_FEET
-        ball_df['Basketball_Y_ft'] = ball_df['Basketball_Y'] * INCHES_TO_FEET
-        ball_df['Basketball_Z_ft'] = ball_df['Basketball_Z'] * INCHES_TO_FEET
-
         # 7. Shot Distance using raw coordinates / 12
         release_x_ft = release_point['Basketball_X'] * INCHES_TO_FEET
         release_y_ft = release_point['Basketball_Y'] * INCHES_TO_FEET
@@ -1181,23 +1050,8 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         metrics['original_shot_distance'] = original_shot_distance
         metrics['flip'] = flip
 
-        # 8. Refine set_idx and lift_idx with height constraints
-        set_candidates = ball_df[(ball_df['Basketball_Z_ft'] >= 6.0) & 
-                                 (ball_df['Basketball_Z_ft'] <= 7.5) & 
-                                 (ball_df.index < metrics['release_idx'])]
-        if not set_candidates.empty:
-            metrics['set_idx'] = set_candidates['Basketball_X_ft'].idxmax()
-        else:
-            metrics['set_idx'] = ball_df.iloc[release_window_start:metrics['release_idx']]['Basketball_X'].idxmax()
-
-        lift_candidates = ball_df[(ball_df['Basketball_Z_ft'] >= 3.5) & 
-                                  (ball_df['Basketball_Z_ft'] <= 5.5) & 
-                                  (ball_df.index < metrics['set_idx'])]
-        if not lift_candidates.empty:
-            metrics['lift_idx'] = lift_candidates['Basketball_X_ft'].idxmin()
-        else:
-            set_window_start = max(0, metrics['set_idx'] - 32)
-            metrics['lift_idx'] = ball_df.iloc[set_window_start:metrics['set_idx']]['Basketball_Z'].idxmin()
+        # 8. Refine set_idx (should be max X, already set above)
+        # Refine lift_idx (already set as min Z)
 
         # 9. Compute KPIs
         metrics['release_height'] = release_point['Basketball_Z'] * INCHES_TO_FEET
@@ -1230,7 +1084,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         start_idx = max(0, lift_idx - extra_frames)
         end_idx = min(max_idx, release_idx + extra_frames)
 
-        # Side View (XZ plane) - Original Weighted Curvature
+        # Side View (XZ plane)
         points_side = ball_df.loc[start_idx:end_idx, ['Basketball_X_ft', 'Basketball_Z_ft']].dropna().values
         if len(points_side) > 7:
             P_side = fit_bezier(points_side, n=6)
@@ -1249,7 +1103,7 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         else:
             metrics['weighted_curvature_area_side'] = 0.0
 
-        # Rear View (YZ plane) - Original Weighted Curvature
+        # Rear View (YZ plane)
         points_rear = ball_df.loc[start_idx:end_idx, ['Basketball_Y_ft', 'Basketball_Z_ft']].dropna().values
         if len(points_rear) > 7:
             P_rear = fit_bezier(points_rear, n=6)
@@ -1268,39 +1122,11 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
         else:
             metrics['weighted_curvature_area_rear'] = 0.0
 
-        # Total Weighted Curvature KPI
+        # Total Weighted Curvature KPI (optional, if still needed)
         metrics['total_weighted_curvature_area'] = (
             metrics.get('weighted_curvature_area_side', 0.0) +
             metrics.get('weighted_curvature_area_rear', 0.0)
         )
-
-        # Modified Release Curvature (Terminal Curvature σ in XZ plane)
-        traj_df = ball_df.loc[metrics['lift_idx']:metrics['release_idx'], ['Basketball_X_ft', 'Basketball_Z_ft']]
-        mask = (traj_df['Basketball_Z_ft'] >= 3.25) & (traj_df['Basketball_Z_ft'] <= 9.0)
-        traj_trimmed = traj_df[mask].values
-        if len(traj_trimmed) < 7:
-            logger.warning("Insufficient points for Bezier fit in release curvature")
-            metrics['release_curvature'] = 0.0
-        else:
-            P = fit_bezier(traj_trimmed, n=6)
-            if P is None:
-                metrics['release_curvature'] = 0.0
-            else:
-                if metrics['set_idx'] in traj_df[mask].index:
-                    trimmed_idx = np.where(traj_df[mask].index == metrics['set_idx'])[0][0]
-                    tau_trimmed = compute_tau(traj_trimmed)
-                    tau_set = tau_trimmed[trimmed_idx]
-                    N = 100
-                    z = np.linspace(0, 1, N)
-                    tau_z = tau_set + z * (1 - tau_set)
-                    kappa_z = np.array([compute_curvature_analytical(P, tau) for tau in tau_z])
-                    w_z = 4 * z**3
-                    sigma = trapezoid(w_z * kappa_z, z)
-                    metrics['release_curvature'] = sigma
-                    logger.debug(f"Release curvature (σ): {sigma}")
-                else:
-                    logger.warning("Set Point not in trimmed trajectory for release curvature")
-                    metrics['release_curvature'] = 0.0
 
         # 13. Lateral Deviation
         lateral_dev = calculate_lateral_deviation(ball_df, metrics['release_idx'], hoop_x=metrics['hoop_x'], hoop_y=metrics['hoop_y'])
@@ -1312,12 +1138,12 @@ def calculate_shot_metrics(pose_df, ball_df, fps=60):
     except Exception as e:
         logger.error(f"Error calculating shot metrics: {str(e)}")
         metrics.setdefault('release_velocity', 0.0)
-        metrics.setdefault('release_curvature', 0.0)  # Updated key
-        metrics.setdefault('weighted_curvature_area_side', 0.0)  # Kept original
-        metrics.setdefault('weighted_curvature_area_rear', 0.0)  # Kept original
+        metrics.setdefault('release_curvature_side', 0.0)
+        metrics.setdefault('release_curvature_rear', 0.0)
         metrics.setdefault('lateral_deviation', 0.0)
 
     return metrics, pose_df, ball_df
+
 def calculate_lateral_deviation(df, release_index, hoop_x=501.0, hoop_y=0.0):
     """
     Calculate lateral deviation of the ball from the intended shot line to the hoop, in feet.
