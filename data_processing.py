@@ -909,16 +909,34 @@ def bezier_derivatives(P, tau):
 
 def compute_curvature(P, tau):
     """Compute curvature analytically using Bezier derivatives."""
+    # Ensure tau is an array and track if it was originally scalar
     if np.isscalar(tau):
         tau = np.array([tau])
+        scalar = True
+    else:
+        scalar = False
+    
+    # Compute first and second derivatives
     d1, d2 = bezier_derivatives(P, tau)
-    x1, z1 = d1[:, 0], d1[:, 1]  # First derivatives
-    x2, z2 = d2[:, 0], d2[:, 1]  # Second derivatives
+    
+    # Handle indexing based on dimensionality
+    if d1.ndim == 1:  # Scalar tau case, d1 is 1D (e.g., [x, z])
+        x1, z1 = d1[0], d1[1]
+        x2, z2 = d2[0], d2[1]
+    else:  # Array tau case, d1 is 2D (e.g., [[x1, z1], [x2, z2], ...])
+        x1, z1 = d1[:, 0], d1[:, 1]
+        x2, z2 = d2[:, 0], d2[:, 1]
+    
+    # Compute curvature
     denom = (x1**2 + z1**2)**1.5
     with np.errstate(divide='ignore', invalid='ignore'):
         curvature = np.abs(x1 * z2 - z1 * x2) / denom
-        curvature[denom == 0] = 0.0  # Handle zero denominator
-    return curvature if len(curvature) > 1 else curvature[0]
+        curvature[denom == 0] = 0.0
+    
+    # Return scalar if input tau was scalar
+    if scalar:
+        return curvature[0]
+    return curvature
 
 def calculate_release_curvature(ball_df, lift_idx, release_idx):
     """
