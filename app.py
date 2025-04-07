@@ -415,6 +415,13 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
         logger.error(f"Error generating curvature analysis plot: {str(e)}")
         st.error("Failed to generate curvature analysis plot.")
     
+    # Add Shot Path Analysis section here
+    st.subheader("Shot Path Analysis")
+    if fig_shot is not None:
+        st.plotly_chart(fig_shot, use_container_width=True)
+    else:
+        st.error("Failed to generate shot path analysis plot.")
+    
     st.subheader("3D Ball Path")
     if not df_ball.empty:
         try:
