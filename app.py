@@ -104,6 +104,78 @@ TEAMS = {
 }
 
 # ---------------- Helper Functions ---------------- #
+import streamlit as st
+import logging
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+import os
+import base64
+from datetime import datetime
+from scipy import stats
+
+# Import your project modules
+from auth import handle_login
+from aws_client import initialize_aws_clients
+from config import BUCKET_NAME, FPS
+from data_processing import (
+    load_final_output,
+    load_spin_axis_csv,
+    separate_pose_and_ball_tracking,
+    get_username_by_email,
+    fetch_user_completed_jobs,
+    fetch_user_completed_data_file_jobs,
+    list_data_file_job_segments,
+    load_data_file_final_output,
+    calculate_shot_metrics,
+    calculate_body_alignment,
+    vector_angle,
+    create_alignment_diagram,
+    plot_curvature_analysis,
+    get_segment_label,
+    get_player_kpi_averages,
+    get_shot_type,
+    plot_shot_location,
+    plot_joint_flexion_analysis
+)
+from visualization import (
+    plot_single_shot,
+    show_brand_header,
+    display_kpi_grid,
+    plot_kinematic_sequence,
+    plot_spin_analysis,
+    plot_velocity_profile,
+    plot_trajectory_arc,
+    plot_asymmetry_radar,
+    plot_distance_over_height,
+    plot_3d_ball_path,
+    plot_velocity_vs_angle,
+    plot_spin_bullseye,
+    plot_shot_analysis,
+    plot_release_angle_analysis,
+    plot_foot_alignment,
+    create_foot_alignment_visual,
+    create_body_alignment_visual,
+    plot_shot_location_in_inches
+)
+from kpi import (
+    calculate_kpis_pose,
+    calculate_kpis_spin,
+    get_kpi_benchmarks,
+    calculate_release_velocity,
+    display_clickable_kpi_card,
+    animated_flip_kpi_card
+)
+from utils import add_time_column, humanize_label, humanize_segment_label
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+# Initialize AWS clients
+cognito_client, dynamodb, s3_client = initialize_aws_clients()
+
+# ---------------- Helper Functions ---------------- #
 
 def list_segments(s3_client, bucket_name, user_email, job_id):
     prefix = f"processed/{user_email}/{job_id}/"
@@ -187,67 +259,53 @@ def process_segment_for_table(job, segment, s3_client):
         logger.error(f"Error processing segment {segment} for job {job['JobID']}: {str(e)}")
         return None
 
-def create_aggregated_stats_table(selected_rows, comparison_row):
-    if len(selected_rows) < 1 or comparison_row is None:
-        return None
-    
-    # Define numeric columns to aggregate
+def create_comparison_table(group_a_df, group_b_df):
+    """Create a Plotly table comparing two groups of shots."""
     numeric_cols = [
         "Release Height", "Release Angle", "Release Velocity",
         "Apex Height", "Release Time", "Side Curvature", "Rear Curvature",
         "Lateral Deviation"
     ]
-    
-    # Calculate means and standard deviations
     metrics = [col for col in numeric_cols]
-    averages = [f"{selected_rows[col].mean():.2f}" for col in numeric_cols]
-    std_devs = [f"±{selected_rows[col].std():.2f}" for col in numeric_cols]
-    comparisons = [f"{float(comparison_row[col]):.2f}" for col in numeric_cols]
-    
-    # Calculate colors for comparison column only
-    header_color = '#2E3E4F'
-    cell_color = '#FFFFFF'
-    yellow_threshold = 1  # 1 standard deviation
-    red_threshold = 2    # 2 standard deviations
-    
-    comparison_colors = []
-    for col in numeric_cols:
-        mean = selected_rows[col].mean()
-        std = selected_rows[col].std()
-        comp_value = float(comparison_row[col])
-        z_score = abs((comp_value - mean) / std) if std > 0 else 0
-        
-        if z_score > red_threshold:
-            comparison_colors.append('#FF6B6B')  # Red
-        elif z_score > yellow_threshold:
-            comparison_colors.append('#FFFF99')  # Yellow
+
+    def compute_stats(df):
+        if df.empty:
+            return ["N/A"] * len(metrics), ["N/A"] * len(metrics)
+        means = [f"{df[col].mean():.2f}" if len(df) > 0 else "N/A" for col in numeric_cols]
+        stds = [f"{df[col].std():.2f}" if len(df) > 1 else "N/A" for col in numeric_cols]
+        return means, stds
+
+    group_a_means, group_a_stds = compute_stats(group_a_df)
+    group_b_means, group_b_stds = compute_stats(group_b_df)
+    differences = []
+    for a, b in zip(group_a_means, group_b_means):
+        if a != "N/A" and b != "N/A":
+            diff = float(a) - float(b)
+            differences.append(f"{diff:.2f}")
         else:
-            comparison_colors.append(cell_color)  # White
-    
-    # Create Plotly table with separate color for comparison column
+            differences.append("N/A")
+
     fig = go.Figure(data=[go.Table(
         header=dict(
-            values=['Metric', 'Average', 'Std Dev', 'Comparison'],
-            fill_color=header_color,
+            values=['Metric', 'Group A Mean', 'Group A Std', 'Group B Mean', 'Group B Std', 'Difference'],
+            fill_color='#2E3E4F',
             align='center',
             font=dict(color='white', size=16, family='Oswald'),
             height=50
         ),
         cells=dict(
-            values=[metrics, averages, std_devs, comparisons],
-            fill_color=[[cell_color]*len(metrics), [cell_color]*len(averages), 
-                       [cell_color]*len(std_devs), comparison_colors],
+            values=[metrics, group_a_means, group_a_stds, group_b_means, group_b_stds, differences],
+            fill_color='#FFFFFF',
             align='center',
             font=dict(color='#333333', size=14, family='Oswald'),
             height=40
         )
     )])
-    
     fig.update_layout(
         title={
-            'text': f"Aggregated Statistics vs Comparison ({len(selected_rows)} Shots)",
-            'y':0.95,
-            'x':0.5,
+            'text': f"Comparison of Group A ({len(group_a_df)} shots) and Group B ({len(group_b_df)} shots)",
+            'y': 0.95,
+            'x': 0.5,
             'xanchor': 'center',
             'yanchor': 'top',
             'font': dict(size=24, color='#2E3E4F', family='Oswald')
@@ -256,7 +314,6 @@ def create_aggregated_stats_table(selected_rows, comparison_row):
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
-    
     return fig
 
 # ---------------- Detailed View Helper Functions ---------------- #
@@ -892,7 +949,6 @@ def main():
         st.info("No completed jobs found for this user.")
         return
 
-    # Initial processing to get all table data for shot type filtering
     all_table_data = []
     with st.spinner("Loading initial shot data..."):
         for job in jobs:
@@ -932,7 +988,6 @@ def main():
         shot_types = ["All", "3 Point", "Free Throw", "Mid Range"]
         shot_type_filter = st.selectbox("Select Shot Type", shot_types, key="shot_type_filter")
 
-    # Process filtered table data
     filtered_table_data = all_table_data
     if team_filter != "All":
         filtered_table_data = [d for d in filtered_table_data if d["Team"] == team_filter]
@@ -943,7 +998,7 @@ def main():
     if source_filter != "All":
         filtered_table_data = [d for d in filtered_table_data if format_source_type(d["Source"]) == source_filter]
     if shot_type_filter != "All":
-        shot_type_filter = shot_type_filter.replace("Mid Range", "Mid-Range")  # Adjust for table data format
+        shot_type_filter = shot_type_filter.replace("Mid Range", "Mid-Range")
         filtered_table_data = [d for d in filtered_table_data if d["Shot Type"] == shot_type_filter]
 
     if not filtered_table_data:
@@ -952,97 +1007,35 @@ def main():
 
     df_table = pd.DataFrame(filtered_table_data)
 
-    # --- Aggregation Selection Table ---
-    st.markdown("""
-        <div style='margin: 30px 0;'>
-            <h2 style='font-family: Oswald; color: #2E3E4F; text-align: center;'>
-                Select Shots for Aggregation
-            </h2>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    df_table.insert(0, "Select", False)
-    edited_df = st.data_editor(
-        df_table,
-        column_config={
-            "Select": st.column_config.CheckboxColumn("Select"),
-            "Release Angle": st.column_config.NumberColumn(format="%.1f°"),
-            "Release Velocity": st.column_config.NumberColumn(format="%.1f ft/s"),
-            "Apex Height": st.column_config.NumberColumn(format="%.1f ft"),
-            "Release Time": st.column_config.NumberColumn(format="%.2f s"),
-            "Side Curvature": st.column_config.NumberColumn(format="%.3f 1/ft"),
-            "Rear Curvature": st.column_config.NumberColumn(format="%.3f 1/ft"),
-            "Lateral Deviation": st.column_config.NumberColumn(format="%.2f ft"),
-            "JobID": None,
-            "Segment": None
-        },
-        hide_index=True,
-        disabled=["Game Date", "Period", "Clock", "Player", "Team", "Shot Type",
-                  "Distance (ft)", "Release Angle", "Release Velocity", "Apex Height",
-                  "Release Time", "Side Curvature", "Rear Curvature", "Lateral Deviation", "Result"],
-        use_container_width=True,
-        key="agg_table"
-    )
+    # --- Introduce Tabs ---
+    tab1, tab2 = st.tabs(["Shot Analysis", "Compare Shots"])
 
-    selected_rows = edited_df[edited_df.Select]
-
-    # --- Comparison Selection Table ---
-    if not selected_rows.empty:
+    # --- Shot Analysis Tab ---
+    with tab1:
         st.markdown("""
-            <div style='margin: 30px 0;'>
+            <div style='margin: 20px 0;'>
                 <h2 style='font-family: Oswald; color: #2E3E4F; text-align: center;'>
-                    Select Comparison Shot
+                    Select a Shot for Detailed Analysis
                 </h2>
             </div>
         """, unsafe_allow_html=True)
-        
-        df_table.insert(0, "Compare", False)
-        comp_df = st.data_editor(
-            df_table,
-            column_config={
-                "Compare": st.column_config.CheckboxColumn("Compare"),
-                "Release Angle": st.column_config.NumberColumn(format="%.1f°"),
-                "Release Velocity": st.column_config.NumberColumn(format="%.1f ft/s"),
-                "Apex Height": st.column_config.NumberColumn(format="%.1f ft"),
-                "Release Time": st.column_config.NumberColumn(format="%.2f s"),
-                "Side Curvature": st.column_config.NumberColumn(format="%.3f 1/ft"),
-                "Rear Curvature": st.column_config.NumberColumn(format="%.3f 1/ft"),
-                "Lateral Deviation": st.column_config.NumberColumn(format="%.2f ft"),
-                "JobID": None,
-                "Segment": None,
-                "Select": None
-            },
-            hide_index=True,
-            disabled=["Game Date", "Period", "Clock", "Player", "Team", "Shot Type",
-                      "Distance (ft)", "Release Angle", "Release Velocity", "Apex Height",
-                      "Release Time", "Side Curvature", "Rear Curvature", "Lateral Deviation", "Result"],
-            use_container_width=True,
-            key="comp_table"
+
+        # Add Shot ID for dropdown
+        df_table['Shot ID'] = df_table.apply(
+            lambda row: f"{row['Player']} - {row['Game Date']} - {row['Period']} - {row['Clock']} - {row['Shot Type']}",
+            axis=1
         )
+        shot_labels = df_table['Shot ID'].tolist()
 
-        comparison_rows = comp_df[comp_df.Compare]
-        comparison_row = comparison_rows.iloc[0] if not comparison_rows.empty else None
+        if shot_labels:
+            selected_shot_label = st.selectbox("Select a shot", shot_labels, key="shot_analysis_select")
+            selected_row = df_table[df_table['Shot ID'] == selected_shot_label].iloc[0]
 
-        # --- Aggregated Stats and Detailed View ---
-        if comparison_row is not None:
-            # Show aggregated stats table
-            st.markdown("""
-                <div style='margin: 40px 0;'>
-                    <h2 style='font-family: Oswald; color: #2E3E4F; text-align: center;'>
-                        Aggregated Statistics vs Comparison
-                    </h2>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            agg_fig = create_aggregated_stats_table(selected_rows, comparison_row)
-            if agg_fig:
-                st.plotly_chart(agg_fig, use_container_width=True)
-            
-            # Load comparison shot data
-            selected_job = next(j for j in jobs if j['JobID'] == comparison_row['JobID'])
-            selected_segment = comparison_row['Segment']
+            # Load data for selected shot
+            selected_job = next(j for j in jobs if j['JobID'] == selected_row['JobID'])
+            selected_segment = selected_row['Segment']
             selected_job_id = selected_job['JobID']
-            shot_type = comparison_row['Shot Type']
+            shot_type = selected_row['Shot Type']
 
             if selected_job['Source'].lower() in ['pose_video', 'data_file']:
                 if selected_job['Source'].lower() == 'data_file':
@@ -1066,21 +1059,86 @@ def main():
                 st.error("No data loaded. Please check the file format and contents.")
                 return
 
-            # Recalculate full shot metrics from raw data
+            # Recalculate full shot metrics
             metrics, df_pose, df_ball = calculate_shot_metrics(df_pose, df_ball)
 
-            # Show detailed view
-            tab1, tab2, tab3 = st.tabs(["Overview", "Biomechanics Analysis", "Spin Analysis"])
-            with tab1:
+            # Sub-tabs for detailed analysis
+            subtab1, subtab2, subtab3 = st.tabs(["Overview", "Biomechanics Analysis", "Spin Analysis"])
+            with subtab1:
                 show_overview_page(df_pose, df_ball, df_spin, metrics, selected_job['PlayerName'], shot_type)
-            with tab2:
+            with subtab2:
                 show_biomechanics_page(df_pose, df_ball, df_spin, metrics)
-            with tab3:
+            with subtab3:
                 show_spin_analysis_page(df_spin)
         else:
-            st.info("Select a comparison shot to view aggregated statistics and detailed analysis")
-    else:
-        st.info("Select one or more shots for aggregation to proceed")
+            st.info("No shots available for analysis.")
+
+    # --- Compare Shots Tab ---
+    with tab2:
+        st.markdown("""
+            <div style='margin: 20px 0;'>
+                <h2 style='font-family: Oswald; color: #2E3E4F; text-align: center;'>
+                    Select Shots for Comparison
+                </h2>
+                <p style='font-family: Oswald; color: #333333; text-align: center;'>
+                    Select shots for Group A and Group B to compare their aggregated statistics.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Add checkbox columns
+        df_table['Group A'] = False
+        df_table['Group B'] = False
+
+        edited_df = st.data_editor(
+            df_table,
+            column_config={
+                "Group A": st.column_config.CheckboxColumn("Group A"),
+                "Group B": st.column_config.CheckboxColumn("Group B"),
+                "Game Date": st.column_config.TextColumn("Game Date"),
+                "Period": st.column_config.TextColumn("Period"),
+                "Clock": st.column_config.TextColumn("Clock"),
+                "Player": st.column_config.TextColumn("Player"),
+                "Team": st.column_config.TextColumn("Team"),
+                "Shot Type": st.column_config.TextColumn("Shot Type"),
+                "Distance (ft)": st.column_config.NumberColumn("Distance (ft)", format="%.1f"),
+                "Release Height": st.column_config.NumberColumn("Release Height", format="%.1f"),
+                "Release Angle": st.column_config.NumberColumn("Release Angle", format="%.1f°"),
+                "Release Velocity": st.column_config.NumberColumn("Release Velocity", format="%.1f ft/s"),
+                "Apex Height": st.column_config.NumberColumn("Apex Height", format="%.1f ft"),
+                "Release Time": st.column_config.NumberColumn("Release Time", format="%.2f s"),
+                "Side Curvature": st.column_config.NumberColumn("Side Curvature", format="%.3f 1/ft"),
+                "Rear Curvature": st.column_config.NumberColumn("Rear Curvature", format="%.3f 1/ft"),
+                "Lateral Deviation": st.column_config.NumberColumn("Lateral Deviation", format="%.2f ft"),
+                "Result": st.column_config.TextColumn("Result"),
+                "JobID": None,
+                "Segment": None,
+                "Shot ID": None
+            },
+            hide_index=True,
+            disabled=["Game Date", "Period", "Clock", "Player", "Team", "Shot Type",
+                      "Distance (ft)", "Release Height", "Release Angle", "Release Velocity",
+                      "Apex Height", "Release Time", "Side Curvature", "Rear Curvature",
+                      "Lateral Deviation", "Result"],
+            use_container_width=True,
+            key="compare_table"
+        )
+
+        group_a_rows = edited_df[edited_df['Group A'] == True]
+        group_b_rows = edited_df[edited_df['Group B'] == True]
+
+        if not group_a_rows.empty and not group_b_rows.empty:
+            st.markdown("""
+                <div style='margin: 40px 0;'>
+                    <h2 style='font-family: Oswald; color: #2E3E4F; text-align: center;'>
+                        Comparison Results
+                    </h2>
+                </div>
+            """, unsafe_allow_html=True)
+            fig = create_comparison_table(group_a_rows, group_b_rows)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Select at least one shot for each group to compare.")
 
 if __name__ == "__main__":
     main()
