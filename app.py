@@ -443,11 +443,17 @@ def show_overview_page(df_pose, df_ball, df_spin, metrics, player_name, shot_typ
 
 def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
     st.header("Biomechanics Analysis")
-    release_idx = metrics.get('release_idx', 0)
+    
+    # Prefer adjusted release_frame index, fallback to release_idx
+    release_idx = metrics.get('release_frame', metrics.get('release_idx', 0))
     player_name = st.session_state.get('username', 'Unknown')
     shot_type = st.session_state.get('shot_type', 'Unknown')
     player_averages = get_player_kpi_averages(player_name, shot_type) or {}
+    
+    # Generate joint flexion analysis plot and KPIs
     fig, kpis = plot_joint_flexion_analysis(df_pose, df_ball, metrics)
+    
+    # Define KPI ranges for visualization
     kpi_ranges = {
         'Kinematic Chain Score': {'min': 0, 'max': 100},
         'Stability Ratio': {'min': 0, 'max': 2},
@@ -457,6 +463,8 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
         'Shoulder Rotation': {'min': 0, 'max': 180},
         'COM Acceleration': {'min': -50, 'max': 50}
     }
+    
+    # Display Biomechanical KPIs
     st.subheader("Biomechanical KPIs")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -537,29 +545,30 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
             description="Positive values indicate upward/forward motion. Good range: 10-30 ft/s².",
             calculation_info="Mean acceleration of centroid from lift to release."
         )
+    
+    # Display Joint Flexion/Extension Plot
     st.subheader("Joint Flexion/Extension")
     st.plotly_chart(fig, use_container_width=True)
+    
+    # Display Body Alignment Visuals
     if not df_pose.empty and release_idx < len(df_pose):
         frame_data = df_pose.iloc[release_idx]
         st.subheader("Body Alignment Visuals")
         col1, col2 = st.columns(2)
         with col1:
             st.write("Body Alignment (Feet, Hips, Shoulders)")
-            body_fig = create_body_alignment_visual(frame_data, hoop_x=501.0, hoop_y=0.0)
+            body_fig = create_body_alignment_visual(frame_data)
             st.plotly_chart(body_fig, use_container_width=True)
         with col2:
             st.write("Foot Alignment")
             foot_fig = create_foot_alignment_visual(
                 frame_data,
-                shot_distance=metrics.get('shot_distance', 0) / 12,
-                flip=False,
-                hoop_x=41.75,
-                hoop_y=0.0
+                hoop_x=metrics.get('shot_distance', 41.75),  # Distance to hoop in feet
+                hoop_y=0.0  # Hoop aligned along X-axis
             )
             st.plotly_chart(foot_fig, use_container_width=True)
     else:
         st.warning("Insufficient pose data or invalid release index for alignment visuals.")
-
 def show_spin_analysis_page(df_spin):
     if not df_spin.empty:
         st.header("Spin Analysis")
