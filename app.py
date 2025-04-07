@@ -1098,7 +1098,7 @@ def main():
             fig = create_comparison_table(baseline_rows, comparison_rows)
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("Select at least one shot for Baseline and one for Comparison to view the comparison table.")
+            st.info("Select at least one shot for Baseline and one for comparison to view the comparison table.")
 
 if __name__ == "__main__":
     main()
