@@ -858,10 +858,11 @@ def calculate_body_alignment(df, release_idx, hoop_x=501.0, hoop_y=0.0):
     
     return metrics
 
-def create_body_alignment_visual(frame_data, hoop_x=501.0, hoop_y=0.0):
+def create_body_alignment_visual(frame_data):
     """
     Create a 2D visualization comparing the orientations of Feet, Hips, and Shoulders,
-    with each segment's offset computed relative to the Hips, using dynamic hoop position.
+    with each segment's offset computed relative to the Hips. Uses standardized coordinates
+    from calculate_shot_metrics where the basket is along the positive X-axis.
     
     For each segment:
       - Compute the midpoint from its left/right keypoints.
@@ -869,12 +870,7 @@ def create_body_alignment_visual(frame_data, hoop_x=501.0, hoop_y=0.0):
       - Compute the rightward perpendicular vector as (seg_unit_y, -seg_unit_x) [90° clockwise].
       - Draw an arrow (fixed length) from the midpoint in the direction of the perpendicular.
     
-    Then use the Hips' perpendicular angle as the baseline and compute:
-      - Feet offset = (Feet perpendicular angle - Hips perpendicular angle)
-      - Shoulders offset = (Shoulders perpendicular angle - Hips perpendicular angle)
-      - Hips offset = 0° (baseline)
-    
-    These offsets are shown in a metrics box in the bottom left.
+    Offsets are computed relative to the Hips' perpendicular angle and shown in a metrics box.
     
     Color palette (pastel shades):
       - Feet: navy ("#000080")
@@ -882,9 +878,7 @@ def create_body_alignment_visual(frame_data, hoop_x=501.0, hoop_y=0.0):
       - Shoulders: lighter pastel blue ("#64B5F6")
     
     Parameters:
-        frame_data (dict or Series): Contains keypoint values for the frame.
-        hoop_x: X-coordinate of the hoop in inches (default 501.0).
-        hoop_y: Y-coordinate of the hoop in inches (default 0.0).
+        frame_data (dict or Series): Contains keypoint values in inches (remapped coordinates).
         
     Returns:
         fig (plotly.graph_objects.Figure): The alignment offset comparison visualization.
@@ -913,7 +907,6 @@ def create_body_alignment_visual(frame_data, hoop_x=501.0, hoop_y=0.0):
     segments = []
     
     # Feet: use average of heel and big toe for left/right
-    # New names
     if all(key in frame_data for key in ['LHEEL_X', 'LBIGTOE_X', 'LHEEL_Y', 'LBIGTOE_Y',
                                          'RHEEL_X', 'RBIGTOE_X', 'RHEEL_Y', 'RBIGTOE_Y']):
         left_foot = ((frame_data['LHEEL_X'] + frame_data['LBIGTOE_X']) / 2,
@@ -921,7 +914,6 @@ def create_body_alignment_visual(frame_data, hoop_x=501.0, hoop_y=0.0):
         right_foot = ((frame_data['RHEEL_X'] + frame_data['RBIGTOE_X']) / 2,
                       (frame_data['RHEEL_Y'] + frame_data['RBIGTOE_Y']) / 2)
         segments.append(("Feet", left_foot, right_foot))
-    # Fallback to old names
     elif all(key in frame_data for key in ['LHEEL_X', 'LBTOE_X', 'LHEEL_Y', 'LBTOE_Y',
                                            'RHEEL_X', 'RBTOE_X', 'RHEEL_Y', 'RBTOE_Y']):
         left_foot = ((frame_data['LHEEL_X'] + frame_data['LBTOE_X']) / 2,
@@ -931,24 +923,20 @@ def create_body_alignment_visual(frame_data, hoop_x=501.0, hoop_y=0.0):
         segments.append(("Feet", left_foot, right_foot))
     
     # Hips: using left/right hip joint centers
-    # New names
     if all(key in frame_data for key in ['LHIP_X', 'RHIP_X', 'LHIP_Y', 'RHIP_Y']):
         left_hip = (frame_data['LHIP_X'], frame_data['LHIP_Y'])
         right_hip = (frame_data['RHIP_X'], frame_data['RHIP_Y'])
         segments.append(("Hips", left_hip, right_hip))
-    # Fallback to old names
     elif all(key in frame_data for key in ['LHJC_X', 'RHJC_X', 'LHJC_Y', 'RHJC_Y']):
         left_hip = (frame_data['LHJC_X'], frame_data['LHJC_Y'])
         right_hip = (frame_data['RHJC_X'], frame_data['RHJC_Y'])
         segments.append(("Hips", left_hip, right_hip))
     
     # Shoulders: using left/right shoulder joint centers
-    # New names
     if all(key in frame_data for key in ['LSHOULDER_X', 'RSHOULDER_X', 'LSHOULDER_Y', 'RSHOULDER_Y']):
         left_shoulder = (frame_data['LSHOULDER_X'], frame_data['LSHOULDER_Y'])
         right_shoulder = (frame_data['RSHOULDER_X'], frame_data['RSHOULDER_Y'])
         segments.append(("Shoulders", left_shoulder, right_shoulder))
-    # Fallback to old names
     elif all(key in frame_data for key in ['LSJC_X', 'RSJC_X', 'LSJC_Y', 'RSJC_Y']):
         left_shoulder = (frame_data['LSJC_X'], frame_data['LSJC_Y'])
         right_shoulder = (frame_data['RSJC_X'], frame_data['RSJC_Y'])
@@ -977,16 +965,14 @@ def create_body_alignment_visual(frame_data, hoop_x=501.0, hoop_y=0.0):
         mid_pt = ((left_pt[0] + right_pt[0]) / 2, (left_pt[1] + right_pt[1]) / 2)
         
         # Compute the segment vector and its norm
-        seg_vec = (right_pt[0] - left_pt[0], right_pt[1] - left_pt[1])
+        seg_vec = (right_pt[0] - left_pt[0], right_pt[1] - right_pt[1])
         seg_norm = sqrt(seg_vec[0]**2 + seg_vec[1]**2)
         if seg_norm == 0:
             continue
         seg_unit = (seg_vec[0] / seg_norm, seg_vec[1] / seg_norm)
         
         # Compute the rightward perpendicular vector
-        # (Rotate 90° clockwise: (dx,dy) -> (dy, -dx))
         perp = (seg_unit[1], -seg_unit[0])
-        # Compute its angle in degrees
         perp_angle = degrees(atan2(perp[1], perp[0]))
         perp_angles[seg_name] = perp_angle
         
@@ -1017,26 +1003,23 @@ def create_body_alignment_visual(frame_data, hoop_x=501.0, hoop_y=0.0):
     offsets = {}
     if baseline is not None:
         for seg in perp_angles:
-            # Compute difference relative to baseline
             diff = perp_angles[seg] - baseline
-            # Normalize to [-180, 180]
             while diff > 180:
                 diff -= 360
             while diff < -180:
                 diff += 360
             offsets[seg] = diff
     else:
-        # If no hips, set all offsets to 0
         for seg in perp_angles:
             offsets[seg] = 0.0
 
-    # Prepare offset text (baseline relative to hips)
+    # Prepare offset text
     offset_text = "Alignment Offsets (relative to Hips):<br>"
     for seg in ["Feet", "Shoulders"]:
         if seg in offsets:
             offset_text += f"{seg}: {offsets[seg]:.1f}°<br>"
     
-    # Add offset metrics annotation in the bottom left (using paper coordinates)
+    # Add offset metrics annotation
     fig.add_annotation(
         xref="paper", x=0.01,
         yref="paper", y=0.01,
@@ -1059,10 +1042,10 @@ def create_body_alignment_visual(frame_data, hoop_x=501.0, hoop_y=0.0):
         fig.update_xaxes(range=[x_min - x_margin, x_max + x_margin])
         fig.update_yaxes(range=[y_min - y_margin, y_max + y_margin])
     else:
-        fig.update_xaxes(range=[-600, 600])  # Full court range in inches
-        fig.update_yaxes(range=[-300, 300])  # Full court range in inches
+        fig.update_xaxes(range=[-600, 600])
+        fig.update_yaxes(range=[-300, 300])
     
-    # Update overall layout (in inches)
+    # Update layout
     fig.update_layout(
         title="Body Alignment Comparison (Feet, Hips, Shoulders)",
         xaxis_title="Court Position (in)",
@@ -1078,27 +1061,26 @@ def create_body_alignment_visual(frame_data, hoop_x=501.0, hoop_y=0.0):
     
     return fig
 
-def create_foot_alignment_visual(frame_data, shot_distance, flip=False, hoop_x=41.75, hoop_y=0.0):
+def create_foot_alignment_visual(frame_data, hoop_x, hoop_y=0.0):
     """
-    Create a foot alignment visualization at a specific frame with new column names and dynamic hoop position in feet.
+    Create a foot alignment visualization at a specific frame using standardized coordinates,
+    with the hoop position dynamically provided from calculate_shot_metrics.
     
     Parameters:
-        frame_data: dict or Series containing the keypoint values in inches.
-        shot_distance: The flipped shot distance (in feet).
-        flip: Boolean flag indicating whether the shot was flipped.
-        hoop_x: X-coordinate of the hoop in feet (default 41.75, or -41.75 if flipped).
+        frame_data: dict or Series containing keypoint values in inches (remapped coordinates).
+        hoop_x: X-coordinate of the hoop in feet (e.g., metrics['shot_distance']).
         hoop_y: Y-coordinate of the hoop in feet (default 0.0).
         
     Returns:
-        A Plotly figure.
+        A Plotly figure showing foot angles relative to the hoop direction.
     """
     INCHES_TO_FEET = 1 / 12
     import numpy as np
     import plotly.graph_objects as go
 
     fig = go.Figure()
-    # Convert hoop position to feet if passed in inches
-    hoop_pos = (hoop_x * 12, hoop_y * 12) if not flip else (-hoop_x * 12, hoop_y * 12)  # Flip to target opposite hoop
+    # Convert hoop position from feet to inches (since frame_data is in inches)
+    hoop_pos = (hoop_x * 12, hoop_y * 12)  # No flip needed due to remapped coordinates
 
     foot_midpoints = {}
     x_vals = []
@@ -1107,22 +1089,20 @@ def create_foot_alignment_visual(frame_data, shot_distance, flip=False, hoop_x=4
     # Plot each foot (Left and Right)
     for side, color in [('L', '#636EFA'), ('R', '#EF553B')]:
         heel_x = f'{side}HEEL_X'
-        toe_x = f'{side}BIGTOE_X'  # New name
+        toe_x = f'{side}BIGTOE_X'
         heel_y = f'{side}HEEL_Y'
-        toe_y = f'{side}BIGTOE_Y'  # New name
+        toe_y = f'{side}BIGTOE_Y'
         
-        # Try new names first
         if all(col in frame_data for col in [heel_x, toe_x, heel_y, toe_y]):
             heel = (frame_data[heel_x] * INCHES_TO_FEET, frame_data[heel_y] * INCHES_TO_FEET)
             toe = (frame_data[toe_x] * INCHES_TO_FEET, frame_data[toe_y] * INCHES_TO_FEET)
-        # Fallback to old names
         elif all(col in frame_data for col in [heel_x, f'{side}BTOE_X', heel_y, f'{side}BTOE_Y']):
             heel = (frame_data[heel_x] * INCHES_TO_FEET, frame_data[heel_y] * INCHES_TO_FEET)
             toe = (frame_data[f'{side}BTOE_X'] * INCHES_TO_FEET, frame_data[f'{side}BTOE_Y'] * INCHES_TO_FEET)
         else:
-            continue  # Skip if neither set is complete
+            continue
 
-        # Draw a thick line with markers for the foot vector
+        # Draw the foot vector
         fig.add_trace(go.Scatter(
             x=[heel[0], toe[0]],
             y=[heel[1], toe[1]],
@@ -1137,7 +1117,7 @@ def create_foot_alignment_visual(frame_data, shot_distance, flip=False, hoop_x=4
         x_vals.extend([heel[0], toe[0]])
         y_vals.extend([heel[1], toe[1]])
         
-        # Compute the foot vector (from heel to toe) and the vector from midpoint to hoop
+        # Compute the foot vector and direction to hoop
         foot_vec = np.array(toe) - np.array(heel)
         direction_vec = np.array(hoop_pos) - np.array(midpoint)
         norm_dir = np.linalg.norm(direction_vec) if np.linalg.norm(direction_vec) != 0 else 1
@@ -1145,12 +1125,8 @@ def create_foot_alignment_visual(frame_data, shot_distance, flip=False, hoop_x=4
         cosine = np.clip(cosine, -1.0, 1.0)
         angle = np.degrees(np.arccos(cosine))
         
-        # Adjust angle if flipped
-        if flip:
-            angle = angle - 180
-            
         fig.add_annotation(
-            x=midpoint[0] + 0.5,  # Adjust for feet scale
+            x=midpoint[0] + 0.5,
             y=midpoint[1] - 0.2,
             text=f"{angle:.1f}°",
             showarrow=False,
@@ -1159,7 +1135,7 @@ def create_foot_alignment_visual(frame_data, shot_distance, flip=False, hoop_x=4
             xanchor="left"
         )
     
-    # Compute overall foot center from available midpoints
+    # Compute overall foot center
     if 'L' in foot_midpoints and 'R' in foot_midpoints:
         foot_center = ((foot_midpoints['L'][0] + foot_midpoints['R'][0]) / 2,
                        (foot_midpoints['L'][1] + foot_midpoints['R'][1]) / 2)
@@ -1170,7 +1146,7 @@ def create_foot_alignment_visual(frame_data, shot_distance, flip=False, hoop_x=4
     else:
         foot_center = (0, 0)
     
-    # Dummy trace for the legend
+    # Dummy trace for legend
     dummy_arrow = go.Scatter(
         x=[None], y=[None],
         mode='lines',
@@ -1178,7 +1154,7 @@ def create_foot_alignment_visual(frame_data, shot_distance, flip=False, hoop_x=4
         name="Direction of Hoop"
     )
     
-    # Zoom in based on collected x and y values (in feet)
+    # Zoom in based on collected values (in feet)
     if x_vals and y_vals:
         x_min, x_max = min(x_vals), max(x_vals)
         y_min, y_max = min(y_vals), max(y_vals)
@@ -1187,8 +1163,8 @@ def create_foot_alignment_visual(frame_data, shot_distance, flip=False, hoop_x=4
         fig.update_xaxes(range=[x_min - x_margin, x_max + x_margin])
         fig.update_yaxes(range=[y_min - y_margin, y_max + y_margin])
     else:
-        fig.update_xaxes(range=[-47, 47])  # Full half-court range in feet
-        fig.update_yaxes(range=[-25, 25])  # Full court range in feet (lateral)
+        fig.update_xaxes(range=[-47, 47])
+        fig.update_yaxes(range=[-25, 25])
     
     fig.update_layout(
         title="Foot Alignment",
