@@ -104,78 +104,6 @@ TEAMS = {
 }
 
 # ---------------- Helper Functions ---------------- #
-import streamlit as st
-import logging
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-import os
-import base64
-from datetime import datetime
-from scipy import stats
-
-# Import your project modules
-from auth import handle_login
-from aws_client import initialize_aws_clients
-from config import BUCKET_NAME, FPS
-from data_processing import (
-    load_final_output,
-    load_spin_axis_csv,
-    separate_pose_and_ball_tracking,
-    get_username_by_email,
-    fetch_user_completed_jobs,
-    fetch_user_completed_data_file_jobs,
-    list_data_file_job_segments,
-    load_data_file_final_output,
-    calculate_shot_metrics,
-    calculate_body_alignment,
-    vector_angle,
-    create_alignment_diagram,
-    plot_curvature_analysis,
-    get_segment_label,
-    get_player_kpi_averages,
-    get_shot_type,
-    plot_shot_location,
-    plot_joint_flexion_analysis
-)
-from visualization import (
-    plot_single_shot,
-    show_brand_header,
-    display_kpi_grid,
-    plot_kinematic_sequence,
-    plot_spin_analysis,
-    plot_velocity_profile,
-    plot_trajectory_arc,
-    plot_asymmetry_radar,
-    plot_distance_over_height,
-    plot_3d_ball_path,
-    plot_velocity_vs_angle,
-    plot_spin_bullseye,
-    plot_shot_analysis,
-    plot_release_angle_analysis,
-    plot_foot_alignment,
-    create_foot_alignment_visual,
-    create_body_alignment_visual,
-    plot_shot_location_in_inches
-)
-from kpi import (
-    calculate_kpis_pose,
-    calculate_kpis_spin,
-    get_kpi_benchmarks,
-    calculate_release_velocity,
-    display_clickable_kpi_card,
-    animated_flip_kpi_card
-)
-from utils import add_time_column, humanize_label, humanize_segment_label
-
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-
-# Initialize AWS clients
-cognito_client, dynamodb, s3_client = initialize_aws_clients()
-
-# ---------------- Helper Functions ---------------- #
 
 def list_segments(s3_client, bucket_name, user_email, job_id):
     prefix = f"processed/{user_email}/{job_id}/"
@@ -259,53 +187,77 @@ def process_segment_for_table(job, segment, s3_client):
         logger.error(f"Error processing segment {segment} for job {job['JobID']}: {str(e)}")
         return None
 
-def create_comparison_table(group_a_df, group_b_df):
-    """Create a Plotly table comparing two groups of shots."""
+def create_comparison_table(baseline_df, comparison_df):
     numeric_cols = [
         "Release Height", "Release Angle", "Release Velocity",
         "Apex Height", "Release Time", "Side Curvature", "Rear Curvature",
         "Lateral Deviation"
     ]
-    metrics = [col for col in numeric_cols]
 
-    def compute_stats(df):
-        if df.empty:
-            return ["N/A"] * len(metrics), ["N/A"] * len(metrics)
-        means = [f"{df[col].mean():.2f}" if len(df) > 0 else "N/A" for col in numeric_cols]
-        stds = [f"{df[col].std():.2f}" if len(df) > 1 else "N/A" for col in numeric_cols]
-        return means, stds
+    # Baseline calculations
+    if len(baseline_df) > 1:
+        baseline_means = [baseline_df[col].mean() for col in numeric_cols]
+        baseline_stds = [baseline_df[col].std() for col in numeric_cols]
+    else:
+        baseline_means = [baseline_df[col].iloc[0] for col in numeric_cols]
+        baseline_stds = [None] * len(numeric_cols)
 
-    group_a_means, group_a_stds = compute_stats(group_a_df)
-    group_b_means, group_b_stds = compute_stats(group_b_df)
-    differences = []
-    for a, b in zip(group_a_means, group_b_means):
-        if a != "N/A" and b != "N/A":
-            diff = float(a) - float(b)
-            differences.append(f"{diff:.2f}")
+    # Comparison calculations
+    if len(comparison_df) > 1:
+        comparison_values = [comparison_df[col].mean() for col in numeric_cols]
+    else:
+        comparison_values = [comparison_df[col].iloc[0] for col in numeric_cols]
+
+    differences = [comp - base for comp, base in zip(comparison_values, baseline_means)]
+
+    # Color coding based on baseline std
+    difference_colors = []
+    for diff, std in zip(differences, baseline_stds):
+        if std is not None and std > 0:
+            z_score = abs(diff / std)
+            if z_score <= 1:
+                color = '#90EE90'  # light green
+            elif z_score <= 2:
+                color = '#FFFF99'  # light yellow
+            else:
+                color = '#FF6B6B'  # light red
         else:
-            differences.append("N/A")
+            color = '#FFFFFF'  # white
+        difference_colors.append(color)
 
+    # Format values
+    baseline_means_str = [f"{val:.2f}" if val is not None else "N/A" for val in baseline_means]
+    baseline_stds_str = [f"{val:.2f}" if val is not None else "N/A" for val in baseline_stds]
+    comparison_values_str = [f"{val:.2f}" for val in comparison_values]
+    differences_str = [f"{val:.2f}" for val in differences]
+
+    # Create table
     fig = go.Figure(data=[go.Table(
         header=dict(
-            values=['Metric', 'Group A Mean', 'Group A Std', 'Group B Mean', 'Group B Std', 'Difference'],
+            values=['Metric', 'Baseline', 'Baseline Std', 'Comparison', 'Difference'],
             fill_color='#2E3E4F',
             align='center',
             font=dict(color='white', size=16, family='Oswald'),
             height=50
         ),
         cells=dict(
-            values=[metrics, group_a_means, group_a_stds, group_b_means, group_b_stds, differences],
-            fill_color='#FFFFFF',
+            values=[numeric_cols, baseline_means_str, baseline_stds_str, comparison_values_str, differences_str],
+            fill_color=[['#FFFFFF']*len(numeric_cols), ['#FFFFFF']*len(numeric_cols), ['#FFFFFF']*len(numeric_cols), ['#FFFFFF']*len(numeric_cols), difference_colors],
             align='center',
             font=dict(color='#333333', size=14, family='Oswald'),
             height=40
         )
     )])
+
+    # Add title with context
+    title_text = f"Comparison: {len(baseline_df)} baseline shot(s) vs {len(comparison_df)} comparison shot(s)"
+    if len(baseline_df) == 1:
+        title_text += " (Color coding not available for single baseline shot)"
     fig.update_layout(
         title={
-            'text': f"Comparison of Group A ({len(group_a_df)} shots) and Group B ({len(group_b_df)} shots)",
-            'y': 0.95,
-            'x': 0.5,
+            'text': title_text,
+            'y':0.95,
+            'x':0.5,
             'xanchor': 'center',
             'yanchor': 'top',
             'font': dict(size=24, color='#2E3E4F', family='Oswald')
@@ -1007,6 +959,9 @@ def main():
 
     df_table = pd.DataFrame(filtered_table_data)
 
+    # Add space before tabs
+    st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
+
     # --- Introduce Tabs ---
     tab1, tab2 = st.tabs(["Shot Analysis", "Compare Shots"])
 
@@ -1081,20 +1036,25 @@ def main():
                     Select Shots for Comparison
                 </h2>
                 <p style='font-family: Oswald; color: #333333; text-align: center;'>
-                    Select shots for Group A and Group B to compare their aggregated statistics.
+                    Select shots for Baseline and Comparison to view their aggregated statistics.
+                </p>
+                <p style='font-family: Oswald; color: #333333; text-align: center; font-size: 14px;'>
+                    Note: Color coding is based on the baseline standard deviation. Select multiple baseline shots to enable color coding.
                 </p>
             </div>
         """, unsafe_allow_html=True)
 
-        # Add checkbox columns
-        df_table['Group A'] = False
-        df_table['Group B'] = False
+        # Add and reorder columns
+        df_table['Baseline'] = False
+        df_table['Comparison'] = False
+        columns_order = ['Baseline', 'Comparison', 'Game Date', 'Period', 'Clock', 'Player', 'Team', 'Shot Type', 'Distance (ft)', 'Release Height', 'Release Angle', 'Release Velocity', 'Apex Height', 'Release Time', 'Side Curvature', 'Rear Curvature', 'Lateral Deviation', 'Result', 'JobID', 'Segment']
+        df_table = df_table[columns_order]
 
         edited_df = st.data_editor(
             df_table,
             column_config={
-                "Group A": st.column_config.CheckboxColumn("Group A"),
-                "Group B": st.column_config.CheckboxColumn("Group B"),
+                "Baseline": st.column_config.CheckboxColumn("Baseline"),
+                "Comparison": st.column_config.CheckboxColumn("Comparison"),
                 "Game Date": st.column_config.TextColumn("Game Date"),
                 "Period": st.column_config.TextColumn("Period"),
                 "Clock": st.column_config.TextColumn("Clock"),
@@ -1124,10 +1084,10 @@ def main():
             key="compare_table"
         )
 
-        group_a_rows = edited_df[edited_df['Group A'] == True]
-        group_b_rows = edited_df[edited_df['Group B'] == True]
+        baseline_rows = edited_df[edited_df['Baseline'] == True]
+        comparison_rows = edited_df[edited_df['Comparison'] == True]
 
-        if not group_a_rows.empty and not group_b_rows.empty:
+        if not baseline_rows.empty and not comparison_rows.empty:
             st.markdown("""
                 <div style='margin: 40px 0;'>
                     <h2 style='font-family: Oswald; color: #2E3E4F; text-align: center;'>
@@ -1135,10 +1095,10 @@ def main():
                     </h2>
                 </div>
             """, unsafe_allow_html=True)
-            fig = create_comparison_table(group_a_rows, group_b_rows)
+            fig = create_comparison_table(baseline_rows, comparison_rows)
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("Select at least one shot for each group to compare.")
+            st.info("Select at least one shot for Baseline and one for Comparison to view the comparison table.")
 
 if __name__ == "__main__":
     main()
