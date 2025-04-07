@@ -972,21 +972,60 @@ def main():
                 <h2 style='font-family: Oswald; color: #2E3E4F; text-align: center;'>
                     Select a Shot for Detailed Analysis
                 </h2>
+                <p style='font-family: Oswald; color: #333333; text-align: center; font-size: 14px;'>
+                    Select one shot from the table below.
+                </p>
             </div>
         """, unsafe_allow_html=True)
 
-        # Add Shot ID for dropdown
-        df_table['Shot ID'] = df_table.apply(
-            lambda row: f"{row['Player']} - {row['Game Date']} - {row['Period']} - {row['Clock']} - {row['Shot Type']}",
-            axis=1
+        # Prepare the DataFrame for the table
+        df_table['Select'] = False  # Initialize with False for selection column
+
+        # Display the table with st.data_editor
+        edited_df = st.data_editor(
+            df_table,
+            column_config={
+                "Select": st.column_config.CheckboxColumn(
+                    "Select",
+                    help="Select one shot for analysis",
+                    default=False
+                ),
+                "Game Date": st.column_config.TextColumn("Game Date"),
+                "Period": st.column_config.TextColumn("Period"),
+                "Clock": st.column_config.TextColumn("Clock"),
+                "Player": st.column_config.TextColumn("Player"),
+                "Team": st.column_config.TextColumn("Team"),
+                "Shot Type": st.column_config.TextColumn("Shot Type"),
+                "Distance (ft)": st.column_config.NumberColumn("Distance (ft)", format="%.1f"),
+                "Release Height": st.column_config.NumberColumn("Release Height", format="%.1f"),
+                "Release Angle": st.column_config.NumberColumn("Release Angle", format="%.1f°"),
+                "Release Velocity": st.column_config.NumberColumn("Release Velocity", format="%.1f ft/s"),
+                "Apex Height": st.column_config.NumberColumn("Apex Height", format="%.1f ft"),
+                "Release Time": st.column_config.NumberColumn("Release Time", format="%.2f s"),
+                "Side Curvature": st.column_config.NumberColumn("Side Curvature", format="%.3f 1/ft"),
+                "Rear Curvature": st.column_config.NumberColumn("Rear Curvature", format="%.3f 1/ft"),
+                "Lateral Deviation": st.column_config.NumberColumn("Lateral Deviation", format="%.2f ft"),
+                "Result": st.column_config.TextColumn("Result"),
+                "JobID": None,  # Hidden column
+                "Segment": None  # Hidden column
+            },
+            hide_index=True,
+            disabled=["Game Date", "Period", "Clock", "Player", "Team", "Shot Type",
+                    "Distance (ft)", "Release Height", "Release Angle", "Release Velocity",
+                    "Apex Height", "Release Time", "Side Curvature", "Rear Curvature",
+                    "Lateral Deviation", "Result"],
+            use_container_width=True,
+            key="shot_analysis_table"
         )
-        shot_labels = df_table['Shot ID'].tolist()
 
-        if shot_labels:
-            selected_shot_label = st.selectbox("Select a shot", shot_labels, key="shot_analysis_select")
-            selected_row = df_table[df_table['Shot ID'] == selected_shot_label].iloc[0]
+        # Enforce single selection
+        selected_rows = edited_df[edited_df['Select'] == True]
+        if len(selected_rows) > 1:
+            st.warning("Please select only one shot for analysis.")
+        elif len(selected_rows) == 1:
+            selected_row = selected_rows.iloc[0]
 
-            # Load data for selected shot
+            # Load data for the selected shot
             selected_job = next(j for j in jobs if j['JobID'] == selected_row['JobID'])
             selected_segment = selected_row['Segment']
             selected_job_id = selected_job['JobID']
@@ -1017,6 +1056,9 @@ def main():
             # Recalculate full shot metrics
             metrics, df_pose, df_ball = calculate_shot_metrics(df_pose, df_ball)
 
+            # Store shot type in session state for use in sub-tabs
+            st.session_state['shot_type'] = shot_type
+
             # Sub-tabs for detailed analysis
             subtab1, subtab2, subtab3 = st.tabs(["Overview", "Biomechanics Analysis", "Spin Analysis"])
             with subtab1:
@@ -1026,7 +1068,7 @@ def main():
             with subtab3:
                 show_spin_analysis_page(df_spin)
         else:
-            st.info("No shots available for analysis.")
+            st.info("Please select one shot from the table to view detailed analysis.")
 
     # --- Compare Shots Tab ---
     with tab2:
