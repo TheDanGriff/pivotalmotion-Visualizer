@@ -1068,7 +1068,7 @@ def main():
             with subtab3:
                 show_spin_analysis_page(df_spin)
         else:
-            st.info("Please select one shot from the table to view detailed analysis.")
+            st.info("Please select one shot from the table to view analysis.")
 
     # --- Compare Shots Tab ---
     with tab2:
