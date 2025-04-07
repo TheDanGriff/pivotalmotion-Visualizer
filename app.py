@@ -978,8 +978,8 @@ def main():
             </div>
         """, unsafe_allow_html=True)
 
-        # Prepare the DataFrame for the table
-        df_table['Select'] = False  # Initialize with False for selection column
+        # Insert 'Select' column as the first column
+        df_table.insert(0, 'Select', False)  # Initialize with False for selection column
 
         # Display the table with st.data_editor
         edited_df = st.data_editor(
@@ -1068,7 +1068,7 @@ def main():
             with subtab3:
                 show_spin_analysis_page(df_spin)
         else:
-            st.info("Please select one shot from the table to view analysis.")
+            st.info("Please select one shot from the table to view detailed analysis.")
 
     # --- Compare Shots Tab ---
     with tab2:
