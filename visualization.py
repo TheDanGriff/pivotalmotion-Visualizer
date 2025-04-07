@@ -1047,7 +1047,7 @@ def create_body_alignment_visual(frame_data):
     
     # Update layout
     fig.update_layout(
-        title="Body Alignment Comparison (Feet, Hips, Shoulders)",
+        title="Body Alignment Comparison",
         xaxis_title="Court Position (in)",
         yaxis_title="Lateral Position (in)",
         template="plotly_white",
