@@ -2039,14 +2039,14 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
 
     INCHES_TO_FEET = 1 / 12
 
-    # Define a cohesive pastel palette
+    # Define a cohesive pastel palette (updated)
     COLOR_PALETTE = {
         'lift': 'rgba(147, 112, 219, 1)',        # Pastel purple
         'set': 'rgba(255, 182, 193, 1)',         # Pastel pink
         'release': 'rgba(255, 102, 102, 1)',     # Pastel red
         'elbow': 'rgba(173, 216, 230, 1)',       # Pastel light blue
         'shoulder': 'rgba(221, 160, 221, 1)',    # Pastel plum
-        'wrist': 'rgba(255, 245, 157, 1)',       # Pastel yellow
+        'wrist': 'rgba(255, 218, 185, 1)',       # Pastel peach (replaced yellow)
         'hip': 'rgba(144, 238, 144, 1)',         # Pastel green
         'knee': 'rgba(255, 160, 122, 1)',        # Pastel coral
         'ankle': 'rgba(176, 196, 222, 1)'        # Pastel steel blue
@@ -2057,10 +2057,9 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         'release': 'dashdot'
     }
 
-    # Extract key indices with defaults
-    lift_idx = metrics.get('lift_idx', 0)
-    set_idx = metrics.get('set_idx', 0)
-    release_idx = metrics.get('release_idx', 0)
+    lift_idx = metrics.get('lift_frame', metrics.get('lift_idx', 0))
+    set_idx = metrics.get('set_frame', metrics.get('set_idx', 0))
+    release_idx = metrics.get('release_frame', metrics.get('release_idx', 0))
 
     # Extend time window: 0.25s before lift_idx, 0.5s after release_idx
     frames_before = int(0.25 * fps)
