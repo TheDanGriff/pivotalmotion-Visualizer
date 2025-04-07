@@ -978,8 +978,9 @@ def main():
             </div>
         """, unsafe_allow_html=True)
 
-        # Insert 'Select' column as the first column
-        df_table.insert(0, 'Select', False)  # Initialize with False for selection column
+        # Insert 'Select' column as the first column if it doesn’t exist
+        if 'Select' not in df_table.columns:
+            df_table.insert(0, 'Select', False)
 
         # Display the table with st.data_editor
         edited_df = st.data_editor(
@@ -1021,7 +1022,12 @@ def main():
         # Enforce single selection
         selected_rows = edited_df[edited_df['Select'] == True]
         if len(selected_rows) > 1:
-            st.warning("Please select only one shot for analysis.")
+            st.warning("Only one shot can be selected at a time. Keeping the first selection only.")
+            # Reset to only the first selected row
+            first_selected = selected_rows.index[0]
+            edited_df['Select'] = False
+            edited_df.at[first_selected, 'Select'] = True
+            st.experimental_rerun()  # Refresh the app to update the table
         elif len(selected_rows) == 1:
             selected_row = selected_rows.iloc[0]
 
