@@ -990,7 +990,7 @@ def create_body_alignment_visual(frame_data):
 
     # Update layout
     fig.update_layout(
-        title="Body Alignment (Basket to the Right)",
+        title="Body Alignment",
         xaxis_title="X (ft, toward basket)",
         yaxis_title="Y (ft, lateral)",
         template="plotly_white",
