@@ -871,7 +871,7 @@ def create_body_alignment_visual(frame_data):
     """
     import numpy as np
     import plotly.graph_objects as go
-    from math import atan2, degrees, sqrt, acos
+    from math import sqrt, acos, degrees
 
     # Define colors for each segment
     colors = {"Feet": "#000080", "Hips": "#EF553B", "Shoulders": "#64B5F6"}
@@ -933,29 +933,26 @@ def create_body_alignment_visual(frame_data):
         # Calculate width
         width = sqrt((right_pt[0] - left_pt[0])**2 + (right_pt[1] - left_pt[1])**2)
 
-        # Calculate perpendicular vector (rotate segment vector 90° clockwise)
+        # Calculate perpendicular vector (90° counterclockwise rotation)
         seg_vec = (right_pt[0] - left_pt[0], right_pt[1] - left_pt[1])
-        perp_vec = (-seg_vec[1], seg_vec[0])  # Rotate 90° clockwise
+        perp_vec = (seg_vec[1], -seg_vec[0])  # Rotate 90° counterclockwise
         perp_norm = sqrt(perp_vec[0]**2 + perp_vec[1]**2)
         if perp_norm == 0:
             continue
         perp_unit = (perp_vec[0] / perp_norm, perp_vec[1] / perp_norm)
 
-        # Calculate angle between perp_unit and hoop direction (1, 0)
+        # Calculate angle between perpendicular vector and hoop direction (1, 0)
         hoop_dir = (1, 0)
         dot_product = perp_unit[0] * hoop_dir[0] + perp_unit[1] * hoop_dir[1]
         angle_rad = acos(np.clip(dot_product, -1.0, 1.0))
         angle = degrees(angle_rad)
 
-        # Determine direction using cross product
+        # Adjust angle based on direction (positive if clockwise deviation)
         cross_product = perp_unit[0] * hoop_dir[1] - perp_unit[1] * hoop_dir[0]
         if cross_product < 0:
-            angle = 360 - angle  # Adjust for clockwise direction
+            angle = 360 - angle
 
-        # Apply the requested adjustment: 360 - angle
-        adjusted_angle = 360 - angle
-
-        text = f"{seg_name}<br>Width: {width:.1f} ft<br>Angle: {adjusted_angle:.1f}°"
+        text = f"{seg_name}<br>Width: {width:.1f} ft<br>Angle: {angle:.1f}°"
         fig.add_annotation(
             x=annotation_x,
             y=annotation_y[seg_name],
@@ -974,7 +971,7 @@ def create_body_alignment_visual(frame_data):
             borderwidth=1
         )
 
-    # Add small basket direction arrow
+    # Add basket direction arrow
     if midpoints:
         avg_mid_x = np.mean([mp[0] for mp in midpoints])
         avg_mid_y = np.mean([mp[1] for mp in midpoints])
@@ -988,7 +985,7 @@ def create_body_alignment_visual(frame_data):
             name="Basket Direction"
         ))
 
-    # Tight zoom on body with space for annotations
+    # Adjust layout
     if all_x and all_y:
         padding = 0.3
         x_range = [x_min - padding, annotation_x + padding]
@@ -996,7 +993,6 @@ def create_body_alignment_visual(frame_data):
         fig.update_xaxes(range=x_range)
         fig.update_yaxes(range=y_range, scaleanchor="x", scaleratio=1)
 
-    # Update layout
     fig.update_layout(
         title="Body Alignment",
         xaxis_title="X (ft, toward basket)",
