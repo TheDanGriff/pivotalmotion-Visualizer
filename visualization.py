@@ -872,12 +872,14 @@ def create_body_alignment_visual(frame_data):
     import plotly.graph_objects as go
     from math import atan2, degrees, sqrt
 
+    # Define colors for each segment
     colors = {"Feet": "#000080", "Hips": "#EF553B", "Shoulders": "#64B5F6"}
     fig = go.Figure()
     segments = []
     all_x, all_y = [], []
 
-    # Define segments
+    # Define segments: Feet, Hips, Shoulders
+    # Feet: Midpoint of heel and big toe for each foot
     if all(key in frame_data for key in ['LHEEL_X', 'LBIGTOE_X', 'LHEEL_Y', 'LBIGTOE_Y',
                                          'RHEEL_X', 'RBIGTOE_X', 'RHEEL_Y', 'RBIGTOE_Y']):
         left_foot = ((frame_data['LHEEL_X'] + frame_data['LBIGTOE_X']) / 2,
@@ -886,20 +888,24 @@ def create_body_alignment_visual(frame_data):
                       (frame_data['RHEEL_Y'] + frame_data['RBIGTOE_Y']) / 2)
         segments.append(("Feet", left_foot, right_foot))
 
+    # Hips
     if all(key in frame_data for key in ['LHIP_X', 'RHIP_X', 'LHIP_Y', 'RHIP_Y']):
         left_hip = (frame_data['LHIP_X'], frame_data['LHIP_Y'])
         right_hip = (frame_data['RHIP_X'], frame_data['RHIP_Y'])
         segments.append(("Hips", left_hip, right_hip))
 
+    # Shoulders
     if all(key in frame_data for key in ['LSHOULDER_X', 'RSHOULDER_X', 'LSHOULDER_Y', 'RSHOULDER_Y']):
         left_shoulder = (frame_data['LSHOULDER_X'], frame_data['LSHOULDER_Y'])
         right_shoulder = (frame_data['RSHOULDER_X'], frame_data['RSHOULDER_Y'])
         segments.append(("Shoulders", left_shoulder, right_shoulder))
 
+    # Plot each segment and collect midpoints for the basket direction arrow
+    midpoints = []
     for seg_name, left_pt, right_pt in segments:
         color = colors.get(seg_name, "#808080")
         
-        # Plot segment
+        # Plot segment as a line with markers
         fig.add_trace(go.Scatter(
             x=[left_pt[0], right_pt[0]],
             y=[left_pt[1], right_pt[1]],
@@ -914,6 +920,7 @@ def create_body_alignment_visual(frame_data):
         # Calculate midpoint
         mid_x = (left_pt[0] + right_pt[0]) / 2
         mid_y = (left_pt[1] + right_pt[1]) / 2
+        midpoints.append((mid_x, mid_y))
 
         # Calculate width
         width = sqrt((right_pt[0] - left_pt[0])**2 + (right_pt[1] - left_pt[1])**2)
@@ -926,42 +933,51 @@ def create_body_alignment_visual(frame_data):
         # Normalize angle to [-90, 90] for deviation from facing the basket
         angle = ((angle + 90) % 180) - 90
 
-        # Annotate width and angle
+        # Annotation with vertical offset to avoid overlap
+        offset = -0.5 if seg_name == "Feet" else 0 if seg_name == "Hips" else 0.5
         fig.add_annotation(
-            x=mid_x, y=mid_y + 0.5,
-            text=f"Width: {width:.1f} ft<br>Angle: {angle:.1f}°",
+            x=mid_x, y=mid_y + offset,
+            text=f"{seg_name}<br>Width: {width:.1f} ft<br>Angle: {angle:.1f}°",
             showarrow=False,
-            font=dict(size=12, color=color)
+            font=dict(size=12, color=color),
+            bgcolor="rgba(255,255,255,0.7)",  # Semi-transparent white background
+            bordercolor="black",
+            borderwidth=1,
+            align="center"
         )
 
-    # Add reference arrow for basket direction
-    if segments:
-        mid_x = np.mean([mid[0] for _, mid, _ in segments])
-        mid_y = np.mean([mid[1] for _, mid, _ in segments])
-        arrow_length = 5
+    # Add basket direction arrow
+    if midpoints:
+        avg_mid_x = np.mean([mid[0] for mid in midpoints])
+        avg_mid_y = np.mean([mid[1] for mid in midpoints])
+        arrow_length = 5  # in feet
         fig.add_trace(go.Scatter(
-            x=[mid_x, mid_x + arrow_length],
-            y=[mid_y, mid_y],
+            x=[avg_mid_x, avg_mid_x + arrow_length],
+            y=[avg_mid_y, avg_mid_y],
             mode="lines+markers",
             line=dict(width=3, color="red"),
             marker=dict(size=8, symbol="arrow-bar-right"),
             name="Basket Direction"
         ))
 
-    # Adjust plot layout
+    # Zoom in by setting axis ranges
     if all_x and all_y:
-        x_range = [min(all_x) - 2, max(all_x) + 7]  # Extra space for arrow
-        y_range = [min(all_y) - 2, max(all_y) + 2]
+        x_min, x_max = min(all_x), max(all_x)
+        y_min, y_max = min(all_y), max(all_y)
+        x_range = [x_min - 2, x_max + 7]  # Extra space for arrow
+        y_range = [y_min - 1, y_max + 1]
         fig.update_xaxes(range=x_range)
         fig.update_yaxes(range=y_range)
 
+    # Update layout
     fig.update_layout(
         title="Body Alignment (Basket to the Right)",
         xaxis_title="X (ft, toward basket)",
         yaxis_title="Y (ft, lateral)",
         template="plotly_white",
         height=500,
-        showlegend=True
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="top", y=1.05, xanchor="center", x=0.5)
     )
     return fig
 
