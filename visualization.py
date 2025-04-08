@@ -877,6 +877,7 @@ def create_body_alignment_visual(frame_data):
     fig = go.Figure()
     segments = []
     all_x, all_y = [], []
+    midpoints = []
 
     # Define segments: Feet, Hips, Shoulders
     # Feet: Midpoint of heel and big toe for each foot
@@ -900,12 +901,9 @@ def create_body_alignment_visual(frame_data):
         right_shoulder = (frame_data['RSHOULDER_X'], frame_data['RSHOULDER_Y'])
         segments.append(("Shoulders", left_shoulder, right_shoulder))
 
-    # Plot each segment and collect midpoints for the basket direction arrow
-    midpoints = []
+    # Plot segments and collect coordinates
     for seg_name, left_pt, right_pt in segments:
         color = colors.get(seg_name, "#808080")
-        
-        # Plot segment as a line with markers
         fig.add_trace(go.Scatter(
             x=[left_pt[0], right_pt[0]],
             y=[left_pt[1], right_pt[1]],
@@ -916,58 +914,79 @@ def create_body_alignment_visual(frame_data):
         ))
         all_x.extend([left_pt[0], right_pt[0]])
         all_y.extend([left_pt[1], right_pt[1]])
-
-        # Calculate midpoint
         mid_x = (left_pt[0] + right_pt[0]) / 2
         mid_y = (left_pt[1] + right_pt[1]) / 2
         midpoints.append((mid_x, mid_y))
 
-        # Calculate width
-        width = sqrt((right_pt[0] - left_pt[0])**2 + (right_pt[1] - left_pt[1])**2)
+    # Handle case with no data
+    if not all_x or not all_y:
+        x_min, x_max = -5, 5
+        y_min, y_max = -5, 5
+    else:
+        x_min, x_max = min(all_x), max(all_x)
+        y_min, y_max = min(all_y), max(all_y)
 
-        # Calculate angle relative to basket direction (positive X-axis)
+    # Add annotations with arrows
+    annotation_x = x_max + 1  # Closer to body for tighter zoom
+    annotation_y = {
+        "Feet": y_min - 0.5,
+        "Hips": (y_min + y_max) / 2,
+        "Shoulders": y_max + 0.5
+    }
+
+    for seg_name, left_pt, right_pt in segments:
+        color = colors.get(seg_name, "#808080")
+        mid_x = (left_pt[0] + right_pt[0]) / 2
+        mid_y = (left_pt[1] + right_pt[1]) / 2
+
+        # Calculate width and angle
+        width = sqrt((right_pt[0] - left_pt[0])**2 + (right_pt[1] - left_pt[1])**2)
         seg_vec = (right_pt[0] - left_pt[0], right_pt[1] - left_pt[1])
         basket_dir = (1, 0)  # Positive X-axis
         angle_rad = atan2(seg_vec[1], seg_vec[0]) - atan2(basket_dir[1], basket_dir[0])
         angle = degrees(angle_rad)
-        # Normalize angle to [-90, 90] for deviation from facing the basket
-        angle = ((angle + 90) % 180) - 90
+        angle = ((angle + 90) % 180) - 90  # Normalize to [-90, 90]
 
-        # Annotation with vertical offset to avoid overlap
-        offset = -0.5 if seg_name == "Feet" else 0 if seg_name == "Hips" else 0.5
+        text = f"{seg_name}<br>Width: {width:.1f} ft<br>Angle: {angle:.1f}°"
         fig.add_annotation(
-            x=mid_x, y=mid_y + offset,
-            text=f"{seg_name}<br>Width: {width:.1f} ft<br>Angle: {angle:.1f}°",
-            showarrow=False,
-            font=dict(size=12, color=color),
-            bgcolor="rgba(255,255,255,0.7)",  # Semi-transparent white background
+            x=annotation_x,
+            y=annotation_y[seg_name],
+            ax=mid_x,
+            ay=mid_y,
+            text=text,
+            showarrow=True,
+            arrowhead=1,
+            arrowsize=1,
+            arrowwidth=1,
+            arrowcolor="black",
+            font=dict(size=10, color=color),  # Smaller font to reduce clutter
+            align="left",
+            bgcolor="white",
             bordercolor="black",
-            borderwidth=1,
-            align="center"
+            borderwidth=1
         )
 
-    # Add basket direction arrow
+    # Add small basket direction arrow
     if midpoints:
-        avg_mid_x = np.mean([mid[0] for mid in midpoints])
-        avg_mid_y = np.mean([mid[1] for mid in midpoints])
-        arrow_length = 5  # in feet
+        avg_mid_x = np.mean([mp[0] for mp in midpoints])
+        avg_mid_y = np.mean([mp[1] for mp in midpoints])
+        arrow_length = 1  # Small arrow
         fig.add_trace(go.Scatter(
             x=[avg_mid_x, avg_mid_x + arrow_length],
             y=[avg_mid_y, avg_mid_y],
             mode="lines+markers",
-            line=dict(width=3, color="red"),
-            marker=dict(size=8, symbol="arrow-bar-right"),
+            line=dict(width=2, color="red", dash="dash"),  # Dashed to reduce emphasis
+            marker=dict(size=6, symbol="arrow-bar-right"),
             name="Basket Direction"
         ))
 
-    # Zoom in by setting axis ranges
+    # Tight zoom on body with space for annotations
     if all_x and all_y:
-        x_min, x_max = min(all_x), max(all_x)
-        y_min, y_max = min(all_y), max(all_y)
-        x_range = [x_min - 2, x_max + 7]  # Extra space for arrow
-        y_range = [y_min - 1, y_max + 1]
+        padding = 0.5  # Minimal padding
+        x_range = [x_min - padding, annotation_x + padding]
+        y_range = [y_min - 1, y_max + 1]  # Enough to include annotations
         fig.update_xaxes(range=x_range)
-        fig.update_yaxes(range=y_range)
+        fig.update_yaxes(range=y_range, scaleanchor="x", scaleratio=1)  # Equal aspect ratio
 
     # Update layout
     fig.update_layout(
