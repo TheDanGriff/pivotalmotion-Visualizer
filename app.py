@@ -556,7 +556,7 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
         st.subheader("Body Alignment Visuals")
         col1, col2 = st.columns(2)
         with col1:
-            st.write("Body Alignment (Feet, Hips, Shoulders)")
+            st.write("Body Alignment")
             body_fig = create_body_alignment_visual(frame_data)
             st.plotly_chart(body_fig, use_container_width=True)
         with col2:
@@ -569,7 +569,7 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
             st.plotly_chart(foot_fig, use_container_width=True)
     else:
         st.warning("Insufficient pose data or invalid release index for alignment visuals.")
-        
+
 def show_spin_analysis_page(df_spin):
     if not df_spin.empty:
         st.header("Spin Analysis")
