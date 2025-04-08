@@ -563,12 +563,13 @@ def show_biomechanics_page(df_pose, df_ball, df_spin, metrics):
             st.write("Foot Alignment")
             foot_fig = create_foot_alignment_visual(
                 frame_data,
-                hoop_x=metrics.get('shot_distance', 41.75),  # Distance to hoop in feet
-                hoop_y=0.0  # Hoop aligned along X-axis
+                hoop_x=0,  # Hoop is at (0, 0) in remapped coordinates
+                hoop_y=0.0
             )
             st.plotly_chart(foot_fig, use_container_width=True)
     else:
         st.warning("Insufficient pose data or invalid release index for alignment visuals.")
+        
 def show_spin_analysis_page(df_spin):
     if not df_spin.empty:
         st.header("Spin Analysis")
