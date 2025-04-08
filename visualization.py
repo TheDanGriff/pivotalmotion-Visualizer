@@ -871,7 +871,7 @@ def create_body_alignment_visual(frame_data):
     """
     import numpy as np
     import plotly.graph_objects as go
-    from math import atan2, degrees, sqrt
+    from math import atan2, degrees, sqrt, acos
 
     # Define colors for each segment
     colors = {"Feet": "#000080", "Hips": "#EF553B", "Shoulders": "#64B5F6"}
@@ -881,13 +881,10 @@ def create_body_alignment_visual(frame_data):
     midpoints = []
 
     # Define segments: Feet, Hips, Shoulders
-    # Feet: Midpoint of heel and big toe for each foot
-    if all(key in frame_data for key in ['LHEEL_X', 'LBIGTOE_X', 'LHEEL_Y', 'LBIGTOE_Y',
-                                         'RHEEL_X', 'RBIGTOE_X', 'RHEEL_Y', 'RBIGTOE_Y']):
-        left_foot = ((frame_data['LHEEL_X'] + frame_data['LBIGTOE_X']) / 2,
-                     (frame_data['LHEEL_Y'] + frame_data['LBIGTOE_Y']) / 2)
-        right_foot = ((frame_data['RHEEL_X'] + frame_data['RBIGTOE_X']) / 2,
-                      (frame_data['RHEEL_Y'] + frame_data['RBIGTOE_Y']) / 2)
+    # Feet: Use big toes instead of heels
+    if all(key in frame_data for key in ['LBIGTOE_X', 'LBIGTOE_Y', 'RBIGTOE_X', 'RBIGTOE_Y']):
+        left_foot = (frame_data['LBIGTOE_X'], frame_data['LBIGTOE_Y'])
+        right_foot = (frame_data['RBIGTOE_X'], frame_data['RBIGTOE_Y'])
         segments.append(("Feet", left_foot, right_foot))
 
     # Hips
@@ -909,8 +906,8 @@ def create_body_alignment_visual(frame_data):
             x=[left_pt[0], right_pt[0]],
             y=[left_pt[1], right_pt[1]],
             mode="lines+markers",
-            line=dict(width=8, color=color),  # Thicker lines for visibility
-            marker=dict(size=16),  # Larger markers
+            line=dict(width=8, color=color),
+            marker=dict(size=16),
             name=seg_name
         ))
         all_x.extend([left_pt[0], right_pt[0]])
@@ -928,7 +925,7 @@ def create_body_alignment_visual(frame_data):
         y_min, y_max = min(all_y), max(all_y)
 
     # Add annotations with arrows
-    annotation_x = x_max + 0.5  # Very close to body for tight zoom
+    annotation_x = x_max + 0.5
     annotation_y = {
         "Feet": y_min - 0.3,
         "Hips": (y_min + y_max) / 2,
@@ -940,13 +937,29 @@ def create_body_alignment_visual(frame_data):
         mid_x = (left_pt[0] + right_pt[0]) / 2
         mid_y = (left_pt[1] + right_pt[1]) / 2
 
-        # Calculate width and angle
+        # Calculate width
         width = sqrt((right_pt[0] - left_pt[0])**2 + (right_pt[1] - left_pt[1])**2)
-        seg_vec = (right_pt[0] - left_pt[0], right_pt[1] - left_pt[1])
-        segment_angle = degrees(atan2(seg_vec[1], seg_vec[0]))
-        deviation_angle = segment_angle - 90  # Deviation from vertical (basket at 90°)
 
-        text = f"{seg_name}<br>Width: {width:.1f} ft<br>Angle: {deviation_angle:.1f}°"
+        # Calculate perpendicular vector (rotate segment vector 90° clockwise)
+        seg_vec = (right_pt[0] - left_pt[0], right_pt[1] - left_pt[1])
+        perp_vec = (-seg_vec[1], seg_vec[0])  # Rotate 90° clockwise
+        perp_norm = sqrt(perp_vec[0]**2 + perp_vec[1]**2)
+        if perp_norm == 0:
+            continue
+        perp_unit = (perp_vec[0] / perp_norm, perp_vec[1] / perp_norm)
+
+        # Calculate angle between perp_unit and hoop direction (1, 0)
+        hoop_dir = (1, 0)
+        dot_product = perp_unit[0] * hoop_dir[0] + perp_unit[1] * hoop_dir[1]
+        angle_rad = acos(np.clip(dot_product, -1.0, 1.0))
+        angle = degrees(angle_rad)
+
+        # Determine direction using cross product
+        cross_product = perp_unit[0] * hoop_dir[1] - perp_unit[1] * hoop_dir[0]
+        if cross_product < 0:
+            angle = 360 - angle  # Adjust for clockwise direction
+
+        text = f"{seg_name}<br>Width: {width:.1f} ft<br>Angle: {angle:.1f}°"
         fig.add_annotation(
             x=annotation_x,
             y=annotation_y[seg_name],
@@ -958,7 +971,7 @@ def create_body_alignment_visual(frame_data):
             arrowsize=1,
             arrowwidth=1,
             arrowcolor="black",
-            font=dict(size=12, color=color),
+            font=dict(size=14, color=color),  # Larger font
             align="left",
             bgcolor="white",
             bordercolor="black",
@@ -969,7 +982,7 @@ def create_body_alignment_visual(frame_data):
     if midpoints:
         avg_mid_x = np.mean([mp[0] for mp in midpoints])
         avg_mid_y = np.mean([mp[1] for mp in midpoints])
-        arrow_length = 0.5  # Very small arrow
+        arrow_length = 0.5
         fig.add_trace(go.Scatter(
             x=[avg_mid_x, avg_mid_x + arrow_length],
             y=[avg_mid_y, avg_mid_y],
@@ -981,11 +994,11 @@ def create_body_alignment_visual(frame_data):
 
     # Tight zoom on body with minimal space for annotations
     if all_x and all_y:
-        padding = 0.3  # Reduced padding for tighter zoom
+        padding = 0.3
         x_range = [x_min - padding, annotation_x + padding]
         y_range = [y_min - 0.5, y_max + 0.5]
         fig.update_xaxes(range=x_range)
-        fig.update_yaxes(range=y_range, scaleanchor="x", scaleratio=1)  # Equal aspect ratio
+        fig.update_yaxes(range=y_range, scaleanchor="x", scaleratio=1)
 
     # Update layout with larger figure size
     fig.update_layout(
@@ -993,8 +1006,8 @@ def create_body_alignment_visual(frame_data):
         xaxis_title="X (ft, toward basket)",
         yaxis_title="Y (ft, lateral)",
         template="plotly_white",
-        height=600,  # Increased height
-        width=600,   # Increased width
+        height=600,
+        width=600,
         showlegend=True,
         legend=dict(orientation="h", yanchor="top", y=1.05, xanchor="center", x=0.5)
     )
@@ -1002,7 +1015,7 @@ def create_body_alignment_visual(frame_data):
 
 def create_foot_alignment_visual(frame_data, hoop_x=0, hoop_y=0):
     """
-    Create a foot alignment visualization with each foot’s direction relative to vertical.
+    Create a foot alignment visualization with each foot’s clockwise rotation to the hoop.
     
     Parameters:
         frame_data (Series): Pose keypoints at release frame in feet (remapped coordinates).
@@ -1013,7 +1026,7 @@ def create_foot_alignment_visual(frame_data, hoop_x=0, hoop_y=0):
     """
     import numpy as np
     import plotly.graph_objects as go
-    from math import atan2, degrees, sqrt
+    from math import atan2, degrees, sqrt, acos
 
     fig = go.Figure()
     hoop_pos = (hoop_x, hoop_y)
@@ -1034,8 +1047,8 @@ def create_foot_alignment_visual(frame_data, hoop_x=0, hoop_y=0):
                 x=[heel[0], toe[0]],
                 y=[heel[1], toe[1]],
                 mode='lines+markers',
-                line=dict(width=12, color=color),  # Thicker lines
-                marker=dict(size=20),  # Larger markers
+                line=dict(width=12, color=color),
+                marker=dict(size=20),
                 name=f"{'Left' if side=='L' else 'Right'} Foot"
             ))
             x_vals.extend([heel[0], toe[0]])
@@ -1044,24 +1057,37 @@ def create_foot_alignment_visual(frame_data, hoop_x=0, hoop_y=0):
             # Midpoint and foot direction
             midpoint = ((heel[0] + toe[0]) / 2, (heel[1] + toe[1]) / 2)
             foot_vec = (toe[0] - heel[0], toe[1] - heel[1])
-            foot_angle = degrees(atan2(foot_vec[1], foot_vec[0]))
-            deviation_angle = foot_angle - 90  # Deviation from vertical (consistent with body)
+            foot_norm = sqrt(foot_vec[0]**2 + foot_vec[1]**2)
+            if foot_norm == 0:
+                continue
+            foot_unit = (foot_vec[0] / foot_norm, foot_vec[1] / foot_norm)
+
+            # Calculate angle between foot_unit and hoop direction (1, 0)
+            hoop_dir = (1, 0)
+            dot_product = foot_unit[0] * hoop_dir[0] + foot_unit[1] * hoop_dir[1]
+            angle_rad = acos(np.clip(dot_product, -1.0, 1.0))
+            angle = degrees(angle_rad)
+
+            # Determine direction using cross product
+            cross_product = foot_unit[0] * hoop_dir[1] - foot_unit[1] * hoop_dir[0]
+            if cross_product < 0:
+                angle = 360 - angle  # Clockwise angle
 
             # Foot width
             foot_width = sqrt((toe[0] - heel[0])**2 + (toe[1] - heel[1])**2)
 
             # Annotation for width and angle
             fig.add_annotation(
-                x=midpoint[0] + 0.3 if side == 'R' else midpoint[0] - 0.3,  # Offset to avoid overlap
+                x=midpoint[0] + 0.3 if side == 'R' else midpoint[0] - 0.3,
                 y=midpoint[1],
-                text=f"Width: {foot_width:.1f} ft<br>Angle: {deviation_angle:.1f}°",
+                text=f"Width: {foot_width:.1f} ft<br>Angle: {angle:.1f}°",
                 showarrow=True,
                 ax=midpoint[0],
                 ay=midpoint[1],
                 arrowhead=1,
                 arrowsize=1,
                 arrowwidth=1,
-                font=dict(size=12, color=color),
+                font=dict(size=14, color=color),  # Larger font
                 bgcolor="white",
                 bordercolor="black",
                 borderwidth=1
@@ -1079,19 +1105,19 @@ def create_foot_alignment_visual(frame_data, hoop_x=0, hoop_y=0):
     if x_vals and y_vals:
         x_min, x_max = min(x_vals), max(x_vals)
         y_min, y_max = min(y_vals), max(y_vals)
-        x_margin = (x_max - x_min) * 0.2 or 1  # Reduced margin for tighter zoom
-        y_margin = (y_max - y_min) * 0.2 or 1
+        x_margin = (x_max - x_min) * 0.1 or 0.5
+        y_margin = (y_max - y_min) * 0.1 or 0.5
         fig.update_xaxes(range=[x_min - x_margin, x_max + x_margin])
         fig.update_yaxes(range=[y_min - y_margin, y_max + y_margin], scaleanchor="x", scaleratio=1)
 
     # Update layout with larger figure size
     fig.update_layout(
-        title="Foot Alignment (Deviation from Vertical)",
+        title="Foot Alignment (Clockwise Rotation to Hoop)",
         xaxis_title="Court Position (ft)",
         yaxis_title="Lateral Position (ft)",
         template="plotly_white",
-        height=600,  # Increased height
-        width=600,   # Increased width
+        height=600,
+        width=600,
         showlegend=True,
         legend=dict(orientation="h", yanchor="top", y=1.05, xanchor="center", x=0.5)
     )
