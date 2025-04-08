@@ -858,6 +858,7 @@ def calculate_body_alignment(df, release_idx, hoop_x=501.0, hoop_y=0.0):
     
     return metrics
 
+
 def create_body_alignment_visual(frame_data):
     """
     Create a 2D visualization of body alignment with the basket to the right.
@@ -908,8 +909,8 @@ def create_body_alignment_visual(frame_data):
             x=[left_pt[0], right_pt[0]],
             y=[left_pt[1], right_pt[1]],
             mode="lines+markers",
-            line=dict(width=6, color=color),
-            marker=dict(size=12),
+            line=dict(width=8, color=color),  # Thicker lines for visibility
+            marker=dict(size=16),  # Larger markers
             name=seg_name
         ))
         all_x.extend([left_pt[0], right_pt[0]])
@@ -927,11 +928,11 @@ def create_body_alignment_visual(frame_data):
         y_min, y_max = min(all_y), max(all_y)
 
     # Add annotations with arrows
-    annotation_x = x_max + 1  # Closer to body for tighter zoom
+    annotation_x = x_max + 0.5  # Very close to body for tight zoom
     annotation_y = {
-        "Feet": y_min - 0.5,
+        "Feet": y_min - 0.3,
         "Hips": (y_min + y_max) / 2,
-        "Shoulders": y_max + 0.5
+        "Shoulders": y_max + 0.3
     }
 
     for seg_name, left_pt, right_pt in segments:
@@ -942,12 +943,10 @@ def create_body_alignment_visual(frame_data):
         # Calculate width and angle
         width = sqrt((right_pt[0] - left_pt[0])**2 + (right_pt[1] - left_pt[1])**2)
         seg_vec = (right_pt[0] - left_pt[0], right_pt[1] - left_pt[1])
-        basket_dir = (1, 0)  # Positive X-axis
-        angle_rad = atan2(seg_vec[1], seg_vec[0]) - atan2(basket_dir[1], basket_dir[0])
-        angle = degrees(angle_rad)
-        angle = ((angle + 90) % 180) - 90  # Normalize to [-90, 90]
+        segment_angle = degrees(atan2(seg_vec[1], seg_vec[0]))
+        deviation_angle = segment_angle - 90  # Deviation from vertical (basket at 90°)
 
-        text = f"{seg_name}<br>Width: {width:.1f} ft<br>Angle: {angle:.1f}°"
+        text = f"{seg_name}<br>Width: {width:.1f} ft<br>Angle: {deviation_angle:.1f}°"
         fig.add_annotation(
             x=annotation_x,
             y=annotation_y[seg_name],
@@ -959,7 +958,7 @@ def create_body_alignment_visual(frame_data):
             arrowsize=1,
             arrowwidth=1,
             arrowcolor="black",
-            font=dict(size=10, color=color),  # Smaller font to reduce clutter
+            font=dict(size=12, color=color),
             align="left",
             bgcolor="white",
             bordercolor="black",
@@ -970,31 +969,32 @@ def create_body_alignment_visual(frame_data):
     if midpoints:
         avg_mid_x = np.mean([mp[0] for mp in midpoints])
         avg_mid_y = np.mean([mp[1] for mp in midpoints])
-        arrow_length = 1  # Small arrow
+        arrow_length = 0.5  # Very small arrow
         fig.add_trace(go.Scatter(
             x=[avg_mid_x, avg_mid_x + arrow_length],
             y=[avg_mid_y, avg_mid_y],
             mode="lines+markers",
-            line=dict(width=2, color="red", dash="dash"),  # Dashed to reduce emphasis
+            line=dict(width=2, color="red", dash="dash"),
             marker=dict(size=6, symbol="arrow-bar-right"),
             name="Basket Direction"
         ))
 
-    # Tight zoom on body with space for annotations
+    # Tight zoom on body with minimal space for annotations
     if all_x and all_y:
-        padding = 0.5  # Minimal padding
+        padding = 0.3  # Reduced padding for tighter zoom
         x_range = [x_min - padding, annotation_x + padding]
-        y_range = [y_min - 1, y_max + 1]  # Enough to include annotations
+        y_range = [y_min - 0.5, y_max + 0.5]
         fig.update_xaxes(range=x_range)
         fig.update_yaxes(range=y_range, scaleanchor="x", scaleratio=1)  # Equal aspect ratio
 
-    # Update layout
+    # Update layout with larger figure size
     fig.update_layout(
         title="Body Alignment",
         xaxis_title="X (ft, toward basket)",
         yaxis_title="Y (ft, lateral)",
         template="plotly_white",
-        height=500,
+        height=600,  # Increased height
+        width=600,   # Increased width
         showlegend=True,
         legend=dict(orientation="h", yanchor="top", y=1.05, xanchor="center", x=0.5)
     )
@@ -1002,7 +1002,7 @@ def create_body_alignment_visual(frame_data):
 
 def create_foot_alignment_visual(frame_data, hoop_x=0, hoop_y=0):
     """
-    Create a foot alignment visualization with each foot’s direction towards the basket at (0, 0).
+    Create a foot alignment visualization with each foot’s direction relative to vertical.
     
     Parameters:
         frame_data (Series): Pose keypoints at release frame in feet (remapped coordinates).
@@ -1034,64 +1034,64 @@ def create_foot_alignment_visual(frame_data, hoop_x=0, hoop_y=0):
                 x=[heel[0], toe[0]],
                 y=[heel[1], toe[1]],
                 mode='lines+markers',
-                line=dict(width=10, color=color),
-                marker=dict(size=15),
+                line=dict(width=12, color=color),  # Thicker lines
+                marker=dict(size=20),  # Larger markers
                 name=f"{'Left' if side=='L' else 'Right'} Foot"
             ))
             x_vals.extend([heel[0], toe[0]])
             y_vals.extend([heel[1], toe[1]])
 
-            # Midpoint and direction
+            # Midpoint and foot direction
             midpoint = ((heel[0] + toe[0]) / 2, (heel[1] + toe[1]) / 2)
             foot_vec = (toe[0] - heel[0], toe[1] - heel[1])
-            foot_norm = sqrt(foot_vec[0]**2 + foot_vec[1]**2)
-            if foot_norm == 0:
-                continue
-            foot_unit = (foot_vec[0] / foot_norm, foot_vec[1] / foot_norm)
+            foot_angle = degrees(atan2(foot_vec[1], foot_vec[0]))
+            deviation_angle = foot_angle - 90  # Deviation from vertical (consistent with body)
 
-            # Perpendicular towards basket
-            perp1 = (foot_unit[1], -foot_unit[0])
-            perp2 = (-foot_unit[1], foot_unit[0])
-            basket_vec = (hoop_pos[0] - midpoint[0], hoop_pos[1] - midpoint[1])
-            basket_norm = sqrt(basket_vec[0]**2 + basket_vec[1]**2)
-            basket_unit = (1, 0) if basket_norm == 0 else (basket_vec[0] / basket_norm, basket_vec[1] / basket_norm)
-            
-            dot1 = perp1[0] * basket_unit[0] + perp1[1] * basket_unit[1]
-            dot2 = perp2[0] * basket_unit[0] + perp2[1] * basket_unit[1]
-            perp = perp1 if dot1 > dot2 else perp2
+            # Foot width
+            foot_width = sqrt((toe[0] - heel[0])**2 + (toe[1] - heel[1])**2)
 
-            # Angle to basket
-            angle = degrees(np.arccos(np.clip(np.dot(foot_unit, basket_unit), -1.0, 1.0)))
+            # Annotation for width and angle
             fig.add_annotation(
-                x=midpoint[0], y=midpoint[1] - 0.2,
-                text=f"{angle:.1f}°",
-                showarrow=False,
-                font=dict(size=16, color=color)
+                x=midpoint[0] + 0.3 if side == 'R' else midpoint[0] - 0.3,  # Offset to avoid overlap
+                y=midpoint[1],
+                text=f"Width: {foot_width:.1f} ft<br>Angle: {deviation_angle:.1f}°",
+                showarrow=True,
+                ax=midpoint[0],
+                ay=midpoint[1],
+                arrowhead=1,
+                arrowsize=1,
+                arrowwidth=1,
+                font=dict(size=12, color=color),
+                bgcolor="white",
+                bordercolor="black",
+                borderwidth=1
             )
 
     # Add basket marker
     fig.add_trace(go.Scatter(
         x=[0], y=[0],
         mode="markers",
-        marker=dict(size=10, color="red", symbol="x"),
+        marker=dict(size=12, color="red", symbol="x"),
         name="Basket"
     ))
 
-    # Adjust axes
+    # Adjust axes for tighter zoom
     if x_vals and y_vals:
         x_min, x_max = min(x_vals), max(x_vals)
         y_min, y_max = min(y_vals), max(y_vals)
-        x_margin = (x_max - x_min) * 0.5 or 5
-        y_margin = (y_max - y_min) * 0.5 or 5
+        x_margin = (x_max - x_min) * 0.2 or 1  # Reduced margin for tighter zoom
+        y_margin = (y_max - y_min) * 0.2 or 1
         fig.update_xaxes(range=[x_min - x_margin, x_max + x_margin])
-        fig.update_yaxes(range=[y_min - y_margin, y_max + y_margin])
+        fig.update_yaxes(range=[y_min - y_margin, y_max + y_margin], scaleanchor="x", scaleratio=1)
 
+    # Update layout with larger figure size
     fig.update_layout(
-        title="Foot Alignment (Towards Basket)",
+        title="Foot Alignment (Deviation from Vertical)",
         xaxis_title="Court Position (ft)",
         yaxis_title="Lateral Position (ft)",
         template="plotly_white",
-        height=500,
+        height=600,  # Increased height
+        width=600,   # Increased width
         showlegend=True,
         legend=dict(orientation="h", yanchor="top", y=1.05, xanchor="center", x=0.5)
     )
