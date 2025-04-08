@@ -880,20 +880,17 @@ def create_body_alignment_visual(frame_data):
     all_x, all_y = [], []
     midpoints = []
 
-    # Define segments: Feet, Hips, Shoulders
-    # Feet: Use big toes instead of heels
+    # Define segments: Feet (using big toes), Hips, Shoulders
     if all(key in frame_data for key in ['LBIGTOE_X', 'LBIGTOE_Y', 'RBIGTOE_X', 'RBIGTOE_Y']):
         left_foot = (frame_data['LBIGTOE_X'], frame_data['LBIGTOE_Y'])
         right_foot = (frame_data['RBIGTOE_X'], frame_data['RBIGTOE_Y'])
         segments.append(("Feet", left_foot, right_foot))
 
-    # Hips
     if all(key in frame_data for key in ['LHIP_X', 'RHIP_X', 'LHIP_Y', 'RHIP_Y']):
         left_hip = (frame_data['LHIP_X'], frame_data['LHIP_Y'])
         right_hip = (frame_data['RHIP_X'], frame_data['RHIP_Y'])
         segments.append(("Hips", left_hip, right_hip))
 
-    # Shoulders
     if all(key in frame_data for key in ['LSHOULDER_X', 'RSHOULDER_X', 'LSHOULDER_Y', 'RSHOULDER_Y']):
         left_shoulder = (frame_data['LSHOULDER_X'], frame_data['LSHOULDER_Y'])
         right_shoulder = (frame_data['RSHOULDER_X'], frame_data['RSHOULDER_Y'])
@@ -926,11 +923,7 @@ def create_body_alignment_visual(frame_data):
 
     # Add annotations with arrows
     annotation_x = x_max + 0.5
-    annotation_y = {
-        "Feet": y_min - 0.3,
-        "Hips": (y_min + y_max) / 2,
-        "Shoulders": y_max + 0.3
-    }
+    annotation_y = {"Feet": y_min - 0.3, "Hips": (y_min + y_max) / 2, "Shoulders": y_max + 0.3}
 
     for seg_name, left_pt, right_pt in segments:
         color = colors.get(seg_name, "#808080")
@@ -959,7 +952,10 @@ def create_body_alignment_visual(frame_data):
         if cross_product < 0:
             angle = 360 - angle  # Adjust for clockwise direction
 
-        text = f"{seg_name}<br>Width: {width:.1f} ft<br>Angle: {angle:.1f}°"
+        # Apply the requested adjustment: 360 - angle
+        adjusted_angle = 360 - angle
+
+        text = f"{seg_name}<br>Width: {width:.1f} ft<br>Angle: {adjusted_angle:.1f}°"
         fig.add_annotation(
             x=annotation_x,
             y=annotation_y[seg_name],
@@ -971,7 +967,7 @@ def create_body_alignment_visual(frame_data):
             arrowsize=1,
             arrowwidth=1,
             arrowcolor="black",
-            font=dict(size=14, color=color),  # Larger font
+            font=dict(size=14, color=color),
             align="left",
             bgcolor="white",
             bordercolor="black",
@@ -992,7 +988,7 @@ def create_body_alignment_visual(frame_data):
             name="Basket Direction"
         ))
 
-    # Tight zoom on body with minimal space for annotations
+    # Tight zoom on body with space for annotations
     if all_x and all_y:
         padding = 0.3
         x_range = [x_min - padding, annotation_x + padding]
@@ -1000,7 +996,7 @@ def create_body_alignment_visual(frame_data):
         fig.update_xaxes(range=x_range)
         fig.update_yaxes(range=y_range, scaleanchor="x", scaleratio=1)
 
-    # Update layout with larger figure size
+    # Update layout
     fig.update_layout(
         title="Body Alignment",
         xaxis_title="X (ft, toward basket)",
@@ -1073,21 +1069,21 @@ def create_foot_alignment_visual(frame_data, hoop_x=0, hoop_y=0):
             if cross_product < 0:
                 angle = 360 - angle  # Clockwise angle
 
-            # Foot width
-            foot_width = sqrt((toe[0] - heel[0])**2 + (toe[1] - heel[1])**2)
+            # Apply the requested adjustment: 360 - angle
+            adjusted_angle = 360 - angle
 
-            # Annotation for width and angle
+            # Annotation for angle only
             fig.add_annotation(
                 x=midpoint[0] + 0.3 if side == 'R' else midpoint[0] - 0.3,
                 y=midpoint[1],
-                text=f"Width: {foot_width:.1f} ft<br>Angle: {angle:.1f}°",
+                text=f"Angle: {adjusted_angle:.1f}°",
                 showarrow=True,
                 ax=midpoint[0],
                 ay=midpoint[1],
                 arrowhead=1,
                 arrowsize=1,
                 arrowwidth=1,
-                font=dict(size=14, color=color),  # Larger font
+                font=dict(size=14, color=color),
                 bgcolor="white",
                 bordercolor="black",
                 borderwidth=1
@@ -1110,7 +1106,7 @@ def create_foot_alignment_visual(frame_data, hoop_x=0, hoop_y=0):
         fig.update_xaxes(range=[x_min - x_margin, x_max + x_margin])
         fig.update_yaxes(range=[y_min - y_margin, y_max + y_margin], scaleanchor="x", scaleratio=1)
 
-    # Update layout with larger figure size
+    # Update layout
     fig.update_layout(
         title="Foot Alignment (Clockwise Rotation to Hoop)",
         xaxis_title="Court Position (ft)",
