@@ -860,8 +860,7 @@ def calculate_body_alignment(df, release_idx, hoop_x=501.0, hoop_y=0.0):
 
 def create_body_alignment_visual(frame_data):
     """
-    Create a 2D visualization of feet, hips, and shoulders, with the midline oriented towards
-    the basket at (0, 0) along the positive X-axis.
+    Create a 2D visualization of body alignment with the basket to the right.
     
     Parameters:
         frame_data (Series): Pose keypoints at release frame in feet (remapped coordinates).
@@ -878,8 +877,7 @@ def create_body_alignment_visual(frame_data):
     segments = []
     all_x, all_y = [], []
 
-    # Define segments (Feet, Hips, Shoulders)
-    # Feet
+    # Define segments
     if all(key in frame_data for key in ['LHEEL_X', 'LBIGTOE_X', 'LHEEL_Y', 'LBIGTOE_Y',
                                          'RHEEL_X', 'RBIGTOE_X', 'RHEEL_Y', 'RBIGTOE_Y']):
         left_foot = ((frame_data['LHEEL_X'] + frame_data['LBIGTOE_X']) / 2,
@@ -888,20 +886,15 @@ def create_body_alignment_visual(frame_data):
                       (frame_data['RHEEL_Y'] + frame_data['RBIGTOE_Y']) / 2)
         segments.append(("Feet", left_foot, right_foot))
 
-    # Hips
     if all(key in frame_data for key in ['LHIP_X', 'RHIP_X', 'LHIP_Y', 'RHIP_Y']):
         left_hip = (frame_data['LHIP_X'], frame_data['LHIP_Y'])
         right_hip = (frame_data['RHIP_X'], frame_data['RHIP_Y'])
         segments.append(("Hips", left_hip, right_hip))
 
-    # Shoulders
     if all(key in frame_data for key in ['LSHOULDER_X', 'RSHOULDER_X', 'LSHOULDER_Y', 'RSHOULDER_Y']):
         left_shoulder = (frame_data['LSHOULDER_X'], frame_data['LSHOULDER_Y'])
         right_shoulder = (frame_data['RSHOULDER_X'], frame_data['RSHOULDER_Y'])
         segments.append(("Shoulders", left_shoulder, right_shoulder))
-
-    arrow_length = 5  # in feet
-    basket_pos = (0, 0)  # Hoop at (0, 0)
 
     for seg_name, left_pt, right_pt in segments:
         color = colors.get(seg_name, "#808080")
@@ -918,80 +911,57 @@ def create_body_alignment_visual(frame_data):
         all_x.extend([left_pt[0], right_pt[0]])
         all_y.extend([left_pt[1], right_pt[1]])
 
-        # Calculate midline (perpendicular to segment, towards basket)
-        mid_pt = ((left_pt[0] + right_pt[0]) / 2, (left_pt[1] + right_pt[1]) / 2)
+        # Calculate midpoint
+        mid_x = (left_pt[0] + right_pt[0]) / 2
+        mid_y = (left_pt[1] + right_pt[1]) / 2
+
+        # Calculate width
+        width = sqrt((right_pt[0] - left_pt[0])**2 + (right_pt[1] - left_pt[1])**2)
+
+        # Calculate angle relative to basket direction (positive X-axis)
         seg_vec = (right_pt[0] - left_pt[0], right_pt[1] - left_pt[1])
-        seg_norm = sqrt(seg_vec[0]**2 + seg_vec[1]**2)
-        if seg_norm == 0:
-            continue
-        seg_unit = (seg_vec[0] / seg_norm, seg_vec[1] / seg_norm)
-        
-        # Perpendicular vector (two possibilities)
-        perp1 = (seg_unit[1], -seg_unit[0])  # Right turn
-        perp2 = (-seg_unit[1], seg_unit[0])  # Left turn
-        
-        # Direction to basket
-        basket_vec = (basket_pos[0] - mid_pt[0], basket_pos[1] - mid_pt[1])
-        basket_norm = sqrt(basket_vec[0]**2 + basket_vec[1]**2)
-        if basket_norm == 0:
-            basket_unit = (1, 0)  # Default to positive X if at basket
-        else:
-            basket_unit = (basket_vec[0] / basket_norm, basket_vec[1] / basket_norm)
-        
-        # Choose perp direction closest to basket direction
-        dot1 = perp1[0] * basket_unit[0] + perp1[1] * basket_unit[1]
-        dot2 = perp2[0] * basket_unit[0] + perp2[1] * basket_unit[1]
-        perp = perp1 if dot1 > dot2 else perp2
+        basket_dir = (1, 0)  # Positive X-axis
+        angle_rad = atan2(seg_vec[1], seg_vec[0]) - atan2(basket_dir[1], basket_dir[0])
+        angle = degrees(angle_rad)
+        # Normalize angle to [-90, 90] for deviation from facing the basket
+        angle = ((angle + 90) % 180) - 90
 
-        # Add arrow pointing towards basket
-        arrow_end = (mid_pt[0] + arrow_length * perp[0], mid_pt[1] + arrow_length * perp[1])
-        fig.add_trace(go.Scatter(
-            x=[mid_pt[0], arrow_end[0]],
-            y=[mid_pt[1], arrow_end[1]],
-            mode="lines+markers",
-            line=dict(width=3, color=color),
-            marker=dict(size=8),
-            showlegend=False
-        ))
-        all_x.append(arrow_end[0])
-        all_y.append(arrow_end[1])
-
-        # Calculate angle relative to positive X-axis (basket direction)
-        angle = degrees(atan2(perp[1], perp[0]))
-        if angle < 0:
-            angle += 360
+        # Annotate width and angle
         fig.add_annotation(
-            x=mid_pt[0], y=mid_pt[1] + 0.5,
-            text=f"{angle:.1f}°",
+            x=mid_x, y=mid_y + 0.5,
+            text=f"Width: {width:.1f} ft<br>Angle: {angle:.1f}°",
             showarrow=False,
             font=dict(size=12, color=color)
         )
 
-    # Add basket marker
-    fig.add_trace(go.Scatter(
-        x=[0], y=[0],
-        mode="markers",
-        marker=dict(size=10, color="red", symbol="x"),
-        name="Basket"
-    ))
+    # Add reference arrow for basket direction
+    if segments:
+        mid_x = np.mean([mid[0] for _, mid, _ in segments])
+        mid_y = np.mean([mid[1] for _, mid, _ in segments])
+        arrow_length = 5
+        fig.add_trace(go.Scatter(
+            x=[mid_x, mid_x + arrow_length],
+            y=[mid_y, mid_y],
+            mode="lines+markers",
+            line=dict(width=3, color="red"),
+            marker=dict(size=8, symbol="arrow-bar-right"),
+            name="Basket Direction"
+        ))
 
-    # Adjust axes
+    # Adjust plot layout
     if all_x and all_y:
-        x_min, x_max = min(all_x), max(all_x)
-        y_min, y_max = min(all_y), max(all_y)
-        x_margin = (x_max - x_min) * 0.5 or 5
-        y_margin = (y_max - y_min) * 0.5 or 5
-        fig.update_xaxes(range=[x_min - x_margin, x_max + x_margin])
-        fig.update_yaxes(range=[y_min - y_margin, y_max + y_margin])
+        x_range = [min(all_x) - 2, max(all_x) + 7]  # Extra space for arrow
+        y_range = [min(all_y) - 2, max(all_y) + 2]
+        fig.update_xaxes(range=x_range)
+        fig.update_yaxes(range=y_range)
 
     fig.update_layout(
-        title="Body Alignment (Towards Basket)",
-        xaxis_title="Court Position (ft)",
-        yaxis_title="Lateral Position (ft)",
+        title="Body Alignment (Basket to the Right)",
+        xaxis_title="X (ft, toward basket)",
+        yaxis_title="Y (ft, lateral)",
         template="plotly_white",
         height=500,
-        showlegend=True,
-        legend=dict(orientation="h", yanchor="top", y=1.05, xanchor="center", x=0.5)
+        showlegend=True
     )
     return fig
 

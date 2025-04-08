@@ -626,19 +626,17 @@ def adjust_shot_coordinates(ball_df, pose_df=None):
 
 def remap_shot_coordinates(ball_df, pose_df, hoop_x, hoop_y, release_idx, INCHES_TO_FEET=1/12):
     """
-    Remap basketball and pose coordinates to feet, with the hoop at (0, 0) and shot direction
-    along the positive X-axis.
+    Remap coordinates so the hoop is at (0, 0) and the shot direction is along the positive X-axis.
     
     Parameters:
         ball_df (DataFrame): Basketball coordinates in inches.
         pose_df (DataFrame): Pose keypoints in inches.
         hoop_x, hoop_y (float): Hoop position in inches.
         release_idx (int): Index of the release frame.
-        INCHES_TO_FEET (float): Conversion factor (1/12).
+        INCHES_TO_FEET (float): Conversion factor (default 1/12).
     
     Returns:
         ball_df, pose_df (DataFrames): Remapped coordinates in feet.
-        theta (float): Rotation angle applied.
     """
     import numpy as np
     
@@ -648,20 +646,21 @@ def remap_shot_coordinates(ball_df, pose_df, hoop_x, hoop_y, release_idx, INCHES
     ball_df['Basketball_Y_ft'] = ball_df['Basketball_Y'] * INCHES_TO_FEET
     ball_df['Basketball_Z_ft'] = ball_df['Basketball_Z'] * INCHES_TO_FEET
 
-    # Calculate rotation angle based on release point to hoop
-    theta = np.arctan2(hoop_y - ball_df['Basketball_Y'].iloc[release_idx],
-                       hoop_x - ball_df['Basketball_X'].iloc[release_idx])
+    # Calculate rotation angle from release point to hoop
+    release_x = ball_df['Basketball_X'].iloc[release_idx] * INCHES_TO_FEET
+    release_y = ball_df['Basketball_Y'].iloc[release_idx] * INCHES_TO_FEET
+    theta = np.arctan2(hoop_y * INCHES_TO_FEET - release_y, hoop_x * INCHES_TO_FEET - release_x)
     cos_theta = np.cos(theta)
     sin_theta = np.sin(theta)
 
-    # Shift and rotate ball_df
+    # Shift and rotate ball coordinates
     hoop_ft = (hoop_x * INCHES_TO_FEET, hoop_y * INCHES_TO_FEET)
     x_shifted = ball_df['Basketball_X_ft'] - hoop_ft[0]
     y_shifted = ball_df['Basketball_Y_ft'] - hoop_ft[1]
     ball_df['Basketball_X_ft'] = x_shifted * cos_theta + y_shifted * sin_theta
     ball_df['Basketball_Y_ft'] = -x_shifted * sin_theta + y_shifted * cos_theta
 
-    # Convert and remap pose_df coordinates
+    # Apply the same transformation to pose coordinates
     pose_df = pose_df.copy()
     for col in pose_df.columns:
         if col.endswith('_X') or col.endswith('_Y') or col.endswith('_Z'):
@@ -674,7 +673,7 @@ def remap_shot_coordinates(ball_df, pose_df, hoop_x, hoop_y, release_idx, INCHES
                 pose_df[col] = x_shifted * cos_theta + y_shifted * sin_theta
                 pose_df[y_col] = -x_shifted * sin_theta + y_shifted * cos_theta
 
-    return ball_df, pose_df, theta
+    return ball_df, pose_df
 
 def calculate_foot_angles(df):
     """Calculate foot angles using both old and new column names."""
