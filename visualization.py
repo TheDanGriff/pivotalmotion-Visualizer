@@ -1065,7 +1065,7 @@ def create_foot_alignment_visual(frame_data, hoop_x=0, hoop_y=0):
             if cross_product < 0:
                 angle = 360 - angle  # Clockwise angle
 
-            # Apply the requested adjustment: 360 - angle
+            # adjustment: 360 - angle
             adjusted_angle = 360 - angle
 
             # Annotation for angle only
