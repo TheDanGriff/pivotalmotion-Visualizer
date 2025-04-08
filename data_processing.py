@@ -676,7 +676,6 @@ def remap_shot_coordinates(ball_df, pose_df, hoop_x, hoop_y, release_idx, INCHES
     return ball_df, pose_df
 
 def calculate_foot_angles(df):
-    """Calculate foot angles using both old and new column names."""
     try:
         # Left foot (new names: LHEEL_X, LSMALLTOE_X, LBIGTOE_X)
         if all(col in df.columns for col in ['LHEEL_X', 'LHEEL_Y', 'LSMALLTOE_X', 'LSMALLTOE_Y', 'LBIGTOE_X', 'LBIGTOE_Y']):
