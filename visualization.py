@@ -860,53 +860,26 @@ def calculate_body_alignment(df, release_idx, hoop_x=501.0, hoop_y=0.0):
 
 def create_body_alignment_visual(frame_data):
     """
-    Create a 2D visualization comparing the orientations of Feet, Hips, and Shoulders,
-    with each segment's offset computed relative to the Hips. Uses standardized coordinates
-    from calculate_shot_metrics where the basket is along the positive X-axis.
-    
-    For each segment:
-      - Compute the midpoint from its left/right keypoints.
-      - Compute the segment’s unit vector (from left to right).
-      - Compute the rightward perpendicular vector as (seg_unit_y, -seg_unit_x) [90° clockwise].
-      - Draw an arrow (fixed length) from the midpoint in the direction of the perpendicular.
-    
-    Offsets are computed relative to the Hips' perpendicular angle and shown in a metrics box.
-    
-    Color palette (pastel shades):
-      - Feet: navy ("#000080")
-      - Hips: pastel blue ("#EF553B")
-      - Shoulders: lighter pastel blue ("#64B5F6")
+    Create a 2D visualization of feet, hips, and shoulders, with the midline oriented towards
+    the basket at (0, 0) along the positive X-axis.
     
     Parameters:
-        frame_data (dict or Series): Contains keypoint values in inches (remapped coordinates).
-        
+        frame_data (Series): Pose keypoints at release frame in feet (remapped coordinates).
+    
     Returns:
-        fig (plotly.graph_objects.Figure): The alignment offset comparison visualization.
+        fig (plotly.graph_objects.Figure): Body alignment visualization.
     """
     import numpy as np
     import plotly.graph_objects as go
-    from math import atan2, degrees, radians, cos, sin, sqrt
+    from math import atan2, degrees, sqrt
 
-    # Define colors
-    colors = {
-        "Feet": "#000080",       # navy
-        "Hips": "#EF553B",       # pastel blue
-        "Shoulders": "#64B5F6"   # lighter pastel blue
-    }
-    
+    colors = {"Feet": "#000080", "Hips": "#EF553B", "Shoulders": "#64B5F6"}
     fig = go.Figure()
-    
-    # Dictionary to store computed perpendicular angles for each segment
-    perp_angles = {}
-    
-    # List to store all x and y values (for axis adjustment)
-    all_x = []
-    all_y = []
-    
-    # Define segments with required keys
     segments = []
-    
-    # Feet: use average of heel and big toe for left/right
+    all_x, all_y = [], []
+
+    # Define segments (Feet, Hips, Shoulders)
+    # Feet
     if all(key in frame_data for key in ['LHEEL_X', 'LBIGTOE_X', 'LHEEL_Y', 'LBIGTOE_Y',
                                          'RHEEL_X', 'RBIGTOE_X', 'RHEEL_Y', 'RBIGTOE_Y']):
         left_foot = ((frame_data['LHEEL_X'] + frame_data['LBIGTOE_X']) / 2,
@@ -914,42 +887,26 @@ def create_body_alignment_visual(frame_data):
         right_foot = ((frame_data['RHEEL_X'] + frame_data['RBIGTOE_X']) / 2,
                       (frame_data['RHEEL_Y'] + frame_data['RBIGTOE_Y']) / 2)
         segments.append(("Feet", left_foot, right_foot))
-    elif all(key in frame_data for key in ['LHEEL_X', 'LBTOE_X', 'LHEEL_Y', 'LBTOE_Y',
-                                           'RHEEL_X', 'RBTOE_X', 'RHEEL_Y', 'RBTOE_Y']):
-        left_foot = ((frame_data['LHEEL_X'] + frame_data['LBTOE_X']) / 2,
-                     (frame_data['LHEEL_Y'] + frame_data['LBTOE_Y']) / 2)
-        right_foot = ((frame_data['RHEEL_X'] + frame_data['RBTOE_X']) / 2,
-                      (frame_data['RHEEL_Y'] + frame_data['RBTOE_Y']) / 2)
-        segments.append(("Feet", left_foot, right_foot))
-    
-    # Hips: using left/right hip joint centers
+
+    # Hips
     if all(key in frame_data for key in ['LHIP_X', 'RHIP_X', 'LHIP_Y', 'RHIP_Y']):
         left_hip = (frame_data['LHIP_X'], frame_data['LHIP_Y'])
         right_hip = (frame_data['RHIP_X'], frame_data['RHIP_Y'])
         segments.append(("Hips", left_hip, right_hip))
-    elif all(key in frame_data for key in ['LHJC_X', 'RHJC_X', 'LHJC_Y', 'RHJC_Y']):
-        left_hip = (frame_data['LHJC_X'], frame_data['LHJC_Y'])
-        right_hip = (frame_data['RHJC_X'], frame_data['RHJC_Y'])
-        segments.append(("Hips", left_hip, right_hip))
-    
-    # Shoulders: using left/right shoulder joint centers
+
+    # Shoulders
     if all(key in frame_data for key in ['LSHOULDER_X', 'RSHOULDER_X', 'LSHOULDER_Y', 'RSHOULDER_Y']):
         left_shoulder = (frame_data['LSHOULDER_X'], frame_data['LSHOULDER_Y'])
         right_shoulder = (frame_data['RSHOULDER_X'], frame_data['RSHOULDER_Y'])
         segments.append(("Shoulders", left_shoulder, right_shoulder))
-    elif all(key in frame_data for key in ['LSJC_X', 'RSJC_X', 'LSJC_Y', 'RSJC_Y']):
-        left_shoulder = (frame_data['LSJC_X'], frame_data['LSJC_Y'])
-        right_shoulder = (frame_data['RSJC_X'], frame_data['RSJC_Y'])
-        segments.append(("Shoulders", left_shoulder, right_shoulder))
-    
-    # Fixed arrow length for drawing perpendicular arrows (in inches)
-    arrow_length = 5 * 12  # 5 feet in inches
-    
-    # Process each segment
+
+    arrow_length = 5  # in feet
+    basket_pos = (0, 0)  # Hoop at (0, 0)
+
     for seg_name, left_pt, right_pt in segments:
         color = colors.get(seg_name, "#808080")
         
-        # Draw the segment line
+        # Plot segment
         fig.add_trace(go.Scatter(
             x=[left_pt[0], right_pt[0]],
             y=[left_pt[1], right_pt[1]],
@@ -960,23 +917,33 @@ def create_body_alignment_visual(frame_data):
         ))
         all_x.extend([left_pt[0], right_pt[0]])
         all_y.extend([left_pt[1], right_pt[1]])
-        
-        # Compute the midpoint
+
+        # Calculate midline (perpendicular to segment, towards basket)
         mid_pt = ((left_pt[0] + right_pt[0]) / 2, (left_pt[1] + right_pt[1]) / 2)
-        
-        # Compute the segment vector and its norm
-        seg_vec = (right_pt[0] - left_pt[0], right_pt[1] - right_pt[1])
+        seg_vec = (right_pt[0] - left_pt[0], right_pt[1] - left_pt[1])
         seg_norm = sqrt(seg_vec[0]**2 + seg_vec[1]**2)
         if seg_norm == 0:
             continue
         seg_unit = (seg_vec[0] / seg_norm, seg_vec[1] / seg_norm)
         
-        # Compute the rightward perpendicular vector
-        perp = (seg_unit[1], -seg_unit[0])
-        perp_angle = degrees(atan2(perp[1], perp[0]))
-        perp_angles[seg_name] = perp_angle
+        # Perpendicular vector (two possibilities)
+        perp1 = (seg_unit[1], -seg_unit[0])  # Right turn
+        perp2 = (-seg_unit[1], seg_unit[0])  # Left turn
         
-        # Draw an arrow from the midpoint along the perpendicular vector
+        # Direction to basket
+        basket_vec = (basket_pos[0] - mid_pt[0], basket_pos[1] - mid_pt[1])
+        basket_norm = sqrt(basket_vec[0]**2 + basket_vec[1]**2)
+        if basket_norm == 0:
+            basket_unit = (1, 0)  # Default to positive X if at basket
+        else:
+            basket_unit = (basket_vec[0] / basket_norm, basket_vec[1] / basket_norm)
+        
+        # Choose perp direction closest to basket direction
+        dot1 = perp1[0] * basket_unit[0] + perp1[1] * basket_unit[1]
+        dot2 = perp2[0] * basket_unit[0] + perp2[1] * basket_unit[1]
+        perp = perp1 if dot1 > dot2 else perp2
+
+        # Add arrow pointing towards basket
         arrow_end = (mid_pt[0] + arrow_length * perp[0], mid_pt[1] + arrow_length * perp[1])
         fig.add_trace(go.Scatter(
             x=[mid_pt[0], arrow_end[0]],
@@ -986,107 +953,67 @@ def create_body_alignment_visual(frame_data):
             marker=dict(size=8),
             showlegend=False
         ))
-        
-        # Mark the midpoint
-        fig.add_trace(go.Scatter(
-            x=[mid_pt[0]],
-            y=[mid_pt[1]],
-            mode="markers",
-            marker=dict(color=color, size=10, symbol="circle"),
-            showlegend=False
-        ))
-        all_x.append(mid_pt[0])
-        all_y.append(mid_pt[1])
-    
-    # Use Hips' perpendicular angle as baseline
-    baseline = perp_angles.get("Hips", None)
-    offsets = {}
-    if baseline is not None:
-        for seg in perp_angles:
-            diff = perp_angles[seg] - baseline
-            while diff > 180:
-                diff -= 360
-            while diff < -180:
-                diff += 360
-            offsets[seg] = diff
-    else:
-        for seg in perp_angles:
-            offsets[seg] = 0.0
+        all_x.append(arrow_end[0])
+        all_y.append(arrow_end[1])
 
-    # Prepare offset text
-    offset_text = "Alignment Offsets (relative to Hips):<br>"
-    for seg in ["Feet", "Shoulders"]:
-        if seg in offsets:
-            offset_text += f"{seg}: {offsets[seg]:.1f}°<br>"
-    
-    # Add offset metrics annotation
-    fig.add_annotation(
-        xref="paper", x=0.01,
-        yref="paper", y=0.01,
-        text=offset_text,
-        showarrow=False,
-        font=dict(size=16, color="black"),
-        align="left",
-        bordercolor="black",
-        borderwidth=1,
-        borderpad=4,
-        bgcolor="rgba(255,255,255,0.8)"
-    )
-    
-    # Adjust axis ranges based on collected points (in inches)
+        # Calculate angle relative to positive X-axis (basket direction)
+        angle = degrees(atan2(perp[1], perp[0]))
+        if angle < 0:
+            angle += 360
+        fig.add_annotation(
+            x=mid_pt[0], y=mid_pt[1] + 0.5,
+            text=f"{angle:.1f}°",
+            showarrow=False,
+            font=dict(size=12, color=color)
+        )
+
+    # Add basket marker
+    fig.add_trace(go.Scatter(
+        x=[0], y=[0],
+        mode="markers",
+        marker=dict(size=10, color="red", symbol="x"),
+        name="Basket"
+    ))
+
+    # Adjust axes
     if all_x and all_y:
         x_min, x_max = min(all_x), max(all_x)
         y_min, y_max = min(all_y), max(all_y)
-        x_margin = (x_max - x_min) * 0.5 if (x_max - x_min) != 0 else 5 * 12
-        y_margin = (y_max - y_min) * 0.5 if (y_max - y_min) != 0 else 5 * 12
+        x_margin = (x_max - x_min) * 0.5 or 5
+        y_margin = (y_max - y_min) * 0.5 or 5
         fig.update_xaxes(range=[x_min - x_margin, x_max + x_margin])
         fig.update_yaxes(range=[y_min - y_margin, y_max + y_margin])
-    else:
-        fig.update_xaxes(range=[-600, 600])
-        fig.update_yaxes(range=[-300, 300])
-    
-    # Update layout
+
     fig.update_layout(
-        title="Body Alignment Comparison",
-        xaxis_title="Court Position (in)",
-        yaxis_title="Lateral Position (in)",
+        title="Body Alignment (Towards Basket)",
+        xaxis_title="Court Position (ft)",
+        yaxis_title="Lateral Position (ft)",
         template="plotly_white",
         height=500,
-        width=900,
-        margin=dict(l=20, r=20, b=20, t=40),
         showlegend=True,
-        legend=dict(orientation="h", yanchor="top", y=1.05, xanchor="center", x=0.5),
-        plot_bgcolor='rgba(248,248,248,1)'
+        legend=dict(orientation="h", yanchor="top", y=1.05, xanchor="center", x=0.5)
     )
-    
     return fig
 
-def create_foot_alignment_visual(frame_data, hoop_x, hoop_y=0.0):
+def create_foot_alignment_visual(frame_data, hoop_x=0, hoop_y=0):
     """
-    Create a foot alignment visualization at a specific frame using standardized coordinates,
-    with the hoop position dynamically provided from calculate_shot_metrics.
+    Create a foot alignment visualization with each foot’s direction towards the basket at (0, 0).
     
     Parameters:
-        frame_data: dict or Series containing keypoint values in inches (remapped coordinates).
-        hoop_x: X-coordinate of the hoop in feet (e.g., metrics['shot_distance']).
-        hoop_y: Y-coordinate of the hoop in feet (default 0.0).
-        
+        frame_data (Series): Pose keypoints at release frame in feet (remapped coordinates).
+        hoop_x, hoop_y (float): Basket position (default 0, 0 in remapped system).
+    
     Returns:
-        A Plotly figure showing foot angles relative to the hoop direction.
+        fig (plotly.graph_objects.Figure): Foot alignment visualization.
     """
-    INCHES_TO_FEET = 1 / 12
     import numpy as np
     import plotly.graph_objects as go
+    from math import atan2, degrees, sqrt
 
     fig = go.Figure()
-    # Convert hoop position from feet to inches (since frame_data is in inches)
-    hoop_pos = (hoop_x * 12, hoop_y * 12)  # No flip needed due to remapped coordinates
+    hoop_pos = (hoop_x, hoop_y)
+    x_vals, y_vals = [], []
 
-    foot_midpoints = {}
-    x_vals = []
-    y_vals = []
-
-    # Plot each foot (Left and Right)
     for side, color in [('L', '#636EFA'), ('R', '#EF553B')]:
         heel_x = f'{side}HEEL_X'
         toe_x = f'{side}BIGTOE_X'
@@ -1094,92 +1021,75 @@ def create_foot_alignment_visual(frame_data, hoop_x, hoop_y=0.0):
         toe_y = f'{side}BIGTOE_Y'
         
         if all(col in frame_data for col in [heel_x, toe_x, heel_y, toe_y]):
-            heel = (frame_data[heel_x] * INCHES_TO_FEET, frame_data[heel_y] * INCHES_TO_FEET)
-            toe = (frame_data[toe_x] * INCHES_TO_FEET, frame_data[toe_y] * INCHES_TO_FEET)
-        elif all(col in frame_data for col in [heel_x, f'{side}BTOE_X', heel_y, f'{side}BTOE_Y']):
-            heel = (frame_data[heel_x] * INCHES_TO_FEET, frame_data[heel_y] * INCHES_TO_FEET)
-            toe = (frame_data[f'{side}BTOE_X'] * INCHES_TO_FEET, frame_data[f'{side}BTOE_Y'] * INCHES_TO_FEET)
-        else:
-            continue
+            heel = (frame_data[heel_x], frame_data[heel_y])
+            toe = (frame_data[toe_x], frame_data[toe_y])
+            
+            # Plot foot
+            fig.add_trace(go.Scatter(
+                x=[heel[0], toe[0]],
+                y=[heel[1], toe[1]],
+                mode='lines+markers',
+                line=dict(width=10, color=color),
+                marker=dict(size=15),
+                name=f"{'Left' if side=='L' else 'Right'} Foot"
+            ))
+            x_vals.extend([heel[0], toe[0]])
+            y_vals.extend([heel[1], toe[1]])
 
-        # Draw the foot vector
-        fig.add_trace(go.Scatter(
-            x=[heel[0], toe[0]],
-            y=[heel[1], toe[1]],
-            mode='lines+markers',
-            line=dict(width=10, color=color),
-            marker=dict(size=15, symbol='circle'),
-            name=f"{'Left' if side=='L' else 'Right'} Foot"
-        ))
-        
-        midpoint = ((heel[0] + toe[0]) / 2, (heel[1] + toe[1]) / 2)
-        foot_midpoints[side] = midpoint
-        x_vals.extend([heel[0], toe[0]])
-        y_vals.extend([heel[1], toe[1]])
-        
-        # Compute the foot vector and direction to hoop
-        foot_vec = np.array(toe) - np.array(heel)
-        direction_vec = np.array(hoop_pos) - np.array(midpoint)
-        norm_dir = np.linalg.norm(direction_vec) if np.linalg.norm(direction_vec) != 0 else 1
-        cosine = np.dot(foot_vec, direction_vec) / (np.linalg.norm(foot_vec) * norm_dir)
-        cosine = np.clip(cosine, -1.0, 1.0)
-        angle = np.degrees(np.arccos(cosine))
-        
-        fig.add_annotation(
-            x=midpoint[0] + 0.5,
-            y=midpoint[1] - 0.2,
-            text=f"{angle:.1f}°",
-            showarrow=False,
-            font=dict(size=16, color=color),
-            bgcolor="rgba(255,255,255,0.8)",
-            xanchor="left"
-        )
-    
-    # Compute overall foot center
-    if 'L' in foot_midpoints and 'R' in foot_midpoints:
-        foot_center = ((foot_midpoints['L'][0] + foot_midpoints['R'][0]) / 2,
-                       (foot_midpoints['L'][1] + foot_midpoints['R'][1]) / 2)
-    elif 'L' in foot_midpoints:
-        foot_center = foot_midpoints['L']
-    elif 'R' in foot_midpoints:
-        foot_center = foot_midpoints['R']
-    else:
-        foot_center = (0, 0)
-    
-    # Dummy trace for legend
-    dummy_arrow = go.Scatter(
-        x=[None], y=[None],
-        mode='lines',
-        line=dict(color="black", width=3),
-        name="Direction of Hoop"
-    )
-    
-    # Zoom in based on collected values (in feet)
+            # Midpoint and direction
+            midpoint = ((heel[0] + toe[0]) / 2, (heel[1] + toe[1]) / 2)
+            foot_vec = (toe[0] - heel[0], toe[1] - heel[1])
+            foot_norm = sqrt(foot_vec[0]**2 + foot_vec[1]**2)
+            if foot_norm == 0:
+                continue
+            foot_unit = (foot_vec[0] / foot_norm, foot_vec[1] / foot_norm)
+
+            # Perpendicular towards basket
+            perp1 = (foot_unit[1], -foot_unit[0])
+            perp2 = (-foot_unit[1], foot_unit[0])
+            basket_vec = (hoop_pos[0] - midpoint[0], hoop_pos[1] - midpoint[1])
+            basket_norm = sqrt(basket_vec[0]**2 + basket_vec[1]**2)
+            basket_unit = (1, 0) if basket_norm == 0 else (basket_vec[0] / basket_norm, basket_vec[1] / basket_norm)
+            
+            dot1 = perp1[0] * basket_unit[0] + perp1[1] * basket_unit[1]
+            dot2 = perp2[0] * basket_unit[0] + perp2[1] * basket_unit[1]
+            perp = perp1 if dot1 > dot2 else perp2
+
+            # Angle to basket
+            angle = degrees(np.arccos(np.clip(np.dot(foot_unit, basket_unit), -1.0, 1.0)))
+            fig.add_annotation(
+                x=midpoint[0], y=midpoint[1] - 0.2,
+                text=f"{angle:.1f}°",
+                showarrow=False,
+                font=dict(size=16, color=color)
+            )
+
+    # Add basket marker
+    fig.add_trace(go.Scatter(
+        x=[0], y=[0],
+        mode="markers",
+        marker=dict(size=10, color="red", symbol="x"),
+        name="Basket"
+    ))
+
+    # Adjust axes
     if x_vals and y_vals:
         x_min, x_max = min(x_vals), max(x_vals)
         y_min, y_max = min(y_vals), max(y_vals)
-        x_margin = (x_max - x_min) * 0.5 if (x_max - x_min) != 0 else 5
-        y_margin = (y_max - y_min) * 0.5 if (y_max - y_min) != 0 else 5
+        x_margin = (x_max - x_min) * 0.5 or 5
+        y_margin = (y_max - y_min) * 0.5 or 5
         fig.update_xaxes(range=[x_min - x_margin, x_max + x_margin])
         fig.update_yaxes(range=[y_min - y_margin, y_max + y_margin])
-    else:
-        fig.update_xaxes(range=[-47, 47])
-        fig.update_yaxes(range=[-25, 25])
-    
+
     fig.update_layout(
-        title="Foot Alignment",
+        title="Foot Alignment (Towards Basket)",
         xaxis_title="Court Position (ft)",
         yaxis_title="Lateral Position (ft)",
         template="plotly_white",
         height=500,
-        margin=dict(l=20, r=20, b=20, t=40),
         showlegend=True,
-        legend=dict(orientation="h", yanchor="top", y=1.05, xanchor="center", x=0.5),
-        plot_bgcolor='rgba(248,248,248,1)'
+        legend=dict(orientation="h", yanchor="top", y=1.05, xanchor="center", x=0.5)
     )
-    
-    fig.add_trace(dummy_arrow)
-    
     return fig
 
 def plot_shot_location_in_inches(shot_x, shot_y):
