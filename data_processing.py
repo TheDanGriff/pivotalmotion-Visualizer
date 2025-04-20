@@ -2042,7 +2042,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     and compute biomechanical KPIs for basketball shooting motion, including velocities.
     
     Parameters:
-    - pose_df: DataFrame with pose data (e.g., 'RWRIST_X', 'RPINKIE_X', etc.) in inches.
+    - pose_df: DataFrame with pose data (e.g., 'RTHUMB_X', 'RPINKIE_X', etc.) in inches.
     - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', 'Basketball_Z' in inches.
     - metrics: Dictionary with 'lift_idx', 'set_idx', 'release_idx', etc.
     - fps: Frames per second, default 60.
@@ -2161,15 +2161,15 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     vz = np.gradient(ball_segment['Basketball_Z'].values, time)
     speed_ball = np.sqrt(vx**2 + vy**2 + vz**2) * INCHES_TO_FEET  # ft/s
 
-    # Right wrist velocity (previously misnamed as thumb)
-    wrist_cols = ['RWRIST_X', 'RWRIST_Y', 'RWRIST_Z']
-    if all(col in pose_segment.columns for col in wrist_cols):
-        v_wrist_x = np.gradient(pose_segment['RWRIST_X'].values, time)
-        v_wrist_y = np.gradient(pose_segment['RWRIST_Y'].values, time)
-        v_wrist_z = np.gradient(pose_segment['RWRIST_Z'].values, time)
-        speed_wrist = np.sqrt(v_wrist_x**2 + v_wrist_y**2 + v_wrist_z**2) * INCHES_TO_FEET  # ft/s
+    # Right thumb velocity (labeled as Wrist Speed)
+    thumb_cols = ['RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z']
+    if all(col in pose_segment.columns for col in thumb_cols):
+        v_thumb_x = np.gradient(pose_segment['RTHUMB_X'].values, time)
+        v_thumb_y = np.gradient(pose_segment['RTHUMB_Y'].values, time)
+        v_thumb_z = np.gradient(pose_segment['RTHUMB_Z'].values, time)
+        speed_thumb = np.sqrt(v_thumb_x**2 + v_thumb_y**2 + v_thumb_z**2) * INCHES_TO_FEET  # ft/s
     else:
-        speed_wrist = np.full(len(time), np.nan)
+        speed_thumb = np.full(len(time), np.nan)
 
     # Right pinkie velocity
     pinkie_cols = ['RPINKIE_X', 'RPINKIE_Y', 'RPINKIE_Z']
@@ -2202,26 +2202,26 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             ),
             row=1, col=1
         )
-    # Add velocity traces to upper body
+    # Add velocity traces to upper body with dashed lines
     fig.add_trace(
         go.Scatter(
             x=pose_segment['time'],
             y=speed_ball,
             mode='lines',
             name='Ball Speed',
-            line=dict(color='rgba(0, 0, 0, 0.5)', width=2)
+            line=dict(color='rgba(0, 0, 0, 0.5)', width=3, dash='dash')
         ),
         row=1, col=1,
         secondary_y=True
     )
-    if not np.all(np.isnan(speed_wrist)):
+    if not np.all(np.isnan(speed_thumb)):
         fig.add_trace(
             go.Scatter(
                 x=pose_segment['time'],
-                y=speed_wrist,
+                y=speed_thumb,
                 mode='lines',
                 name='Wrist Speed',
-                line=dict(color='rgba(255, 0, 0, 0.5)', width=2)
+                line=dict(color='rgba(255, 0, 0, 0.5)', width=3, dash='dash')
             ),
             row=1, col=1,
             secondary_y=True
@@ -2233,7 +2233,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
                 y=speed_pinkie,
                 mode='lines',
                 name='Pinkie Speed',
-                line=dict(color='rgba(0, 0, 255, 0.5)', width=2)
+                line=dict(color='rgba(0, 0, 255, 0.5)', width=3, dash='dash')
             ),
             row=1, col=1,
             secondary_y=True
@@ -2258,14 +2258,14 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             ),
             row=1, col=2
         )
-    # Add ball velocity to lower body
+    # Add ball velocity to lower body with dashed lines
     fig.add_trace(
         go.Scatter(
             x=pose_segment['time'],
             y=speed_ball,
             mode='lines',
             name='Ball Speed',
-            line=dict(color='rgba(0, 0, 0, 0.5)', width=2)
+            line=dict(color='rgba(0, 0, 0, 0.5)', width=3, dash='dash')
         ),
         row=1, col=2,
         secondary_y=True
@@ -2277,13 +2277,13 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             row=1, col=2
         )
 
-    # Update layout with dtick for x-axes
+    # Update layout with adjusted legend position
     fig.update_layout(
         title="Joint Flexion/Extension Analysis",
         title_x=0.5,
         height=600,
         width=1400,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(size=12)),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5, font=dict(size=12)),
         margin=dict(l=80, r=80, t=150, b=200),
         plot_bgcolor='rgba(245, 245, 245, 1)'
     )
@@ -2360,8 +2360,6 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
 
     # Add Shoulder Rotation KPI
     kpis['shoulder_rotation'] = abs(kpis['right_shoulder']['at_release'] - kpis['right_shoulder']['at_set'])
-
-    return fig, kpis
 
     # Kinematic Chain Score
     def calculate_kinematic_chain_score(pose_segment, lift_idx, set_idx, release_idx, start_idx, end_idx, fps):
