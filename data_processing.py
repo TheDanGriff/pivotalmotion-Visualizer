@@ -954,14 +954,16 @@ def compute_curvature(P, tau):
         return curvature[0]
     return curvature
 
-def calculate_release_curvature(ball_df, set_idx, release_idx):
+def calculate_release_curvature(ball_df, set_idx, release_idx, min_curvature=0.001):
     """
-    Calculate the release curvature for side (XZ) and rear (YZ) views using Bezier curve fitting.
+    Calculate the release curvature for side (XZ) and rear (YZ) views using Bezier curve fitting,
+    extending the range if curvature is too small.
     
     Parameters:
     - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', 'Basketball_Z' in inches.
     - set_idx: Index where the ball is set.
     - release_idx: Index where the ball is released.
+    - min_curvature: Minimum acceptable curvature value (1/ft) to avoid near-zero results.
     
     Returns:
     - tuple: (side curvature, rear curvature) in 1/feet.
@@ -971,51 +973,60 @@ def calculate_release_curvature(ball_df, set_idx, release_idx):
         logger.error(f"Invalid indices: set_idx={set_idx}, release_idx={release_idx}, len(ball_df)={len(ball_df)}")
         return 0.0, 0.0
     
-    # Initial range of points
-    points_side = ball_df[['Basketball_X', 'Basketball_Z']].iloc[set_idx:release_idx + 1].values
-    points_rear = ball_df[['Basketball_Y', 'Basketball_Z']].iloc[set_idx:release_idx + 1].values
-    num_points = len(points_side)
+    max_extension = min(set_idx, len(ball_df) - 1 - release_idx)  # Max possible extension
+    extension = 0
     
-    # Extend range if too few points
-    if num_points < 3:
-        extra_before = max(0, set_idx - 1)  # One point before set_idx, if possible
-        extra_after = min(len(ball_df) - 1, release_idx + 1)  # One point after release_idx, if possible
-        points_side = ball_df[['Basketball_X', 'Basketball_Z']].iloc[extra_before:extra_after + 1].values
-        points_rear = ball_df[['Basketball_Y', 'Basketball_Z']].iloc[extra_before:extra_after + 1].values
+    while extension <= max_extension:
+        # Define range with current extension
+        start_idx = max(0, set_idx - extension)
+        end_idx = min(len(ball_df) - 1, release_idx + extension)
+        points_side = ball_df[['Basketball_X', 'Basketball_Z']].iloc[start_idx:end_idx + 1].values
+        points_rear = ball_df[['Basketball_Y', 'Basketball_Z']].iloc[start_idx:end_idx + 1].values
         num_points = len(points_side)
+        
+        logger.info(f"Range extension {extension}: {num_points} points from index {start_idx} to {end_idx}")
+        
         if num_points < 3:
-            logger.warning(f"Too few points even after extension: {num_points}")
+            extension += 1
+            continue
+        
+        # Set Bezier degree
+        bezier_degree = min(6, num_points - 1)
+        if bezier_degree < 2:
+            bezier_degree = 2
+        
+        try:
+            # Fit Bezier curves
+            P_side = fit_bezier(points_side, n=bezier_degree)
+            P_rear = fit_bezier(points_rear, n=bezier_degree)
+            
+            if P_side is None or P_rear is None:
+                logger.error("Bezier fit failed")
+                return 0.0, 0.0
+            
+            # Compute curvature at release point (tau=1.0)
+            kappa_side = compute_curvature(P_side, 1.0)
+            kappa_rear = compute_curvature(P_rear, 1.0)
+            
+            # Scale to 1/feet
+            scaling_factor = 12
+            kappa_side_scaled = kappa_side * scaling_factor
+            kappa_rear_scaled = kappa_rear * scaling_factor
+            
+            logger.debug(f"Side curvature: {kappa_side_scaled} 1/ft, Rear curvature: {kappa_rear_scaled} 1/ft")
+            
+            # Check if curvatures are above threshold
+            if kappa_side_scaled >= min_curvature and kappa_rear_scaled >= min_curvature:
+                return kappa_side_scaled, kappa_rear_scaled
+            else:
+                logger.info(f"Curvature too small (side={kappa_side_scaled}, rear={kappa_rear_scaled}), extending range")
+                extension += 1
+        except Exception as e:
+            logger.error(f"Error in curvature calculation: {str(e)}")
             return 0.0, 0.0
-        logger.info(f"Extended range to include {num_points} points")
     
-    # Set Bezier degree (minimum 2 for curvature, capped at num_points - 1)
-    bezier_degree = min(6, num_points - 1)
-    if bezier_degree < 2:
-        bezier_degree = 2
-    
-    # Fit Bezier curves
-    try:
-        P_side = fit_bezier(points_side, n=bezier_degree)
-        P_rear = fit_bezier(points_rear, n=bezier_degree)
-        
-        if P_side is None or P_rear is None:
-            logger.error("Bezier fit failed for one or both views")
-            return 0.0, 0.0
-        
-        # Compute curvature at release point (tau=1.0)
-        kappa_side = compute_curvature(P_side, 1.0)
-        kappa_rear = compute_curvature(P_rear, 1.0)
-        
-        # Scale curvature from 1/inches to 1/feet
-        scaling_factor = 12
-        kappa_side_scaled = kappa_side * scaling_factor
-        kappa_rear_scaled = kappa_rear * scaling_factor
-        
-        return kappa_side_scaled, kappa_rear_scaled
-    except Exception as e:
-        logger.error(f"Error in curvature calculation: {str(e)}")
-        return 0.0, 0.0
-    
+    logger.warning(f"Max extension reached ({max_extension}), returning best effort or zero")
+    return kappa_side_scaled, kappa_rear_scaled if 'kappa_side_scaled' in locals() else (0.0, 0.0)
 def calculate_shot_metrics(pose_df, ball_df, fps=60):
     """
     Calculate basketball shot metrics entirely in FEET.
