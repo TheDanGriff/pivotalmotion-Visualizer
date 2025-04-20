@@ -2039,7 +2039,7 @@ from filterpy.kalman import KalmanFilter
 def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     """
     Create a side-by-side visualization of joint flexion/extension angles with Kalman smoothing
-    and compute biomechanical KPIs for basketball shooting motion, including velocities.
+    and compute biomechanical KPIs for basketball shooting motion, including normalized velocities.
     
     Parameters:
     - pose_df: DataFrame with pose data (e.g., 'RTHUMB_X', 'RPINKIE_X', etc.) in inches.
@@ -2048,7 +2048,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     - fps: Frames per second, default 60.
     
     Returns:
-    - fig: Plotly figure object with two subplots including velocities.
+    - fig: Plotly figure object with two subplots including normalized velocities.
     - kpis: Dictionary of biomechanical KPIs with nested joint metrics.
     """
     logger = logging.getLogger(__name__)
@@ -2181,6 +2181,16 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     else:
         speed_pinkie = np.full(len(time), np.nan)
 
+    # Normalize velocities
+    max_ball_speed = np.nanmax(speed_ball)
+    normalized_ball_speed = speed_ball / max_ball_speed if max_ball_speed > 0 else speed_ball
+
+    max_wrist_speed = np.nanmax(speed_thumb)
+    normalized_wrist_speed = speed_thumb / max_wrist_speed if max_wrist_speed > 0 else speed_thumb
+
+    max_pinkie_speed = np.nanmax(speed_pinkie)
+    normalized_pinkie_speed = speed_pinkie / max_pinkie_speed if max_pinkie_speed > 0 else speed_pinkie
+
     # Create figure with secondary Y-axes
     fig = make_subplots(
         rows=1, cols=2,
@@ -2202,37 +2212,37 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             ),
             row=1, col=1
         )
-    # Add velocity traces to upper body with dashed lines
+    # Add normalized velocity traces to upper body
     fig.add_trace(
         go.Scatter(
             x=pose_segment['time'],
-            y=speed_ball,
+            y=normalized_ball_speed,
             mode='lines',
-            name='Ball Speed',
+            name='Ball Speed (normalized)',
             line=dict(color='rgba(0, 0, 0, 0.5)', width=3, dash='dash')
         ),
         row=1, col=1,
         secondary_y=True
     )
-    if not np.all(np.isnan(speed_thumb)):
+    if not np.all(np.isnan(normalized_wrist_speed)):
         fig.add_trace(
             go.Scatter(
                 x=pose_segment['time'],
-                y=speed_thumb,
+                y=normalized_wrist_speed,
                 mode='lines',
-                name='Wrist Speed',
+                name='Wrist Speed (normalized)',
                 line=dict(color='rgba(255, 0, 0, 0.5)', width=3, dash='dash')
             ),
             row=1, col=1,
             secondary_y=True
         )
-    if not np.all(np.isnan(speed_pinkie)):
+    if not np.all(np.isnan(normalized_pinkie_speed)):
         fig.add_trace(
             go.Scatter(
                 x=pose_segment['time'],
-                y=speed_pinkie,
+                y=normalized_pinkie_speed,
                 mode='lines',
-                name='Pinkie Speed',
+                name='Pinkie Speed (normalized)',
                 line=dict(color='rgba(0, 0, 255, 0.5)', width=3, dash='dash')
             ),
             row=1, col=1,
@@ -2258,14 +2268,15 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             ),
             row=1, col=2
         )
-    # Add ball velocity to lower body with dashed lines
+    # Add normalized ball speed to lower body
     fig.add_trace(
         go.Scatter(
             x=pose_segment['time'],
-            y=speed_ball,
+            y=normalized_ball_speed,
             mode='lines',
-            name='Ball Speed',
-            line=dict(color='rgba(0, 0, 0, 0.5)', width=3, dash='dash')
+            name='Ball Speed (normalized)',
+            line=dict(color='rgba(0, 0, 0, 0.5)', width=3, dash='dash'),
+            showlegend=False  # Avoid duplicate legend entry
         ),
         row=1, col=2,
         secondary_y=True
@@ -2277,14 +2288,14 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             row=1, col=2
         )
 
-    # Update layout with adjusted legend position
+    # Update layout with adjusted legend position and margins
     fig.update_layout(
         title="Joint Flexion/Extension Analysis",
         title_x=0.5,
         height=600,
         width=1400,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5, font=dict(size=12)),
-        margin=dict(l=80, r=80, t=150, b=200),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.5, xanchor="center", x=0.5, font=dict(size=12)),
+        margin=dict(l=80, r=80, t=150, b=250),
         plot_bgcolor='rgba(245, 245, 245, 1)'
     )
     fig.update_xaxes(
@@ -2316,14 +2327,16 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         row=1, col=2
     )
     fig.update_yaxes(
-        title_text="Velocity (ft/s)",
+        title_text="Normalized Speed",
+        range=[0, 1],
         title_font_size=14,
         tickfont_size=12,
         row=1, col=1,
         secondary_y=True
     )
     fig.update_yaxes(
-        title_text="Velocity (ft/s)",
+        title_text="Normalized Speed",
+        range=[0, 1],
         title_font_size=14,
         tickfont_size=12,
         row=1, col=2,
