@@ -967,59 +967,49 @@ def calculate_release_curvature(ball_df, set_idx, release_idx):
     Returns:
     - tuple: (side curvature, rear curvature) in 1/inches.
     """
-    # Use only the points between set_idx and release_idx
-    start_idx = set_idx
-    end_idx = release_idx + 1  # +1 to include release_idx in iloc
-    
-    # Ensure indices are valid
-    if start_idx >= end_idx or start_idx < 0 or end_idx > len(ball_df):
+    # Validate indices
+    if set_idx >= release_idx or set_idx < 0 or release_idx >= len(ball_df):
         logger.error(f"Invalid indices: set_idx={set_idx}, release_idx={release_idx}, len(ball_df)={len(ball_df)}")
-        print(f"Invalid indices: set_idx={set_idx}, release_idx={release_idx}, len(ball_df)={len(ball_df)}")
         return 0.0, 0.0
     
-    # Extract points
-    points_side = ball_df[['Basketball_X', 'Basketball_Z']].iloc[start_idx:end_idx].values
-    points_rear = ball_df[['Basketball_Y', 'Basketball_Z']].iloc[start_idx:end_idx].values
+    # Extract points between set_idx and release_idx (inclusive)
+    points_side = ball_df[['Basketball_X', 'Basketball_Z']].iloc[set_idx:release_idx + 1].values
+    points_rear = ball_df[['Basketball_Y', 'Basketball_Z']].iloc[set_idx:release_idx + 1].values
     
     num_points = len(points_side)
     logger.info(f"set_idx: {set_idx}, release_idx: {release_idx}, num_points: {num_points}")
-    print(f"set_idx: {set_idx}, release_idx: {release_idx}, num_points: {num_points}")
     
-    # Check for sufficient points and adjust Bezier degree
-    if num_points < 4:
+    # Determine Bezier degree based on number of points
+    if num_points < 3:
         logger.warning(f"Too few points for Bezier fit: {num_points}")
-        print(f"Too few points for Bezier fit: {num_points}")
         return 0.0, 0.0
+    elif num_points == 3:
+        bezier_degree = 2  # Quadratic Bezier for 3 points
     elif num_points <= 7:
-        bezier_degree = 3  # Use a cubic Bezier for 4-7 points
+        bezier_degree = 3  # Cubic Bezier for 4-7 points
     else:
-        bezier_degree = 6  # Use 6th-degree Bezier for 8+ points
+        bezier_degree = 6  # 6th-degree Bezier for 8+ points
     
     logger.debug(f"Using Bezier degree: {bezier_degree} with {num_points} points")
-    print(f"Using Bezier degree: {bezier_degree} with {num_points} points")
     
-    # Fit Bezier curves
+    # Fit Bezier curves and compute curvature
     try:
         P_side = fit_bezier(points_side, n=bezier_degree)
         P_rear = fit_bezier(points_rear, n=bezier_degree)
         
         if P_side is None or P_rear is None:
             logger.error("Bezier fit failed for one or both views")
-            print("Bezier fit failed for one or both views")
             return 0.0, 0.0
         
-        # Compute curvature at release (tau=1.0)
+        # Compute curvature at release point (tau=1.0)
         kappa_release_side = compute_curvature(P_side, 1.0)
         kappa_release_rear = compute_curvature(P_rear, 1.0)
         
         logger.debug(f"Side curvature: {kappa_release_side}, Rear curvature: {kappa_release_rear}")
-        print(f"Side curvature: {kappa_release_side}, Rear curvature: {kappa_release_rear}")
-        
         return kappa_release_side, kappa_release_rear
     
     except Exception as e:
         logger.error(f"Error in curvature calculation: {str(e)}")
-        print(f"Error in curvature calculation: {str(e)}")
         return 0.0, 0.0
 
 def calculate_shot_metrics(pose_df, ball_df, fps=60):
