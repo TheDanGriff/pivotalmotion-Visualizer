@@ -2256,7 +2256,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
                 y=normalized_smoothed_wrist_speed,
                 mode='lines',
                 name='Wrist',
-                line=dict(color='rgb(34, 139, 34)', width=3)  # Solid forest green
+                line=dict(color='rgb(255, 117, 109)', width=3)  # Solid forest green
             ),
             row=1, col=1,
             secondary_y=True
