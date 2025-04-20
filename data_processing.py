@@ -2029,40 +2029,40 @@ def plot_shot_location(ball_df, metrics, pose_df=None):
 
     return fig
 
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import numpy as np
+import pandas as pd
+import logging
+from filterpy.kalman import KalmanFilter
+
 def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     """
     Create a side-by-side visualization of joint flexion/extension angles with Kalman smoothing
-    and compute biomechanical KPIs for basketball shooting motion.
+    and compute biomechanical KPIs for basketball shooting motion, including velocities.
     
     Parameters:
-    - pose_df: DataFrame with pose data (e.g., 'RSHOULDER_X', 'RELBOW_X', etc.) in inches.
-    - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', 'Basketball_Z' in inches (unused here).
+    - pose_df: DataFrame with pose data (e.g., 'RSHOULDER_X', 'RTHUMB_X', etc.) in inches.
+    - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', 'Basketball_Z' in inches.
     - metrics: Dictionary with 'lift_idx', 'set_idx', 'release_idx', etc.
     - fps: Frames per second, default 60.
     
     Returns:
-    - fig: Single Plotly figure object with two subplots.
+    - fig: Plotly figure object with two subplots including velocities.
     - kpis: Dictionary of biomechanical KPIs with nested joint metrics.
     """
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-    import numpy as np
-    import pandas as pd
-    import logging
-    from filterpy.kalman import KalmanFilter
-
     logger = logging.getLogger(__name__)
 
     INCHES_TO_FEET = 1 / 12
 
-    # Define a cohesive pastel palette (updated)
+    # Define a cohesive pastel palette
     COLOR_PALETTE = {
         'lift': 'rgba(147, 112, 219, 1)',        # Pastel purple
         'set': 'rgba(255, 182, 193, 1)',         # Pastel pink
         'release': 'rgba(255, 102, 102, 1)',     # Pastel red
         'elbow': 'rgba(173, 216, 230, 1)',       # Pastel light blue
         'shoulder': 'rgba(221, 160, 221, 1)',    # Pastel plum
-        'wrist': 'rgba(255, 218, 185, 1)',       # Pastel peach (replaced yellow)
+        'wrist': 'rgba(255, 218, 185, 1)',       # Pastel peach
         'hip': 'rgba(144, 238, 144, 1)',         # Pastel green
         'knee': 'rgba(255, 160, 122, 1)',        # Pastel coral
         'ankle': 'rgba(176, 196, 222, 1)'        # Pastel steel blue
@@ -2088,7 +2088,9 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         return go.Figure(), {}
 
     pose_segment = pose_df.iloc[start_idx:end_idx + 1].copy()
+    ball_segment = ball_df.iloc[start_idx:end_idx + 1].copy()
     pose_segment['time'] = (pose_segment.index - start_idx) / fps
+    time = pose_segment['time'].values
 
     # Calculate joint angles
     def calculate_angle(df, a_x, a_y, a_z, b_x, b_y, b_z, c_x, c_y, c_z):
@@ -2103,7 +2105,6 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             logger.warning(f"Missing key for angle calculation: {e}")
             return np.nan
 
-    # Define joint angle calculations (right side)
     joint_angles = {
         'right_elbow': calculate_angle(pose_segment, 'RSHOULDER_X', 'RSHOULDER_Y', 'RSHOULDER_Z',
                                       'RELBOW_X', 'RELBOW_Y', 'RELBOW_Z',
@@ -2123,7 +2124,6 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         'right_ankle': calculate_angle(pose_segment, 'RKNEE_X', 'RKNEE_Y', 'RKNEE_Z',
                                       'RANKLE_X', 'RANKLE_Y', 'RANKLE_Z',
                                       'RBIGTOE_X', 'RBIGTOE_Y', 'RBIGTOE_Z'),
-        # Left side
         'left_elbow': calculate_angle(pose_segment, 'LSHOULDER_X', 'LSHOULDER_Y', 'LSHOULDER_Z',
                                      'LELBOW_X', 'LELBOW_Y', 'LELBOW_Z',
                                      'LWRIST_X', 'LWRIST_Y', 'LWRIST_Z'),
@@ -2135,13 +2135,12 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     # Apply Kalman filter to smooth angles
     def apply_kalman_filter(data, process_noise=0.01, measurement_noise=1.0):
         kf = KalmanFilter(dim_x=1, dim_z=1)
-        kf.x = np.array([data.iloc[0] if not pd.isna(data.iloc[0]) else 0.0])  # Initial state
-        kf.P = np.array([[1.0]])  # Initial covariance
-        kf.F = np.array([[1.0]])  # State transition model (simple 1D)
-        kf.H = np.array([[1.0]])  # Measurement model
-        kf.R = np.array([[measurement_noise]])  # Measurement noise (Corrected: ADDR -> np.array)
-        kf.Q = np.array([[process_noise]])  # Process noise
-
+        kf.x = np.array([data.iloc[0] if not pd.isna(data.iloc[0]) else 0.0])
+        kf.P = np.array([[1.0]])
+        kf.F = np.array([[1.0]])
+        kf.H = np.array([[1.0]])
+        kf.R = np.array([[measurement_noise]])
+        kf.Q = np.array([[process_noise]])
         smoothed = []
         for measurement in data:
             if pd.isna(measurement):
@@ -2152,20 +2151,47 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
                 smoothed.append(kf.x[0])
         return np.array(smoothed)
 
-    # Smooth joint angles
     for joint, angles in joint_angles.items():
         smoothed_angles = apply_kalman_filter(angles, process_noise=0.01, measurement_noise=1.0)
         pose_segment[f'{joint}_angle'] = smoothed_angles
 
-    # Create figure
+    # Compute velocities
+    # Basketball velocity
+    vx = np.gradient(ball_segment['Basketball_X'].values, time)
+    vy = np.gradient(ball_segment['Basketball_Y'].values, time)
+    vz = np.gradient(ball_segment['Basketball_Z'].values, time)
+    speed_ball = np.sqrt(vx**2 + vy**2 + vz**2) * INCHES_TO_FEET  # ft/s
+
+    # Right thumb velocity
+    thumb_cols = ['RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z']
+    if all(col in pose_segment.columns for col in thumb_cols):
+        v_thumb_x = np.gradient(pose_segment['RTHUMB_X'].values, time)
+        v_thumb_y = np.gradient(pose_segment['RTHUMB_Y'].values, time)
+        v_thumb_z = np.gradient(pose_segment['RTHUMB_Z'].values, time)
+        speed_thumb = np.sqrt(v_thumb_x**2 + v_thumb_y**2 + v_thumb_z**2) * INCHES_TO_FEET  # ft/s
+    else:
+        speed_thumb = np.full(len(time), np.nan)
+
+    # Right pinkie velocity (assuming 'RPINKIE_X', etc., exist)
+    pinkie_cols = ['RPINKIE_X', 'RPINKIE_Y', 'RPINKIE_Z']
+    if all(col in pose_segment.columns for col in pinkie_cols):
+        v_pinkie_x = np.gradient(pose_segment['RPINKIE_X'].values, time)
+        v_pinkie_y = np.gradient(pose_segment['RPINKIE_Y'].values, time)
+        v_pinkie_z = np.gradient(pose_segment['RPINKIE_Z'].values, time)
+        speed_pinkie = np.sqrt(v_pinkie_x**2 + v_pinkie_y**2 + v_pinkie_z**2) * INCHES_TO_FEET  # ft/s
+    else:
+        speed_pinkie = np.full(len(time), np.nan)
+
+    # Create figure with secondary Y-axes
     fig = make_subplots(
         rows=1, cols=2,
         subplot_titles=("Upper Body Joint Flexion/Extension", "Lower Body Joint Flexion/Extension"),
-        horizontal_spacing=0.15
+        horizontal_spacing=0.15,
+        specs=[[{"secondary_y": True}, {"secondary_y": True}]]
     )
 
-    # Upper body traces (right side only for visualization)
-    for angle in ['right_elbow_angle', 'right_shoulder_angle', 'right_wrist_angle']:
+    # Upper body traces (excluding wrist)
+    for angle in ['right_elbow_angle', 'right_shoulder_angle']:
         joint = angle.replace('_angle', '').replace('right_', '')
         fig.add_trace(
             go.Scatter(
@@ -2177,6 +2203,42 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             ),
             row=1, col=1
         )
+    # Add velocity traces to upper body
+    fig.add_trace(
+        go.Scatter(
+            x=pose_segment['time'],
+            y=speed_ball,
+            mode='lines',
+            name='Ball Speed',
+            line=dict(color='rgba(0, 0, 0, 0.5)', width=2)
+        ),
+        row=1, col=1,
+        secondary_y=True
+    )
+    if not np.all(np.isnan(speed_thumb)):
+        fig.add_trace(
+            go.Scatter(
+                x=pose_segment['time'],
+                y=speed_thumb,
+                mode='lines',
+                name='Thumb Speed',
+                line=dict(color='rgba(255, 0, 0, 0.5)', width=2)
+            ),
+            row=1, col=1,
+            secondary_y=True
+        )
+    if not np.all(np.isnan(speed_pinkie)):
+        fig.add_trace(
+            go.Scatter(
+                x=pose_segment['time'],
+                y=speed_pinkie,
+                mode='lines',
+                name='Pinkie Speed',
+                line=dict(color='rgba(0, 0, 255, 0.5)', width=2)
+            ),
+            row=1, col=1,
+            secondary_y=True
+        )
     for event, idx in [('lift', lift_idx), ('set', set_idx), ('release', release_idx)]:
         fig.add_vline(
             x=(idx - start_idx) / fps,
@@ -2184,7 +2246,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             row=1, col=1
         )
 
-    # Lower body traces (right side only for visualization)
+    # Lower body traces
     for angle in ['right_hip_angle', 'right_knee_angle', 'right_ankle_angle']:
         joint = angle.replace('_angle', '').replace('right_', '')
         fig.add_trace(
@@ -2197,6 +2259,18 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             ),
             row=1, col=2
         )
+    # Add ball velocity to lower body
+    fig.add_trace(
+        go.Scatter(
+            x=pose_segment['time'],
+            y=speed_ball,
+            mode='lines',
+            name='Ball Speed',
+            line=dict(color='rgba(0, 0, 0, 0.5)', width=2)
+        ),
+        row=1, col=2,
+        secondary_y=True
+    )
     for event, idx in [('lift', lift_idx), ('set', set_idx), ('release', release_idx)]:
         fig.add_vline(
             x=(idx - start_idx) / fps,
@@ -2218,8 +2292,10 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     fig.update_xaxes(title_text="Time (s)", title_font_size=14, tickfont_size=12, row=1, col=2)
     fig.update_yaxes(title_text="Angle (degrees)", range=[0, 180], title_font_size=14, tickfont_size=12, row=1, col=1)
     fig.update_yaxes(title_text="Angle (degrees)", range=[0, 180], title_font_size=14, tickfont_size=12, row=1, col=2)
+    fig.update_yaxes(title_text="Velocity (ft/s)", title_font_size=14, tickfont_size=12, row=1, col=1, secondary_y=True)
+    fig.update_yaxes(title_text="Velocity (ft/s)", title_font_size=14, tickfont_size=12, row=1, col=2, secondary_y=True)
 
-    # Calculate KPIs using smoothed angles
+    # Calculate KPIs
     kpis = {}
     joints = ['right_elbow', 'right_shoulder', 'right_wrist', 'right_hip', 'right_knee', 'right_ankle', 'left_elbow', 'left_knee']
 
@@ -2236,7 +2312,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
                 'rate_change': np.nan
             }
         else:
-            rate = angles.diff() / pose_segment['time'].diff()  # Rate of change in degrees/sec
+            rate = angles.diff() / pose_segment['time'].diff()
             kpis[joint] = {
                 'max_flexion': angles.max(),
                 'min_flexion': angles.min(),
@@ -2246,6 +2322,9 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
                 'range': angles.max() - angles.min(),
                 'rate_change': rate.max() if not rate.isna().all() else np.nan
             }
+
+    # Add Shoulder Rotation KPI (assuming Release Curvature refers to this)
+    kpis['shoulder_rotation'] = abs(kpis['right_shoulder']['at_release'] - kpis['right_shoulder']['at_set'])
 
     # Kinematic Chain Score
     def calculate_kinematic_chain_score(pose_segment, lift_idx, set_idx, release_idx, start_idx, end_idx, fps):
