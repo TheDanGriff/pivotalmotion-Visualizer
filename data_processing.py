@@ -954,19 +954,6 @@ def compute_curvature(P, tau):
         return curvature[0]
     return curvature
 
-import numpy as np
-import logging
-
-logger = logging.getLogger(__name__)
-
-def fit_bezier(points, n):
-    # Placeholder for Bezier fitting function (assumed to exist)
-    pass
-
-def compute_curvature(bezier_curve, tau):
-    # Placeholder for curvature computation (assumed to exist)
-    pass
-
 def calculate_release_curvature(ball_df, set_idx, release_idx):
     """
     Calculate the release curvature for side (XZ) and rear (YZ) views using Bezier curve fitting
