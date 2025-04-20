@@ -954,10 +954,23 @@ def compute_curvature(P, tau):
         return curvature[0]
     return curvature
 
+import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
+
+def fit_bezier(points, n):
+    # Placeholder for Bezier fitting function (assumed to exist)
+    pass
+
+def compute_curvature(bezier_curve, tau):
+    # Placeholder for curvature computation (assumed to exist)
+    pass
+
 def calculate_release_curvature(ball_df, set_idx, release_idx):
     """
     Calculate the release curvature for side (XZ) and rear (YZ) views using Bezier curve fitting
-    between set_idx and release_idx only.
+    between set_idx and release_idx, incorporating weighting near the release point and scaling.
     
     Parameters:
     - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', 'Basketball_Z' in inches.
@@ -965,7 +978,7 @@ def calculate_release_curvature(ball_df, set_idx, release_idx):
     - release_idx: Index where the ball is released.
     
     Returns:
-    - tuple: (side curvature, rear curvature) in 1/inches.
+    - tuple: (side curvature, rear curvature) in 1/feet, weighted near release.
     """
     # Validate indices
     if set_idx >= release_idx or set_idx < 0 or release_idx >= len(ball_df):
@@ -992,7 +1005,7 @@ def calculate_release_curvature(ball_df, set_idx, release_idx):
     
     logger.debug(f"Using Bezier degree: {bezier_degree} with {num_points} points")
     
-    # Fit Bezier curves and compute curvature
+    # Fit Bezier curves
     try:
         P_side = fit_bezier(points_side, n=bezier_degree)
         P_rear = fit_bezier(points_rear, n=bezier_degree)
@@ -1001,12 +1014,25 @@ def calculate_release_curvature(ball_df, set_idx, release_idx):
             logger.error("Bezier fit failed for one or both views")
             return 0.0, 0.0
         
-        # Compute curvature at release point (tau=1.0)
-        kappa_release_side = compute_curvature(P_side, 1.0)
-        kappa_release_rear = compute_curvature(P_rear, 1.0)
+        # Compute weighted curvature near release (tau from 0.9 to 1.0)
+        tau_values = np.linspace(0.9, 1.0, 11)  # 11 points from 0.9 to 1.0
+        weights = (tau_values - 0.9) ** 2  # Quadratic weighting, higher near tau=1.0
+        weights /= weights.sum()  # Normalize weights
         
-        logger.debug(f"Side curvature: {kappa_release_side}, Rear curvature: {kappa_release_rear}")
-        return kappa_release_side, kappa_release_rear
+        kappa_side = np.array([compute_curvature(P_side, tau) for tau in tau_values])
+        kappa_rear = np.array([compute_curvature(P_rear, tau) for tau in tau_values])
+        
+        # Weighted average curvature
+        kappa_release_side = np.sum(kappa_side * weights)
+        kappa_release_rear = np.sum(kappa_rear * weights)
+        
+        # Scale from 1/inches to 1/feet
+        scaling_factor = 12
+        kappa_release_side_scaled = kappa_release_side * scaling_factor
+        kappa_release_rear_scaled = kappa_release_rear * scaling_factor
+        
+        logger.debug(f"Weighted side curvature: {kappa_release_side_scaled} (1/ft), Weighted rear curvature: {kappa_release_rear_scaled} (1/ft)")
+        return kappa_release_side_scaled, kappa_release_rear_scaled
     
     except Exception as e:
         logger.error(f"Error in curvature calculation: {str(e)}")
