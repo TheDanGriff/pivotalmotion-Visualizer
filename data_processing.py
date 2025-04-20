@@ -2396,9 +2396,8 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
                 'rate_change': rate.max() if not rate.isna().all() else np.nan
             }
 
-    # Add Shoulder Rotation KPI
     kpis['shoulder_rotation'] = abs(kpis['right_shoulder']['at_release'] - kpis['right_shoulder']['at_set'])
-    
+
     # Kinematic Chain Score
     def calculate_kinematic_chain_score(pose_segment, lift_idx, set_idx, release_idx, start_idx, end_idx, fps):
         sequence_order = ['right_ankle', 'right_knee', 'right_hip', 'right_shoulder', 'right_elbow', 'right_wrist']
