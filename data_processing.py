@@ -2036,10 +2036,48 @@ import pandas as pd
 import logging
 from filterpy.kalman import KalmanFilter
 
+def apply_kalman_filter(data, process_noise=0.01, measurement_noise=1.0):
+    """
+    Apply Kalman filter to smooth the input data.
+    
+    Parameters:
+    - data: pandas Series or numpy array.
+    - process_noise: Process noise for Kalman filter.
+    - measurement_noise: Measurement noise for Kalman filter.
+    
+    Returns:
+    - smoothed: numpy array of smoothed data.
+    """
+    if isinstance(data, pd.Series):
+        data_array = data.values
+    elif isinstance(data, np.ndarray):
+        data_array = data
+    else:
+        raise ValueError("Data must be a pandas Series or numpy array")
+    
+    kf = KalmanFilter(dim_x=1, dim_z=1)
+    initial_value = data_array[0] if not np.isnan(data_array[0]) else 0.0
+    kf.x = np.array([initial_value])
+    kf.P = np.array([[1.0]])
+    kf.F = np.array([[1.0]])
+    kf.H = np.array([[1.0]])
+    kf.R = np.array([[measurement_noise]])
+    kf.Q = np.array([[process_noise]])
+    
+    smoothed = []
+    for measurement in data_array:
+        if np.isnan(measurement):
+            smoothed.append(np.nan)
+        else:
+            kf.predict()
+            kf.update(np.array([measurement]))
+            smoothed.append(kf.x[0])
+    return np.array(smoothed)
+
 def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     """
     Create a side-by-side visualization of joint flexion/extension angles with Kalman smoothing
-    and compute biomechanical KPIs for basketball shooting motion, including normalized velocities.
+    and compute biomechanical KPIs for basketball shooting motion, including normalized and smoothed velocities.
     
     Parameters:
     - pose_df: DataFrame with pose data (e.g., 'RTHUMB_X', 'RPINKIE_X', etc.) in inches.
@@ -2048,7 +2086,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     - fps: Frames per second, default 60.
     
     Returns:
-    - fig: Plotly figure object with two subplots including normalized velocities.
+    - fig: Plotly figure object with two subplots including normalized and smoothed velocities.
     - kpis: Dictionary of biomechanical KPIs with nested joint metrics.
     """
     logger = logging.getLogger(__name__)
@@ -2132,29 +2170,11 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     }
 
     # Apply Kalman filter to smooth angles
-    def apply_kalman_filter(data, process_noise=0.01, measurement_noise=1.0):
-        kf = KalmanFilter(dim_x=1, dim_z=1)
-        kf.x = np.array([data.iloc[0] if not pd.isna(data.iloc[0]) else 0.0])
-        kf.P = np.array([[1.0]])
-        kf.F = np.array([[1.0]])
-        kf.H = np.array([[1.0]])
-        kf.R = np.array([[measurement_noise]])
-        kf.Q = np.array([[process_noise]])
-        smoothed = []
-        for measurement in data:
-            if pd.isna(measurement):
-                smoothed.append(np.nan)
-            else:
-                kf.predict()
-                kf.update(np.array([measurement]))
-                smoothed.append(kf.x[0])
-        return np.array(smoothed)
-
     for joint, angles in joint_angles.items():
         smoothed_angles = apply_kalman_filter(angles, process_noise=0.01, measurement_noise=1.0)
         pose_segment[f'{joint}_angle'] = smoothed_angles
 
-    # Compute velocities
+    # Compute raw velocities
     # Basketball velocity
     vx = np.gradient(ball_segment['Basketball_X'].values, time)
     vy = np.gradient(ball_segment['Basketball_Y'].values, time)
@@ -2181,15 +2201,20 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     else:
         speed_pinkie = np.full(len(time), np.nan)
 
-    # Normalize velocities
-    max_ball_speed = np.nanmax(speed_ball)
-    normalized_ball_speed = speed_ball / max_ball_speed if max_ball_speed > 0 else speed_ball
+    # Apply Kalman filter to smooth velocities
+    smoothed_speed_ball = apply_kalman_filter(speed_ball, process_noise=0.01, measurement_noise=1.0)
+    smoothed_speed_thumb = apply_kalman_filter(speed_thumb, process_noise=0.01, measurement_noise=1.0)
+    smoothed_speed_pinkie = apply_kalman_filter(speed_pinkie, process_noise=0.01, measurement_noise=1.0)
 
-    max_wrist_speed = np.nanmax(speed_thumb)
-    normalized_wrist_speed = speed_thumb / max_wrist_speed if max_wrist_speed > 0 else speed_thumb
+    # Normalize smoothed velocities
+    max_smoothed_ball_speed = np.nanmax(smoothed_speed_ball)
+    normalized_smoothed_ball_speed = smoothed_speed_ball / max_smoothed_ball_speed if max_smoothed_ball_speed > 0 else smoothed_speed_ball
 
-    max_pinkie_speed = np.nanmax(speed_pinkie)
-    normalized_pinkie_speed = speed_pinkie / max_pinkie_speed if max_pinkie_speed > 0 else speed_pinkie
+    max_smoothed_wrist_speed = np.nanmax(smoothed_speed_thumb)
+    normalized_smoothed_wrist_speed = smoothed_speed_thumb / max_smoothed_wrist_speed if max_smoothed_wrist_speed > 0 else smoothed_speed_thumb
+
+    max_smoothed_pinkie_speed = np.nanmax(smoothed_speed_pinkie)
+    normalized_smoothed_pinkie_speed = smoothed_speed_pinkie / max_smoothed_pinkie_speed if max_smoothed_pinkie_speed > 0 else smoothed_speed_pinkie
 
     # Create figure with secondary Y-axes
     fig = make_subplots(
@@ -2212,11 +2237,11 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             ),
             row=1, col=1
         )
-    # Add normalized velocity traces to upper body
+    # Add normalized and smoothed velocity traces to upper body
     fig.add_trace(
         go.Scatter(
             x=pose_segment['time'],
-            y=normalized_ball_speed,
+            y=normalized_smoothed_ball_speed,
             mode='lines',
             name='Ball Speed (normalized)',
             line=dict(color='rgba(0, 0, 0, 0.5)', width=3, dash='dash')
@@ -2224,23 +2249,23 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         row=1, col=1,
         secondary_y=True
     )
-    if not np.all(np.isnan(normalized_wrist_speed)):
+    if not np.all(np.isnan(normalized_smoothed_wrist_speed)):
         fig.add_trace(
             go.Scatter(
                 x=pose_segment['time'],
-                y=normalized_wrist_speed,
+                y=normalized_smoothed_wrist_speed,
                 mode='lines',
-                name='Wrist Speed (normalized)',
-                line=dict(color='rgba(255, 0, 0, 0.5)', width=3, dash='dash')
+                name='Wrist',
+                line=dict(color='rgb(34, 139, 34)', width=3)  # Solid forest green
             ),
             row=1, col=1,
             secondary_y=True
         )
-    if not np.all(np.isnan(normalized_pinkie_speed)):
+    if not np.all(np.isnan(normalized_smoothed_pinkie_speed)):
         fig.add_trace(
             go.Scatter(
                 x=pose_segment['time'],
-                y=normalized_pinkie_speed,
+                y=normalized_smoothed_pinkie_speed,
                 mode='lines',
                 name='Pinkie Speed (normalized)',
                 line=dict(color='rgba(0, 0, 255, 0.5)', width=3, dash='dash')
@@ -2268,11 +2293,11 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             ),
             row=1, col=2
         )
-    # Add normalized ball speed to lower body
+    # Add normalized and smoothed ball speed to lower body
     fig.add_trace(
         go.Scatter(
             x=pose_segment['time'],
-            y=normalized_ball_speed,
+            y=normalized_smoothed_ball_speed,
             mode='lines',
             name='Ball Speed (normalized)',
             line=dict(color='rgba(0, 0, 0, 0.5)', width=3, dash='dash'),
@@ -2373,7 +2398,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
 
     # Add Shoulder Rotation KPI
     kpis['shoulder_rotation'] = abs(kpis['right_shoulder']['at_release'] - kpis['right_shoulder']['at_set'])
-
+    
     # Kinematic Chain Score
     def calculate_kinematic_chain_score(pose_segment, lift_idx, set_idx, release_idx, start_idx, end_idx, fps):
         sequence_order = ['right_ankle', 'right_knee', 'right_hip', 'right_shoulder', 'right_elbow', 'right_wrist']
