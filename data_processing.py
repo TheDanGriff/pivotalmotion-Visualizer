@@ -956,8 +956,7 @@ def compute_curvature(P, tau):
 
 def calculate_release_curvature(ball_df, set_idx, release_idx):
     """
-    Calculate the release curvature for side (XZ) and rear (YZ) views using Bezier curve fitting
-    between set_idx and release_idx, incorporating weighting near the release point and scaling.
+    Calculate the release curvature for side (XZ) and rear (YZ) views using Bezier curve fitting.
     
     Parameters:
     - ball_df: DataFrame with 'Basketball_X', 'Basketball_Y', 'Basketball_Z' in inches.
@@ -965,32 +964,34 @@ def calculate_release_curvature(ball_df, set_idx, release_idx):
     - release_idx: Index where the ball is released.
     
     Returns:
-    - tuple: (side curvature, rear curvature) in 1/feet, weighted near release.
+    - tuple: (side curvature, rear curvature) in 1/feet.
     """
     # Validate indices
     if set_idx >= release_idx or set_idx < 0 or release_idx >= len(ball_df):
         logger.error(f"Invalid indices: set_idx={set_idx}, release_idx={release_idx}, len(ball_df)={len(ball_df)}")
         return 0.0, 0.0
     
-    # Extract points between set_idx and release_idx (inclusive)
+    # Initial range of points
     points_side = ball_df[['Basketball_X', 'Basketball_Z']].iloc[set_idx:release_idx + 1].values
     points_rear = ball_df[['Basketball_Y', 'Basketball_Z']].iloc[set_idx:release_idx + 1].values
-    
     num_points = len(points_side)
-    logger.info(f"set_idx: {set_idx}, release_idx: {release_idx}, num_points: {num_points}")
     
-    # Determine Bezier degree based on number of points
+    # Extend range if too few points
     if num_points < 3:
-        logger.warning(f"Too few points for Bezier fit: {num_points}")
-        return 0.0, 0.0
-    elif num_points == 3:
-        bezier_degree = 2  # Quadratic Bezier for 3 points
-    elif num_points <= 7:
-        bezier_degree = 3  # Cubic Bezier for 4-7 points
-    else:
-        bezier_degree = 6  # 6th-degree Bezier for 8+ points
+        extra_before = max(0, set_idx - 1)  # One point before set_idx, if possible
+        extra_after = min(len(ball_df) - 1, release_idx + 1)  # One point after release_idx, if possible
+        points_side = ball_df[['Basketball_X', 'Basketball_Z']].iloc[extra_before:extra_after + 1].values
+        points_rear = ball_df[['Basketball_Y', 'Basketball_Z']].iloc[extra_before:extra_after + 1].values
+        num_points = len(points_side)
+        if num_points < 3:
+            logger.warning(f"Too few points even after extension: {num_points}")
+            return 0.0, 0.0
+        logger.info(f"Extended range to include {num_points} points")
     
-    logger.debug(f"Using Bezier degree: {bezier_degree} with {num_points} points")
+    # Set Bezier degree (minimum 2 for curvature, capped at num_points - 1)
+    bezier_degree = min(6, num_points - 1)
+    if bezier_degree < 2:
+        bezier_degree = 2
     
     # Fit Bezier curves
     try:
@@ -1001,30 +1002,20 @@ def calculate_release_curvature(ball_df, set_idx, release_idx):
             logger.error("Bezier fit failed for one or both views")
             return 0.0, 0.0
         
-        # Compute weighted curvature near release (tau from 0.9 to 1.0)
-        tau_values = np.linspace(0.9, 1.0, 11)  # 11 points from 0.9 to 1.0
-        weights = (tau_values - 0.9) ** 2  # Quadratic weighting, higher near tau=1.0
-        weights /= weights.sum()  # Normalize weights
+        # Compute curvature at release point (tau=1.0)
+        kappa_side = compute_curvature(P_side, 1.0)
+        kappa_rear = compute_curvature(P_rear, 1.0)
         
-        kappa_side = np.array([compute_curvature(P_side, tau) for tau in tau_values])
-        kappa_rear = np.array([compute_curvature(P_rear, tau) for tau in tau_values])
-        
-        # Weighted average curvature
-        kappa_release_side = np.sum(kappa_side * weights)
-        kappa_release_rear = np.sum(kappa_rear * weights)
-        
-        # Scale from 1/inches to 1/feet
+        # Scale curvature from 1/inches to 1/feet
         scaling_factor = 12
-        kappa_release_side_scaled = kappa_release_side * scaling_factor
-        kappa_release_rear_scaled = kappa_release_rear * scaling_factor
+        kappa_side_scaled = kappa_side * scaling_factor
+        kappa_rear_scaled = kappa_rear * scaling_factor
         
-        logger.debug(f"Weighted side curvature: {kappa_release_side_scaled} (1/ft), Weighted rear curvature: {kappa_release_rear_scaled} (1/ft)")
-        return kappa_release_side_scaled, kappa_release_rear_scaled
-    
+        return kappa_side_scaled, kappa_rear_scaled
     except Exception as e:
         logger.error(f"Error in curvature calculation: {str(e)}")
         return 0.0, 0.0
-
+    
 def calculate_shot_metrics(pose_df, ball_df, fps=60):
     """
     Calculate basketball shot metrics entirely in FEET.
