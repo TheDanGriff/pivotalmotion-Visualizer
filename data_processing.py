@@ -1027,7 +1027,9 @@ def calculate_release_curvature(ball_df, set_idx, release_idx, min_curvature=0.0
     
     logger.warning(f"Max extension reached ({max_extension}), returning best effort or zero")
     return kappa_side_scaled, kappa_rear_scaled if 'kappa_side_scaled' in locals() else (0.0, 0.0)
+
 def calculate_shot_metrics(pose_df, ball_df, fps=60):
+
     """
     Calculate basketball shot metrics entirely in FEET.
     Assumptions:
@@ -2094,6 +2096,18 @@ def apply_kalman_filter(data, process_noise=0.01, measurement_noise=1.0):
             smoothed.append(kf.x[0])
     return np.array(smoothed)
 
+import numpy as np
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import logging
+
+def apply_kalman_filter(data, process_noise=0.01, measurement_noise=1.0):
+    """
+    Placeholder for Kalman filter implementation.
+    Replace with actual implementation as needed.
+    """
+    return data  # Dummy return; actual implementation should smooth the data
+
 def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     """
     Create a side-by-side visualization of joint flexion/extension angles with Kalman smoothing
@@ -2132,13 +2146,13 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
 
     lift_idx = metrics.get('lift_frame', metrics.get('lift_idx', 0))
     set_idx = metrics.get('set_frame', metrics.get('set_idx', 0))
-    release_idx = metrics.get('release_frame', metrics.get('release_idx', 0))
+    # release_idx will be computed based on max ball velocity
 
-    # Extend time window: 0.25s before lift_idx, 0.5s after release_idx
+    # Extend time window: 0.25s before lift_idx, 0.5s after set_idx (initial guess)
     frames_before = int(0.25 * fps)
     frames_after = int(0.5 * fps)
     start_idx = max(0, lift_idx - frames_before)
-    end_idx = min(len(pose_df) - 1, release_idx + frames_after)
+    end_idx = min(len(pose_df) - 1, set_idx + frames_after)  # Use set_idx initially
 
     if start_idx >= end_idx or end_idx >= len(pose_df):
         logger.error(f"Invalid indices: start_idx={start_idx}, end_idx={end_idx}, len(pose_df)={len(pose_df)}")
@@ -2148,6 +2162,37 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
     ball_segment = ball_df.iloc[start_idx:end_idx + 1].copy()
     pose_segment['time'] = (pose_segment.index - start_idx) / fps
     time = pose_segment['time'].values
+
+    # Calculate ball velocity to determine release_idx
+    vx = np.gradient(ball_segment['Basketball_X'].values, time)
+    vy = np.gradient(ball_segment['Basketball_Y'].values, time)
+    vz = np.gradient(ball_segment['Basketball_Z'].values, time)
+    speed_ball = np.sqrt(vx**2 + vy**2 + vz**2) * INCHES_TO_FEET  # ft/s
+    smoothed_speed_ball = apply_kalman_filter(speed_ball, process_noise=0.01, measurement_noise=1.0)
+
+    # Find the index of maximum ball velocity (relative to segment)
+    max_velocity_idx = np.argmax(smoothed_speed_ball)
+    # Convert to global index
+    release_idx = start_idx + max_velocity_idx
+
+    # Recompute end_idx to include 0.5s after the new release_idx
+    end_idx = min(len(pose_df) - 1, release_idx + frames_after)
+    if start_idx >= end_idx:
+        logger.error(f"Invalid indices after release_idx adjustment: start_idx={start_idx}, end_idx={end_idx}")
+        return go.Figure(), {}
+
+    # Recreate segments with updated end_idx
+    pose_segment = pose_df.iloc[start_idx:end_idx + 1].copy()
+    ball_segment = ball_df.iloc[start_idx:end_idx + 1].copy()
+    pose_segment['time'] = (pose_segment.index - start_idx) / fps
+    time = pose_segment['time'].values
+
+    # Recalculate ball velocity for the updated segment
+    vx = np.gradient(ball_segment['Basketball_X'].values, time)
+    vy = np.gradient(ball_segment['Basketball_Y'].values, time)
+    vz = np.gradient(ball_segment['Basketball_Z'].values, time)
+    speed_ball = np.sqrt(vx**2 + vy**2 + vz**2) * INCHES_TO_FEET  # ft/s
+    smoothed_speed_ball = apply_kalman_filter(speed_ball, process_noise=0.01, measurement_noise=1.0)
 
     # Calculate joint angles
     def calculate_angle(df, a_x, a_y, a_z, b_x, b_y, b_z, c_x, c_y, c_z):
@@ -2195,12 +2240,6 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         pose_segment[f'{joint}_angle'] = smoothed_angles
 
     # Compute raw velocities
-    # Basketball velocity
-    vx = np.gradient(ball_segment['Basketball_X'].values, time)
-    vy = np.gradient(ball_segment['Basketball_Y'].values, time)
-    vz = np.gradient(ball_segment['Basketball_Z'].values, time)
-    speed_ball = np.sqrt(vx**2 + vy**2 + vz**2) * INCHES_TO_FEET  # ft/s
-
     # Right thumb velocity (labeled as Wrist Speed)
     thumb_cols = ['RTHUMB_X', 'RTHUMB_Y', 'RTHUMB_Z']
     if all(col in pose_segment.columns for col in thumb_cols):
@@ -2222,7 +2261,6 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
         speed_pinkie = np.full(len(time), np.nan)
 
     # Apply Kalman filter to smooth velocities
-    smoothed_speed_ball = apply_kalman_filter(speed_ball, process_noise=0.01, measurement_noise=1.0)
     smoothed_speed_thumb = apply_kalman_filter(speed_thumb, process_noise=0.01, measurement_noise=1.0)
     smoothed_speed_pinkie = apply_kalman_filter(speed_pinkie, process_noise=0.01, measurement_noise=1.0)
 
@@ -2417,7 +2455,7 @@ def plot_joint_flexion_analysis(pose_df, ball_df, metrics, fps=60):
             }
 
     kpis['shoulder_rotation'] = abs(kpis['right_shoulder']['at_release'] - kpis['right_shoulder']['at_set'])
-
+    
     def calculate_kinematic_chain_score(pose_segment, lift_idx, set_idx, release_idx, start_idx, end_idx, fps):
         sequence_order = ['right_ankle', 'right_knee', 'right_hip', 'right_shoulder', 'right_elbow', 'right_wrist']
         score = 0
